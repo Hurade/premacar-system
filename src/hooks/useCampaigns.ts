@@ -312,7 +312,7 @@ export function useLeadsHistory(filters: {
         .select('*, campaign:campaigns(name)')
         .order('sent_at', { ascending: false });
 
-      if (filters.campaignId) {
+      if (filters.campaignId && filters.campaignId !== 'all') {
         query = query.eq('campaign_id', filters.campaignId);
       }
       if (filters.startDate) {

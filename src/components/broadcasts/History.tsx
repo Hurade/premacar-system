@@ -29,7 +29,7 @@ const maskPhone = (phone: string): string => {
 export const BroadcastHistory: React.FC = () => {
   const { data: campaigns } = useCampaigns();
   const [filters, setFilters] = useState({
-    campaignId: '',
+    campaignId: 'all',
     startDate: '',
     endDate: '',
     status: 'all',
@@ -81,7 +81,7 @@ export const BroadcastHistory: React.FC = () => {
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 {campaigns?.map(campaign => (
                   <SelectItem key={campaign.id} value={campaign.id}>
                     {campaign.name}
