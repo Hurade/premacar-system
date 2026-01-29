@@ -491,7 +491,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       console.log('[OnboardingWizard] Step 5: Verifying saved data...');
       const { data: verifyData, error: verifyError } = await supabase
         .from('nina_settings')
-        .select('company_name, sdr_name, whatsapp_phone_number_id, whatsapp_access_token, system_prompt_override, is_active')
+        .select('company_name, sdr_name, evolution_api_url, evolution_api_key, evolution_instance_name, whatsapp_phone_number_id, whatsapp_access_token, system_prompt_override, is_active')
         .eq('id', result.data.id)
         .maybeSingle();
 
@@ -501,6 +501,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         console.log('[OnboardingWizard] ✓ Verification result:', {
           company_name: verifyData?.company_name || '(null)',
           sdr_name: verifyData?.sdr_name || '(null)',
+          evolution_api_url: (verifyData as any)?.evolution_api_url ? '✓ VERIFIED' : '✗ NULL',
+          evolution_api_key: (verifyData as any)?.evolution_api_key ? '✓ VERIFIED' : '✗ NULL',
+          evolution_instance_name: (verifyData as any)?.evolution_instance_name ? '✓ VERIFIED' : '✗ NULL',
           whatsapp_phone_number_id: verifyData?.whatsapp_phone_number_id ? '✓ VERIFIED' : '✗ NULL',
           whatsapp_access_token: verifyData?.whatsapp_access_token ? '✓ VERIFIED' : '✗ NULL',
           system_prompt_override: verifyData?.system_prompt_override ? '✓ VERIFIED' : '✗ NULL',
@@ -511,11 +514,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         if (settings.company_name && !verifyData?.company_name) {
           console.error('[OnboardingWizard] ❌ CRITICAL: company_name not persisted!');
         }
-        if (settings.evolution_api_url && !(verifyData as any)?.evolution_api_url) {
+        // Verify Evolution API fields persisted
+        const verifyEvolutionUrl = (verifyData as any)?.evolution_api_url;
+        const verifyEvolutionKey = (verifyData as any)?.evolution_api_key;
+        const verifyEvolutionInstance = (verifyData as any)?.evolution_instance_name;
+        
+        if (settings.evolution_api_url && !verifyEvolutionUrl) {
           console.error('[OnboardingWizard] ❌ CRITICAL: evolution_api_url not persisted!');
         }
-        if (settings.evolution_api_key && !(verifyData as any)?.evolution_api_key) {
+        if (settings.evolution_api_key && !verifyEvolutionKey) {
           console.error('[OnboardingWizard] ❌ CRITICAL: evolution_api_key not persisted!');
+        }
+        if (settings.evolution_instance_name && !verifyEvolutionInstance) {
+          console.error('[OnboardingWizard] ❌ CRITICAL: evolution_instance_name not persisted!');
+        }
+        
+        // Log success if all Evolution fields are verified
+        if (settings.evolution_api_url && verifyEvolutionUrl && 
+            settings.evolution_api_key && verifyEvolutionKey && 
+            settings.evolution_instance_name && verifyEvolutionInstance) {
+          console.log('[OnboardingWizard] ✓ All Evolution API fields verified successfully!');
         }
       }
       

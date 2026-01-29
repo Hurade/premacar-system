@@ -118,9 +118,12 @@ export function useOnboardingStatus(): OnboardingStatus {
                 isComplete: !!(settings.company_name && settings.sdr_name),
               };
             case 'whatsapp':
+              // Support both Evolution API and Meta API
+              const hasEvolutionConfig = !!((settings as any).evolution_api_url && (settings as any).evolution_api_key && (settings as any).evolution_instance_name);
+              const hasMetaConfig = !!(settings.whatsapp_access_token && settings.whatsapp_phone_number_id);
               return {
                 ...step,
-                isComplete: !!((settings as any).evolution_api_url && (settings as any).evolution_api_key && (settings as any).evolution_instance_name),
+                isComplete: hasEvolutionConfig || hasMetaConfig,
               };
             case 'agent':
               return {

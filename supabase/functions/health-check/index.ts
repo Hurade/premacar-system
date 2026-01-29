@@ -107,18 +107,39 @@ Deno.serve(async (req) => {
         message: 'Configurações não encontradas. Execute o onboarding.',
       });
     } else {
-      // Check WhatsApp configuration
-      const whatsappConfigured = !!(
+      // Check WhatsApp configuration - supports both Evolution API and Meta API
+      const evolutionConfigured = !!(
+        settings.evolution_api_url &&
+        settings.evolution_api_key &&
+        settings.evolution_instance_name
+      );
+      
+      const metaConfigured = !!(
         settings.whatsapp_access_token &&
         settings.whatsapp_phone_number_id
       );
+      
+      const whatsappConfigured = evolutionConfigured || metaConfigured;
 
-      if (whatsappConfigured) {
+      if (evolutionConfigured) {
         results.push({
           component: 'whatsapp',
           status: 'ok',
-          message: 'WhatsApp está configurado',
+          message: 'WhatsApp configurado via Evolution API',
           details: {
+            provider: 'evolution',
+            hasApiUrl: !!settings.evolution_api_url,
+            hasApiKey: !!settings.evolution_api_key,
+            hasInstanceName: !!settings.evolution_instance_name,
+          },
+        });
+      } else if (metaConfigured) {
+        results.push({
+          component: 'whatsapp',
+          status: 'ok',
+          message: 'WhatsApp configurado via Meta API',
+          details: {
+            provider: 'meta',
             hasAccessToken: !!settings.whatsapp_access_token,
             hasPhoneNumberId: !!settings.whatsapp_phone_number_id,
             hasBusinessAccountId: !!settings.whatsapp_business_account_id,
@@ -129,12 +150,15 @@ Deno.serve(async (req) => {
         results.push({
           component: 'whatsapp',
           status: 'warning',
-          message: 'WhatsApp não está totalmente configurado',
+          message: 'WhatsApp não está configurado (Evolution ou Meta API)',
           details: {
+            evolutionConfigured: false,
+            metaConfigured: false,
+            hasEvolutionUrl: !!settings.evolution_api_url,
+            hasEvolutionKey: !!settings.evolution_api_key,
+            hasEvolutionInstance: !!settings.evolution_instance_name,
             hasAccessToken: !!settings.whatsapp_access_token,
             hasPhoneNumberId: !!settings.whatsapp_phone_number_id,
-            hasBusinessAccountId: !!settings.whatsapp_business_account_id,
-            hasVerifyToken: !!settings.whatsapp_verify_token,
           },
         });
       }
