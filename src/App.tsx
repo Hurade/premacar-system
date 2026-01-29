@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ChatInterface from './components/ChatInterface';
@@ -17,6 +18,8 @@ import { AuthProvider } from './hooks/useAuth';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
+
+const queryClient = new QueryClient();
 
 // Componente de Layout que envolve a aplicação principal
 const AppLayout: React.FC = () => {
@@ -57,41 +60,43 @@ const AppLayout: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <CompanySettingsProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/auth" element={<Auth />} />
-            
-            {/* Protected Routes (With Sidebar) */}
-            <Route element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/pipeline" element={<Kanban />} />
-              <Route path="/chat" element={<ChatInterface />} />
-              <Route path="/contacts" element={<Contacts />} />
-              <Route path="/broadcasts" element={<Broadcasts />} />
-              <Route path="/scheduling" element={<Scheduling />} />
-              <Route path="/team" element={<Team />} />
-              <Route path="/settings" element={<Settings />} />
-            </Route>
-            
-            {/* Catch all - redirect to dashboard */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
-        <Toaster 
-          position="top-right"
-          richColors
-          theme="dark"
-        />
-      </CompanySettingsProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <CompanySettingsProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/auth" element={<Auth />} />
+              
+              {/* Protected Routes (With Sidebar) */}
+              <Route element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/pipeline" element={<Kanban />} />
+                <Route path="/chat" element={<ChatInterface />} />
+                <Route path="/contacts" element={<Contacts />} />
+                <Route path="/broadcasts" element={<Broadcasts />} />
+                <Route path="/scheduling" element={<Scheduling />} />
+                <Route path="/team" element={<Team />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              
+              {/* Catch all - redirect to dashboard */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster 
+            position="top-right"
+            richColors
+            theme="dark"
+          />
+        </CompanySettingsProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 };
 
