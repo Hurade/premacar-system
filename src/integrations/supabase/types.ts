@@ -83,6 +83,214 @@ export type Database = {
           },
         ]
       }
+      campaign_blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          phone: string
+          reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phone: string
+          reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phone?: string
+          reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      campaign_leads: {
+        Row: {
+          attempts: number | null
+          campaign_id: string
+          city: string | null
+          company: string | null
+          created_at: string
+          custom1: string | null
+          custom2: string | null
+          custom3: string | null
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          name: string | null
+          phone: string
+          product: string | null
+          read_at: string | null
+          replied_at: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          variation_used: number | null
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          campaign_id: string
+          city?: string | null
+          company?: string | null
+          created_at?: string
+          custom1?: string | null
+          custom2?: string | null
+          custom3?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          name?: string | null
+          phone: string
+          product?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          variation_used?: number | null
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          campaign_id?: string
+          city?: string | null
+          company?: string | null
+          created_at?: string
+          custom1?: string | null
+          custom2?: string | null
+          custom3?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          name?: string | null
+          phone?: string
+          product?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          variation_used?: number | null
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_leads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          anti_ban_enabled: boolean
+          business_days: number[] | null
+          business_hours_enabled: boolean
+          business_hours_end: string | null
+          business_hours_start: string | null
+          created_at: string
+          daily_limit: number
+          description: string | null
+          id: string
+          interval_max: number
+          interval_min: number
+          interval_type: string
+          last_sent_at: string | null
+          name: string
+          pause_after_count: number | null
+          pause_duration_minutes: number | null
+          paused_until: string | null
+          scheduled_start: string | null
+          sent_today: number | null
+          status: string
+          template_id: string | null
+          total_delivered: number | null
+          total_errors: number | null
+          total_leads: number | null
+          total_read: number | null
+          total_replied: number | null
+          total_sent: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          anti_ban_enabled?: boolean
+          business_days?: number[] | null
+          business_hours_enabled?: boolean
+          business_hours_end?: string | null
+          business_hours_start?: string | null
+          created_at?: string
+          daily_limit?: number
+          description?: string | null
+          id?: string
+          interval_max?: number
+          interval_min?: number
+          interval_type?: string
+          last_sent_at?: string | null
+          name: string
+          pause_after_count?: number | null
+          pause_duration_minutes?: number | null
+          paused_until?: string | null
+          scheduled_start?: string | null
+          sent_today?: number | null
+          status?: string
+          template_id?: string | null
+          total_delivered?: number | null
+          total_errors?: number | null
+          total_leads?: number | null
+          total_read?: number | null
+          total_replied?: number | null
+          total_sent?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          anti_ban_enabled?: boolean
+          business_days?: number[] | null
+          business_hours_enabled?: boolean
+          business_hours_end?: string | null
+          business_hours_start?: string | null
+          created_at?: string
+          daily_limit?: number
+          description?: string | null
+          id?: string
+          interval_max?: number
+          interval_min?: number
+          interval_type?: string
+          last_sent_at?: string | null
+          name?: string
+          pause_after_count?: number | null
+          pause_duration_minutes?: number | null
+          paused_until?: string | null
+          scheduled_start?: string | null
+          sent_today?: number | null
+          status?: string
+          template_id?: string | null
+          total_delivered?: number | null
+          total_errors?: number | null
+          total_leads?: number | null
+          total_read?: number | null
+          total_replied?: number | null
+          total_sent?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           blocked_at: string | null
@@ -491,6 +699,39 @@ export type Database = {
           status?: Database["public"]["Enums"]["queue_status"]
           updated_at?: string
           whatsapp_message_id?: string
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          created_at: string
+          id: string
+          media_type: string | null
+          media_urls: Json | null
+          name: string
+          updated_at: string
+          user_id: string | null
+          variations: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_type?: string | null
+          media_urls?: Json | null
+          name: string
+          updated_at?: string
+          user_id?: string | null
+          variations?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_type?: string | null
+          media_urls?: Json | null
+          name?: string
+          updated_at?: string
+          user_id?: string | null
+          variations?: Json
         }
         Relationships: []
       }
@@ -1199,6 +1440,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      reset_campaign_daily_counts: { Args: never; Returns: undefined }
       update_client_memory: {
         Args: { p_contact_id: string; p_new_memory: Json }
         Returns: undefined

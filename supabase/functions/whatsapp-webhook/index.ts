@@ -74,6 +74,90 @@ serve(async (req) => {
         });
       }
 
+      // Handle message status updates (for campaigns)
+      if (event === 'messages.update') {
+        const updates = Array.isArray(data) ? data : [data];
+        
+        for (const update of updates) {
+          const messageId = update.key?.id;
+          const status = update.update?.status;
+          
+          if (!messageId) continue;
+          
+          // Update campaign lead status
+          if (status === 'DELIVERY_ACK' || status === 'delivered') {
+            await supabase
+              .from('campaign_leads')
+              .update({ 
+                status: 'delivered',
+                delivered_at: new Date().toISOString() 
+              })
+              .eq('whatsapp_message_id', messageId)
+              .eq('status', 'sent');
+
+            // Update campaign counter
+            const { data: lead } = await supabase
+              .from('campaign_leads')
+              .select('campaign_id')
+              .eq('whatsapp_message_id', messageId)
+              .single();
+
+            if (lead) {
+              // Increment delivered counter
+              const { data: campaign } = await supabase
+                .from('campaigns')
+                .select('total_delivered')
+                .eq('id', lead.campaign_id)
+                .single();
+
+              if (campaign) {
+                await supabase
+                  .from('campaigns')
+                  .update({ total_delivered: (campaign.total_delivered || 0) + 1 })
+                  .eq('id', lead.campaign_id);
+              }
+            }
+          }
+          
+          if (status === 'READ' || status === 'read') {
+            await supabase
+              .from('campaign_leads')
+              .update({ 
+                status: 'read',
+                read_at: new Date().toISOString() 
+              })
+              .eq('whatsapp_message_id', messageId)
+              .in('status', ['sent', 'delivered']);
+
+            const { data: lead } = await supabase
+              .from('campaign_leads')
+              .select('campaign_id')
+              .eq('whatsapp_message_id', messageId)
+              .single();
+
+            if (lead) {
+              const { data: campaign } = await supabase
+                .from('campaigns')
+                .select('total_read')
+                .eq('id', lead.campaign_id)
+                .single();
+
+              if (campaign) {
+                await supabase
+                  .from('campaigns')
+                  .update({ total_read: (campaign.total_read || 0) + 1 })
+                  .eq('id', lead.campaign_id);
+              }
+            }
+          }
+        }
+        
+        return new Response(JSON.stringify({ status: 'status_update_processed' }), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
       // Only process messages.upsert events
       if (event !== 'messages.upsert') {
         console.log('[Webhook] Ignoring event:', event);
@@ -138,6 +222,45 @@ serve(async (req) => {
       const messageTimestamp = data.messageTimestamp || Math.floor(Date.now() / 1000);
 
       console.log(`[Webhook] Processing message from ${phoneNumber} (${contactName})`);
+
+      // Check if this is a reply to a campaign message
+      const { data: campaignLead } = await supabase
+        .from('campaign_leads')
+        .select('id, campaign_id, status')
+        .eq('phone', phoneNumber)
+        .in('status', ['sent', 'delivered', 'read'])
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (campaignLead) {
+        console.log('[Webhook] Reply from campaign lead detected');
+        
+        // Update lead status to replied
+        await supabase
+          .from('campaign_leads')
+          .update({ 
+            status: 'replied',
+            replied_at: new Date().toISOString()
+          })
+          .eq('id', campaignLead.id);
+
+        // Update campaign replied counter
+        const { data: campaign } = await supabase
+          .from('campaigns')
+          .select('total_replied')
+          .eq('id', campaignLead.campaign_id)
+          .single();
+
+        if (campaign) {
+          await supabase
+            .from('campaigns')
+            .update({ 
+              total_replied: (campaign.total_replied || 0) + 1 
+            })
+            .eq('id', campaignLead.campaign_id);
+        }
+      }
 
       // 1. Get or create contact
       let { data: contact } = await supabase
