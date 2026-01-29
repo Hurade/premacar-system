@@ -64,7 +64,7 @@ const componentIcons: Record<string, React.ReactNode> = {
 
 const componentLabels: Record<string, string> = {
   lovable_api_key: 'Chave de IA',
-  whatsapp: 'WhatsApp Cloud API',
+  whatsapp: 'WhatsApp (Evolution ou Meta)',
   identity: 'Identidade da Empresa',
   agent_prompt: 'Prompt do Agente',
   nina_settings: 'Configurações do Sistema',
