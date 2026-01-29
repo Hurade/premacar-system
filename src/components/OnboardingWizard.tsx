@@ -198,11 +198,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
   const [companyName, setCompanyName] = useState('');
   const [sdrName, setSdrName] = useState('');
   
-  // Form state - WhatsApp
-  const [accessToken, setAccessToken] = useState('');
-  const [phoneNumberId, setPhoneNumberId] = useState('');
-  const [businessAccountId, setBusinessAccountId] = useState('');
-  const [verifyToken, setVerifyToken] = useState('');
+  // Form state - Evolution API
+  const [evolutionApiUrl, setEvolutionApiUrl] = useState('');
+  const [evolutionApiKey, setEvolutionApiKey] = useState('');
+  const [evolutionInstanceName, setEvolutionInstanceName] = useState('');
   
   // Form state - Agent
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -245,11 +244,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
           setCompanyName(data.company_name || '');
           setSdrName(data.sdr_name || '');
           
-          // WhatsApp
-          setAccessToken(data.whatsapp_access_token || '');
-          setPhoneNumberId(data.whatsapp_phone_number_id || '');
-          setBusinessAccountId((data as any).whatsapp_business_account_id || '');
-          setVerifyToken(data.whatsapp_verify_token || '');
+          // Evolution API
+          setEvolutionApiUrl((data as any).evolution_api_url || '');
+          setEvolutionApiKey((data as any).evolution_api_key || '');
+          setEvolutionInstanceName((data as any).evolution_instance_name || '');
           
           // Agent - usar prompt padrão se vazio
           setSystemPrompt(data.system_prompt_override || DEFAULT_NINA_PROMPT);
@@ -295,15 +293,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         if (!companyName?.trim()) issues.push('Nome da empresa está vazio');
         if (!sdrName?.trim()) issues.push('Nome do SDR está vazio');
         break;
-      case 1: // WhatsApp
-        console.log('[OnboardingWizard] Step 1 (WhatsApp) values:', { 
-          accessToken: accessToken ? `${accessToken.substring(0, 10)}...` : 'EMPTY',
-          phoneNumberId: phoneNumberId || 'EMPTY',
-          businessAccountId: businessAccountId || 'EMPTY',
-          verifyToken: verifyToken || 'EMPTY'
+      case 1: // Evolution API
+        console.log('[OnboardingWizard] Step 1 (Evolution API) values:', { 
+          evolutionApiUrl: evolutionApiUrl || 'EMPTY',
+          evolutionApiKey: evolutionApiKey ? '***configured***' : 'EMPTY',
+          evolutionInstanceName: evolutionInstanceName || 'EMPTY'
         });
-        if (!accessToken?.trim()) issues.push('Access Token está vazio');
-        if (!phoneNumberId?.trim()) issues.push('Phone Number ID está vazio');
+        if (!evolutionApiUrl?.trim()) issues.push('URL da Evolution API está vazia');
+        if (!evolutionApiUrl?.startsWith('http://') && !evolutionApiUrl?.startsWith('https://')) {
+          issues.push('URL deve começar com http:// ou https://');
+        }
+        if (!evolutionApiKey?.trim()) issues.push('API Key está vazia');
+        if (evolutionApiKey?.length < 10) issues.push('API Key deve ter no mínimo 10 caracteres');
+        if (!evolutionInstanceName?.trim()) issues.push('Nome da Instância está vazio');
         break;
       case 2: // Agent
         console.log('[OnboardingWizard] Step 2 (Agent) values:', { 
@@ -332,7 +334,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
     }
     
     return { valid: issues.length === 0, issues };
-  }, [companyName, sdrName, accessToken, phoneNumberId, businessAccountId, verifyToken, 
+  }, [companyName, sdrName, evolutionApiUrl, evolutionApiKey, evolutionInstanceName, 
       systemPrompt, aiModelMode, elevenLabsApiKey, audioResponseEnabled,
       timezone, businessHoursStart, businessHoursEnd, businessDays]);
 
@@ -353,11 +355,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       // Identity
       companyName: companyName || '(empty)',
       sdrName: sdrName || '(empty)',
-      // WhatsApp
-      accessToken: accessToken ? `${accessToken.substring(0, 15)}...` : '(empty)',
-      phoneNumberId: phoneNumberId || '(empty)',
-      businessAccountId: businessAccountId || '(empty)',
-      verifyToken: verifyToken || '(empty)',
+      // Evolution API
+      evolutionApiUrl: evolutionApiUrl || '(empty)',
+      evolutionApiKey: evolutionApiKey ? '***' : '(empty)',
+      evolutionInstanceName: evolutionInstanceName || '(empty)',
       // Agent
       systemPrompt: systemPrompt ? `${systemPrompt.substring(0, 50)}...` : '(empty)',
       aiModelMode,
@@ -400,11 +401,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         company_name: companyName?.trim() || null,
         sdr_name: sdrName?.trim() || null,
         
-        // WhatsApp - trim whitespace
-        whatsapp_access_token: accessToken?.trim() || null,
-        whatsapp_phone_number_id: phoneNumberId?.trim() || null,
-        whatsapp_business_account_id: businessAccountId?.trim() || null,
-        whatsapp_verify_token: verifyToken?.trim() || null,
+        // Evolution API - trim whitespace
+        evolution_api_url: evolutionApiUrl?.trim() || null,
+        evolution_api_key: evolutionApiKey?.trim() || null,
+        evolution_instance_name: evolutionInstanceName?.trim() || null,
         
         // Agent - use default prompt if empty
         system_prompt_override: systemPrompt?.trim() || DEFAULT_NINA_PROMPT,
@@ -433,8 +433,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       console.log('[OnboardingWizard] Step 2: Settings object built:', {
         company_name: settings.company_name,
         sdr_name: settings.sdr_name,
-        whatsapp_phone_number_id: settings.whatsapp_phone_number_id ? '✓ SET' : '✗ EMPTY',
-        whatsapp_access_token: settings.whatsapp_access_token ? '✓ SET' : '✗ EMPTY',
+        evolution_api_url: settings.evolution_api_url ? '✓ SET' : '✗ EMPTY',
+        evolution_api_key: settings.evolution_api_key ? '✓ SET' : '✗ EMPTY',
+        evolution_instance_name: settings.evolution_instance_name ? '✓ SET' : '✗ EMPTY',
         system_prompt_override: settings.system_prompt_override ? '✓ SET' : '✗ EMPTY',
         elevenlabs_api_key: settings.elevenlabs_api_key ? '✓ SET' : '✗ EMPTY',
         is_active: settings.is_active,
@@ -510,11 +511,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         if (settings.company_name && !verifyData?.company_name) {
           console.error('[OnboardingWizard] ❌ CRITICAL: company_name not persisted!');
         }
-        if (settings.whatsapp_phone_number_id && !verifyData?.whatsapp_phone_number_id) {
-          console.error('[OnboardingWizard] ❌ CRITICAL: whatsapp_phone_number_id not persisted!');
+        if (settings.evolution_api_url && !(verifyData as any)?.evolution_api_url) {
+          console.error('[OnboardingWizard] ❌ CRITICAL: evolution_api_url not persisted!');
         }
-        if (settings.whatsapp_access_token && !verifyData?.whatsapp_access_token) {
-          console.error('[OnboardingWizard] ❌ CRITICAL: whatsapp_access_token not persisted!');
+        if (settings.evolution_api_key && !(verifyData as any)?.evolution_api_key) {
+          console.error('[OnboardingWizard] ❌ CRITICAL: evolution_api_key not persisted!');
         }
       }
       
@@ -532,7 +533,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       setIsSaving(false);
     }
   }, [
-    user, activeStep, companyName, sdrName, accessToken, phoneNumberId, businessAccountId, verifyToken, 
+    user, activeStep, companyName, sdrName, evolutionApiUrl, evolutionApiKey, evolutionInstanceName, 
     systemPrompt, aiModelMode, elevenLabsApiKey, elevenLabsVoiceId, elevenLabsModel,
     audioResponseEnabled, elevenLabsStability, elevenLabsSimilarityBoost, elevenLabsSpeed,
     timezone, businessHoursStart, businessHoursEnd, businessDays, refetch
@@ -621,14 +622,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
       case 1:
         return (
           <StepWhatsApp
-            accessToken={accessToken}
-            phoneNumberId={phoneNumberId}
-            businessAccountId={businessAccountId}
-            verifyToken={verifyToken}
-            onAccessTokenChange={setAccessToken}
-            onPhoneNumberIdChange={setPhoneNumberId}
-            onBusinessAccountIdChange={setBusinessAccountId}
-            onVerifyTokenChange={setVerifyToken}
+            evolutionApiUrl={evolutionApiUrl}
+            evolutionApiKey={evolutionApiKey}
+            evolutionInstanceName={evolutionInstanceName}
+            onEvolutionApiUrlChange={setEvolutionApiUrl}
+            onEvolutionApiKeyChange={setEvolutionApiKey}
+            onEvolutionInstanceNameChange={setEvolutionInstanceName}
             webhookUrl={webhookUrl}
           />
         );

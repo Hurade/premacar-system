@@ -78,11 +78,11 @@ serve(async (req) => {
         // Get the phone_number_id from the first message
         const phoneNumberId = messages[0].phone_number_id;
 
-        // Get owner settings for this phone_number_id
+        // Get owner settings for this instance
         const { data: ownerSettings } = await supabase
           .from('nina_settings')
-          .select('user_id, whatsapp_access_token')
-          .eq('whatsapp_phone_number_id', phoneNumberId)
+          .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name')
+          .eq('evolution_instance_name', phoneNumberId)
           .maybeSingle();
 
         // Get all message_ids from the queue entries
