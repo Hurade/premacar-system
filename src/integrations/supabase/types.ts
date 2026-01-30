@@ -291,6 +291,39 @@ export type Database = {
           },
         ]
       }
+      contact_folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           blocked_at: string | null
@@ -298,14 +331,17 @@ export type Database = {
           call_name: string | null
           client_memory: Json | null
           created_at: string
+          disparo_enabled: boolean | null
           email: string | null
           first_contact_date: string
+          folder_id: string | null
           id: string
           is_blocked: boolean | null
           is_business: boolean | null
           last_activity: string
           name: string | null
           notes: string | null
+          oficina: string | null
           phone_number: string
           profile_picture_url: string | null
           tags: string[] | null
@@ -319,14 +355,17 @@ export type Database = {
           call_name?: string | null
           client_memory?: Json | null
           created_at?: string
+          disparo_enabled?: boolean | null
           email?: string | null
           first_contact_date?: string
+          folder_id?: string | null
           id?: string
           is_blocked?: boolean | null
           is_business?: boolean | null
           last_activity?: string
           name?: string | null
           notes?: string | null
+          oficina?: string | null
           phone_number: string
           profile_picture_url?: string | null
           tags?: string[] | null
@@ -340,14 +379,17 @@ export type Database = {
           call_name?: string | null
           client_memory?: Json | null
           created_at?: string
+          disparo_enabled?: boolean | null
           email?: string | null
           first_contact_date?: string
+          folder_id?: string | null
           id?: string
           is_blocked?: boolean | null
           is_business?: boolean | null
           last_activity?: string
           name?: string | null
           notes?: string | null
+          oficina?: string | null
           phone_number?: string
           profile_picture_url?: string | null
           tags?: string[] | null
@@ -355,7 +397,15 @@ export type Database = {
           user_id?: string | null
           whatsapp_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "contact_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_states: {
         Row: {

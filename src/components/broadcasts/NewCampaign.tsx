@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useCreateCampaign, useImportLeads, CampaignLead } from '@/hooks/useCampaigns';
 import { useMessageTemplates } from '@/hooks/useMessageTemplates';
 import { Button } from '@/components/ui/button';
@@ -11,11 +11,19 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle, 
-  Loader2, Send, Clock, Shield, Calendar, Play, Info, X
+  Loader2, Send, Clock, Shield, Calendar, Play, Info, X, Folder, Users
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ContactFolder {
+  id: string;
+  name: string;
+  color: string;
+  contact_count?: number;
+}
 
 interface NewCampaignProps {
   onSuccess: () => void;
@@ -75,6 +83,95 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
   const [leads, setLeads] = useState<ParsedLead[]>([]);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Folder selection
+  const [leadSource, setLeadSource] = useState<'file' | 'folder'>('file');
+  const [folders, setFolders] = useState<ContactFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+  const [loadingFolders, setLoadingFolders] = useState(false);
+
+  // Load folders with disparo-enabled contact count
+  useEffect(() => {
+    const loadFolders = async () => {
+      setLoadingFolders(true);
+      try {
+        const { data: foldersData } = await supabase
+          .from('contact_folders')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+        
+        // Get disparo-enabled contact count per folder
+        const { data: contactsData } = await supabase
+          .from('contacts')
+          .select('folder_id')
+          .eq('disparo_enabled', true);
+        
+        const counts: Record<string, number> = {};
+        contactsData?.forEach(c => {
+          const key = c.folder_id || 'no_folder';
+          counts[key] = (counts[key] || 0) + 1;
+        });
+
+        setFolders((foldersData || []).map(f => ({
+          ...f,
+          contact_count: counts[f.id] || 0
+        })));
+      } catch (error) {
+        console.error('Erro ao carregar pastas:', error);
+      } finally {
+        setLoadingFolders(false);
+      }
+    };
+    loadFolders();
+  }, []);
+
+  // Load contacts from selected folder
+  const loadContactsFromFolder = async (folderId: string) => {
+    setIsUploading(true);
+    try {
+      let query = supabase
+        .from('contacts')
+        .select('phone_number, name, oficina')
+        .eq('disparo_enabled', true);
+      
+      if (folderId !== 'all') {
+        query = query.eq('folder_id', folderId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const phoneSet = new Set<string>();
+      const validLeads: ParsedLead[] = [];
+
+      for (const contact of data || []) {
+        if (!contact.phone_number || phoneSet.has(contact.phone_number)) continue;
+        phoneSet.add(contact.phone_number);
+        validLeads.push({
+          phone: contact.phone_number,
+          name: contact.name || undefined,
+          company: contact.oficina || undefined,
+        });
+      }
+
+      setLeads(validLeads);
+      setValidation({ valid: validLeads, duplicates: 0, invalid: 0 });
+      toast.success(`${validLeads.length} contatos carregados da pasta`);
+    } catch (error) {
+      console.error('Erro ao carregar contatos:', error);
+      toast.error('Erro ao carregar contatos da pasta');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFolderSelect = (folderId: string) => {
+    setSelectedFolderId(folderId);
+    if (folderId) {
+      loadContactsFromFolder(folderId);
+    }
+  };
 
   // Calculate estimated duration
   const estimatedDays = leads.length > 0 ? Math.ceil(leads.length / dailyLimit) : 0;
@@ -295,42 +392,100 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
       {/* Section 2: Import Leads */}
       <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <FileSpreadsheet className="w-5 h-5 text-primary" />
-          Importar Leads
+          <Users className="w-5 h-5 text-primary" />
+          Origem dos Leads
         </h3>
 
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <label className="relative cursor-pointer">
-              <input
-                type="file"
-                accept=".xlsx,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <div className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-border rounded-lg hover:border-primary/50 transition-colors">
-                {isUploading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                ) : (
-                  <Upload className="w-5 h-5 text-muted-foreground" />
-                )}
-                <span className="text-muted-foreground">
-                  {isUploading ? 'Processando...' : 'Clique para fazer upload (.xlsx, .csv)'}
-                </span>
-              </div>
+        {/* Source selector */}
+        <div className="flex items-center gap-4 p-4 bg-secondary/20 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="source-file"
+              checked={leadSource === 'file'}
+              onCheckedChange={() => { setLeadSource('file'); setLeads([]); setValidation(null); }}
+            />
+            <label htmlFor="source-file" className="text-sm flex items-center gap-2 cursor-pointer">
+              <FileSpreadsheet className="w-4 h-4" />
+              Importar Planilha
             </label>
           </div>
-          <Button variant="outline" onClick={downloadTemplate} className="gap-2">
-            <Download className="w-4 h-4" />
-            Baixar Modelo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="source-folder"
+              checked={leadSource === 'folder'}
+              onCheckedChange={() => { setLeadSource('folder'); setLeads([]); setValidation(null); }}
+            />
+            <label htmlFor="source-folder" className="text-sm flex items-center gap-2 cursor-pointer">
+              <Folder className="w-4 h-4" />
+              Pasta de Contatos
+            </label>
+          </div>
         </div>
+
+        {leadSource === 'file' ? (
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <label className="relative cursor-pointer">
+                <input
+                  type="file"
+                  accept=".xlsx,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <div className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-border rounded-lg hover:border-primary/50 transition-colors">
+                  {isUploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  ) : (
+                    <Upload className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <span className="text-muted-foreground">
+                    {isUploading ? 'Processando...' : 'Clique para fazer upload (.xlsx, .csv)'}
+                  </span>
+                </div>
+              </label>
+            </div>
+            <Button variant="outline" onClick={downloadTemplate} className="gap-2">
+              <Download className="w-4 h-4" />
+              Baixar Modelo
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Label>Selecione a pasta com contatos habilitados para disparo</Label>
+            <Select value={selectedFolderId} onValueChange={handleFolderSelect}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione uma pasta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <span className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Todos com disparo ativado
+                  </span>
+                </SelectItem>
+                {folders.map(folder => (
+                  <SelectItem key={folder.id} value={folder.id}>
+                    <span className="flex items-center gap-2">
+                      <Folder className="w-4 h-4" style={{ color: folder.color }} />
+                      {folder.name} ({folder.contact_count || 0} contatos)
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {folders.length === 0 && !loadingFolders && (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma pasta encontrada. Crie pastas na aba de Contatos.
+              </p>
+            )}
+          </div>
+        )}
 
         {validation && (
           <div className="flex items-center gap-6 p-4 bg-secondary/30 rounded-lg">
             <div className="flex items-center gap-2 text-primary">
               <CheckCircle className="w-4 h-4" />
-              <span>{validation.valid.length} válidos</span>
+              <span>{validation.valid.length} contatos prontos para disparo</span>
             </div>
             {validation.duplicates > 0 && (
               <div className="flex items-center gap-2 text-muted-foreground">
