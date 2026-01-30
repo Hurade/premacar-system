@@ -146,9 +146,11 @@ export function useOnboardingStatus(): OnboardingStatus {
                 isComplete: !isDefaultConfig || hasSeenWizard,
               };
             case 'verification':
+              // Check if any WhatsApp provider is configured (Evolution OR Meta)
+              const hasWhatsAppConfig = !!((settings as any).evolution_api_url && (settings as any).evolution_api_key && (settings as any).evolution_instance_name) || !!(settings.whatsapp_access_token && settings.whatsapp_phone_number_id);
               return {
                 ...step,
-                isComplete: !!(settings.company_name && settings.sdr_name && settings.whatsapp_access_token && settings.system_prompt_override),
+                isComplete: !!(settings.company_name && settings.sdr_name && hasWhatsAppConfig),
               };
             case 'finish':
               return {
