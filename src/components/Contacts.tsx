@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Filter, Upload, MessageSquare, Loader2, Phone, Users, Check, X, Send, Folder } from 'lucide-react';
+import { Search, Filter, Upload, MessageSquare, Loader2, Phone, Users, Check, X, Send, Folder, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import FolderManager, { ContactFolder } from './contacts/FolderManager';
 import ImportContactsModal from './contacts/ImportContactsModal';
 import BulkActionsBar from './contacts/BulkActionsBar';
+import AddContactModal from './contacts/AddContactModal';
 
 interface ContactRow {
   id: string;
@@ -28,6 +29,7 @@ const Contacts: React.FC = () => {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -228,10 +230,20 @@ const Contacts: React.FC = () => {
                 : 'Todos os contatos'}
             </p>
           </div>
-          <Button onClick={() => setShowImportModal(true)} className="shadow-lg shadow-cyan-500/20">
-            <Upload className="w-4 h-4 mr-2" />
-            Importar Planilha
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAddModal(true)}
+              className="border-slate-700 hover:border-cyan-500/50"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Adicionar Contato
+            </Button>
+            <Button onClick={() => setShowImportModal(true)} className="shadow-lg shadow-cyan-500/20">
+              <Upload className="w-4 h-4 mr-2" />
+              Importar Planilha
+            </Button>
+          </div>
         </div>
 
         {/* Search bar */}
@@ -393,6 +405,17 @@ const Contacts: React.FC = () => {
         onClose={() => setShowImportModal(false)}
         folders={folders}
         onImportComplete={() => {
+          loadContacts();
+          loadFolders();
+        }}
+      />
+
+      {/* Add contact modal */}
+      <AddContactModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        folders={folders}
+        onContactAdded={() => {
           loadContacts();
           loadFolders();
         }}
