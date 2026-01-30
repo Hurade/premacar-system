@@ -1,13 +1,13 @@
-import React from 'react';
-import { useCampaigns, useUpdateCampaign, useDeleteCampaign, Campaign } from '@/hooks/useCampaigns';
+import React, { useEffect, useRef, useState } from 'react';
+import { useCampaigns, useUpdateCampaign, useDeleteCampaign, useProcessCampaigns, Campaign } from '@/hooks/useCampaigns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Play, Pause, BarChart3, Pencil, Trash2, PlusCircle, Clock, 
-  CheckCircle, Send, Eye, MessageSquare, AlertTriangle, Loader2 
+  CheckCircle, Send, Eye, MessageSquare, AlertTriangle, Loader2, Zap, RefreshCw
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   AlertDialog,
@@ -34,10 +34,54 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
   scheduled: { label: 'Agendada', color: 'bg-purple-500/20 text-purple-400', icon: <Clock className="w-3 h-3" /> },
 };
 
+const POLLING_INTERVAL = 60000; // 60 seconds
+
 export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCampaign }) => {
-  const { data: campaigns, isLoading } = useCampaigns();
+  const { data: campaigns, isLoading, refetch } = useCampaigns();
   const updateCampaign = useUpdateCampaign();
   const deleteCampaign = useDeleteCampaign();
+  const processCampaigns = useProcessCampaigns();
+  const [autoProcessing, setAutoProcessing] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check if there are active campaigns
+  const hasActiveCampaigns = campaigns?.some(c => c.status === 'active') ?? false;
+
+  // Auto-polling effect
+  useEffect(() => {
+    if (autoProcessing && hasActiveCampaigns) {
+      // Process immediately when enabled
+      processCampaigns.mutate();
+      
+      // Set up interval
+      pollingRef.current = setInterval(() => {
+        if (!processCampaigns.isPending) {
+          console.log('[CampaignsList] Auto-processing campaigns...');
+          processCampaigns.mutate();
+        }
+      }, POLLING_INTERVAL);
+
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    } else {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }
+  }, [autoProcessing, hasActiveCampaigns]);
+
+  // Stop auto-processing when no active campaigns
+  useEffect(() => {
+    if (!hasActiveCampaigns && autoProcessing) {
+      setAutoProcessing(false);
+      toast.info('Processamento automático pausado - sem campanhas ativas');
+    }
+  }, [hasActiveCampaigns, autoProcessing]);
 
   const handleToggleStatus = async (campaign: Campaign) => {
     const newStatus = campaign.status === 'active' ? 'paused' : 'active';
@@ -53,6 +97,24 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
 
   const handleDelete = async (id: string) => {
     deleteCampaign.mutate(id);
+  };
+
+  const handleProcessNow = () => {
+    processCampaigns.mutate();
+  };
+
+  const toggleAutoProcessing = () => {
+    if (!autoProcessing) {
+      if (!hasActiveCampaigns) {
+        toast.error('Nenhuma campanha ativa para processar');
+        return;
+      }
+      setAutoProcessing(true);
+      toast.success('Processamento automático ativado (a cada 60s)');
+    } else {
+      setAutoProcessing(false);
+      toast.info('Processamento automático desativado');
+    }
   };
 
   if (isLoading) {
@@ -79,12 +141,47 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleProcessNow}
+            disabled={processCampaigns.isPending || !hasActiveCampaigns}
+            className="gap-2"
+          >
+            {processCampaigns.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Zap className="w-4 h-4" />
+            )}
+            Processar Agora
+          </Button>
+          
+          <Button
+            variant={autoProcessing ? "default" : "outline"}
+            size="sm"
+            onClick={toggleAutoProcessing}
+            disabled={!hasActiveCampaigns && !autoProcessing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${autoProcessing ? 'animate-spin' : ''}`} />
+            {autoProcessing ? 'Auto: Ligado' : 'Auto: Desligado'}
+          </Button>
+        </div>
+        
         <Button onClick={onNewCampaign} className="gap-2">
           <PlusCircle className="w-4 h-4" />
           Nova Campanha
         </Button>
       </div>
+
+      {autoProcessing && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 flex items-center gap-2 text-sm text-green-400">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Processamento automático ativo - enviando mensagens a cada 60 segundos
+        </div>
+      )}
 
       <div className="grid gap-4">
         {campaigns.map((campaign) => {
@@ -220,9 +317,17 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
                 <span>
                   Modelo: {campaign.template?.name ?? 'Nenhum selecionado'}
                 </span>
-                <span>
-                  Criada em {format(new Date(campaign.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                </span>
+                <div className="flex items-center gap-4">
+                  {campaign.last_sent_at && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Último envio: {formatDistanceToNow(new Date(campaign.last_sent_at), { addSuffix: true, locale: ptBR })}
+                    </span>
+                  )}
+                  <span>
+                    Criada em {format(new Date(campaign.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </span>
+                </div>
               </div>
             </div>
           );

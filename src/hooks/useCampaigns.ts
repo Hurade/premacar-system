@@ -2,6 +2,47 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Process campaigns - trigger campaign-processor edge function
+export function useProcessCampaigns() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('campaign-processor');
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['campaign-stats'] });
+      
+      if (data?.results) {
+        const sent = data.results.filter((r: any) => r.sent).length;
+        if (sent > 0) {
+          toast.success(`${sent} mensagem(ns) enviada(s)!`);
+        } else {
+          const reasons = data.results.map((r: any) => r.reason).filter(Boolean);
+          if (reasons.length > 0) {
+            const reasonMap: Record<string, string> = {
+              'daily_limit_reached': 'Limite diário atingido',
+              'outside_business_hours': 'Fora do horário comercial',
+              'not_business_day': 'Não é dia útil',
+              'anti_ban_pause': 'Pausa anti-ban ativa',
+              'no_pending_leads': 'Sem leads pendentes',
+              'scheduled_start_not_reached': 'Início agendado não atingido',
+            };
+            toast.info(reasonMap[reasons[0]] || reasons[0]);
+          }
+        }
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao processar: ${error.message}`);
+    },
+  });
+}
+
 export interface Campaign {
   id: string;
   user_id: string;
