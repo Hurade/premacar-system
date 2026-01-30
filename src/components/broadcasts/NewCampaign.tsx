@@ -458,17 +458,11 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">
-                  <span className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Todos com disparo ativado
-                  </span>
+                  Todos com disparo ativado
                 </SelectItem>
                 {folders.map(folder => (
                   <SelectItem key={folder.id} value={folder.id}>
-                    <span className="flex items-center gap-2">
-                      <Folder className="w-4 h-4" style={{ color: folder.color }} />
-                      {folder.name} ({folder.contact_count || 0} contatos)
-                    </span>
+                    {folder.name} ({folder.contact_count || 0} contatos)
                   </SelectItem>
                 ))}
               </SelectContent>
