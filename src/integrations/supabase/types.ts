@@ -882,12 +882,18 @@ export type Database = {
           evolution_api_key: string | null
           evolution_api_url: string | null
           evolution_instance_name: string | null
+          google_calendar_url: string | null
           id: string
           is_active: boolean
           message_breaking_enabled: boolean
           response_delay_max: number
           response_delay_min: number
           route_all_to_receiver_enabled: boolean
+          scheduling_available_days: number[] | null
+          scheduling_buffer_between: number | null
+          scheduling_end_time: string | null
+          scheduling_slot_duration: number | null
+          scheduling_start_time: string | null
           sdr_name: string | null
           system_prompt_override: string | null
           test_phone_numbers: Json | null
@@ -923,12 +929,18 @@ export type Database = {
           evolution_api_key?: string | null
           evolution_api_url?: string | null
           evolution_instance_name?: string | null
+          google_calendar_url?: string | null
           id?: string
           is_active?: boolean
           message_breaking_enabled?: boolean
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
+          scheduling_available_days?: number[] | null
+          scheduling_buffer_between?: number | null
+          scheduling_end_time?: string | null
+          scheduling_slot_duration?: number | null
+          scheduling_start_time?: string | null
           sdr_name?: string | null
           system_prompt_override?: string | null
           test_phone_numbers?: Json | null
@@ -964,12 +976,18 @@ export type Database = {
           evolution_api_key?: string | null
           evolution_api_url?: string | null
           evolution_instance_name?: string | null
+          google_calendar_url?: string | null
           id?: string
           is_active?: boolean
           message_breaking_enabled?: boolean
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
+          scheduling_available_days?: number[] | null
+          scheduling_buffer_between?: number | null
+          scheduling_end_time?: string | null
+          scheduling_slot_duration?: number | null
+          scheduling_start_time?: string | null
           sdr_name?: string | null
           system_prompt_override?: string | null
           test_phone_numbers?: Json | null
