@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, AlignLeft, X, Loader2, LayoutGrid, List, Columns, Video, User, UserCircle, Bot, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, AlignLeft, X, Loader2, LayoutGrid, List, Columns, Video, User, UserCircle, Bot, Pencil, Settings2 } from 'lucide-react';
+import { AvailabilitySettings } from './scheduling/AvailabilitySettings';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { Appointment, Contact } from '../types';
@@ -21,6 +22,7 @@ const Scheduling: React.FC = () => {
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -512,6 +514,14 @@ const Scheduling: React.FC = () => {
                 </button>
             </div>
 
+            <button 
+              onClick={() => setShowAvailabilityModal(true)}
+              className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Configurar Disponibilidade"
+            >
+              <Settings2 className="w-5 h-5" />
+            </button>
+
             <Button onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setShowCreateModal(true); }}>
                 <Plus className="w-4 h-4 mr-2" />
                 Agendar
@@ -967,6 +977,17 @@ const Scheduling: React.FC = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Availability Settings Modal */}
+      {showAvailabilityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-xl w-full overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="p-6">
+              <AvailabilitySettings onClose={() => setShowAvailabilityModal(false)} />
+            </div>
           </div>
         </div>
       )}
