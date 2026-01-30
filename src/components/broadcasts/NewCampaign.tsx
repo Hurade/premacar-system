@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { useCreateCampaign, useImportLeads, CampaignLead } from '@/hooks/useCampaigns';
+import { useCreateCampaign, useImportLeads } from '@/hooks/useCampaigns';
 import { useMessageTemplates } from '@/hooks/useMessageTemplates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,10 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { 
   Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle, 
-  Loader2, Send, Clock, Shield, Calendar, Play, Info, X, Folder, Users
+  Loader2, Send, Clock, Shield, Calendar, Play, Info, X, Folder, Users, Tag as TagIcon
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -23,6 +24,14 @@ interface ContactFolder {
   name: string;
   color: string;
   contact_count?: number;
+}
+
+interface TagDefinition {
+  id: string;
+  key: string;
+  label: string;
+  color: string;
+  is_active: boolean;
 }
 
 interface NewCampaignProps {
@@ -90,22 +99,26 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [loadingFolders, setLoadingFolders] = useState(false);
 
-  // Load folders with disparo-enabled contact count
+  // Tags
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [tagOnDelivered, setTagOnDelivered] = useState<string>('');
+  const [tagOnNoWhatsApp, setTagOnNoWhatsApp] = useState<string>('');
+
+  // Load folders and tags
   useEffect(() => {
-    const loadFolders = async () => {
+    const loadData = async () => {
       setLoadingFolders(true);
       try {
+        // Load folders with contact count
         const { data: foldersData } = await supabase
           .from('contact_folders')
           .select('*')
           .eq('is_active', true)
           .order('name');
         
-        // Get disparo-enabled contact count per folder
         const { data: contactsData } = await supabase
           .from('contacts')
-          .select('folder_id')
-          .eq('disparo_enabled', true);
+          .select('folder_id');
         
         const counts: Record<string, number> = {};
         contactsData?.forEach(c => {
@@ -117,13 +130,22 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
           ...f,
           contact_count: counts[f.id] || 0
         })));
+
+        // Load tag definitions
+        const { data: tagsData } = await supabase
+          .from('tag_definitions')
+          .select('*')
+          .eq('is_active', true)
+          .order('label');
+        
+        setTagDefinitions(tagsData || []);
       } catch (error) {
-        console.error('Erro ao carregar pastas:', error);
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setLoadingFolders(false);
       }
     };
-    loadFolders();
+    loadData();
   }, []);
 
   // Load contacts from selected folder
@@ -132,8 +154,7 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
     try {
       let query = supabase
         .from('contacts')
-        .select('phone_number, name, oficina')
-        .eq('disparo_enabled', true);
+        .select('phone_number, name, oficina');
       
       if (folderId !== 'all') {
         query = query.eq('folder_id', folderId);
@@ -451,14 +472,14 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
           </div>
         ) : (
           <div className="space-y-3">
-            <Label>Selecione a pasta com contatos habilitados para disparo</Label>
+            <Label>Selecione a pasta de contatos</Label>
             <Select value={selectedFolderId} onValueChange={handleFolderSelect}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione uma pasta" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">
-                  Todos com disparo ativado
+                  Todos os contatos
                 </SelectItem>
                 {folders.map(folder => (
                   <SelectItem key={folder.id} value={folder.id}>
@@ -497,7 +518,103 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
         )}
       </div>
 
-      {/* Section 3: Send Settings */}
+      {/* Section 3: Automatic Tags */}
+      <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <TagIcon className="w-5 h-5 text-primary" />
+          Tags Automáticas
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Configure tags que serão automaticamente adicionadas aos contatos com base no resultado do disparo.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Tag ao receber mensagem</Label>
+            <Select value={tagOnDelivered} onValueChange={setTagOnDelivered}>
+              <SelectTrigger>
+                <SelectValue placeholder="Nenhuma tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma tag</SelectItem>
+                {tagDefinitions.map(tag => (
+                  <SelectItem key={tag.id} value={tag.key}>
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Será adicionada quando a mensagem for entregue com sucesso
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tag quando não tem WhatsApp</Label>
+            <Select value={tagOnNoWhatsApp} onValueChange={setTagOnNoWhatsApp}>
+              <SelectTrigger>
+                <SelectValue placeholder="Nenhuma tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma tag</SelectItem>
+                {tagDefinitions.map(tag => (
+                  <SelectItem key={tag.id} value={tag.key}>
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Será adicionada quando o número não possuir WhatsApp
+            </p>
+          </div>
+        </div>
+
+        {/* Preview of selected tags */}
+        {(tagOnDelivered !== '' && tagOnDelivered !== 'none') || (tagOnNoWhatsApp !== '' && tagOnNoWhatsApp !== 'none') ? (
+          <div className="flex items-center gap-2 flex-wrap pt-2">
+            <span className="text-xs text-muted-foreground">Tags configuradas:</span>
+            {tagOnDelivered && tagOnDelivered !== 'none' && (
+              <Badge
+                className="text-xs"
+                style={{ 
+                  backgroundColor: `${tagDefinitions.find(t => t.key === tagOnDelivered)?.color}20`,
+                  borderColor: `${tagDefinitions.find(t => t.key === tagOnDelivered)?.color}40`,
+                  color: tagDefinitions.find(t => t.key === tagOnDelivered)?.color 
+                }}
+              >
+                ✓ {tagDefinitions.find(t => t.key === tagOnDelivered)?.label}
+              </Badge>
+            )}
+            {tagOnNoWhatsApp && tagOnNoWhatsApp !== 'none' && (
+              <Badge
+                className="text-xs"
+                style={{ 
+                  backgroundColor: `${tagDefinitions.find(t => t.key === tagOnNoWhatsApp)?.color}20`,
+                  borderColor: `${tagDefinitions.find(t => t.key === tagOnNoWhatsApp)?.color}40`,
+                  color: tagDefinitions.find(t => t.key === tagOnNoWhatsApp)?.color 
+                }}
+              >
+                ✗ {tagDefinitions.find(t => t.key === tagOnNoWhatsApp)?.label}
+              </Badge>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Section 4: Send Settings */}
       <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-6">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Clock className="w-5 h-5 text-primary" />

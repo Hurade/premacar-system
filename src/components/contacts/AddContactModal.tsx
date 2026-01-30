@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { X, Loader2, UserPlus } from 'lucide-react';
+import { X, Loader2, UserPlus, Tag as TagIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Switch } from '../ui/switch';
+import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ContactFolder } from './FolderManager';
+import { TagDefinition } from './TagManager';
 
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
   folders: ContactFolder[];
+  tags: TagDefinition[];
   onContactAdded: () => void;
 }
 
@@ -20,12 +22,13 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
   isOpen,
   onClose,
   folders,
+  tags,
   onContactAdded
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [oficina, setOficina] = useState('');
-  const [disparoEnabled, setDisparoEnabled] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [folderId, setFolderId] = useState<string>('none');
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +36,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
     setName('');
     setPhone('');
     setOficina('');
-    setDisparoEnabled(false);
+    setSelectedTags([]);
     setFolderId('none');
   };
 
@@ -43,8 +46,15 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
   };
 
   const formatPhone = (value: string) => {
-    // Remove tudo que não é número
     return value.replace(/\D/g, '');
+  };
+
+  const toggleTag = (tagKey: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tagKey) 
+        ? prev.filter(t => t !== tagKey)
+        : [...prev, tagKey]
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +87,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
           name: name.trim() || null,
           phone_number: cleanPhone,
           oficina: oficina.trim() || null,
-          disparo_enabled: disparoEnabled,
+          tags: selectedTags.length > 0 ? selectedTags : null,
           folder_id: folderId === 'none' ? null : folderId
         });
 
@@ -95,6 +105,8 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const activeTags = tags.filter(t => t.is_active);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -186,17 +198,35 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             </Select>
           </div>
 
-          {/* Disparo */}
-          <div className="flex items-center justify-between p-4 bg-slate-950/50 rounded-lg border border-slate-800">
-            <div className="space-y-0.5">
-              <Label htmlFor="disparo" className="cursor-pointer">Habilitar Disparo</Label>
-              <p className="text-xs text-slate-500">Permite enviar mensagens automáticas para este contato</p>
-            </div>
-            <Switch
-              id="disparo"
-              checked={disparoEnabled}
-              onCheckedChange={setDisparoEnabled}
-            />
+          {/* Tags */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <TagIcon className="w-4 h-4" />
+              Tags
+            </Label>
+            {activeTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 p-3 bg-slate-950/50 rounded-lg border border-slate-800">
+                {activeTags.map(tag => (
+                  <Badge
+                    key={tag.id}
+                    className="px-2 py-0.5 text-xs font-medium cursor-pointer transition-all"
+                    style={{ 
+                      backgroundColor: selectedTags.includes(tag.key) ? `${tag.color}30` : `${tag.color}10`,
+                      borderColor: selectedTags.includes(tag.key) ? tag.color : `${tag.color}30`,
+                      color: tag.color,
+                      borderWidth: selectedTags.includes(tag.key) ? '2px' : '1px'
+                    }}
+                    onClick={() => toggleTag(tag.key)}
+                  >
+                    {tag.label}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                Nenhuma tag disponível. Crie tags na barra lateral.
+              </p>
+            )}
           </div>
 
           {/* Submit */}

@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, FileSpreadsheet, Loader2, Check, AlertCircle } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Checkbox } from '../ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -25,7 +24,6 @@ interface ColumnMapping {
   nome: string;
   oficina: string;
   telefone: string;
-  disparo: string;
 }
 
 const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
@@ -41,8 +39,7 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
     nome: '',
     oficina: '',
-    telefone: '',
-    disparo: ''
+    telefone: ''
   });
   const [targetFolderId, setTargetFolderId] = useState<string>('none');
   const [loading, setLoading] = useState(false);
@@ -97,8 +94,7 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
     const mapping: ColumnMapping = {
       nome: '',
       oficina: '',
-      telefone: '',
-      disparo: ''
+      telefone: ''
     };
 
     headers.forEach(header => {
@@ -109,8 +105,6 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
         mapping.oficina = header;
       } else if (lower.includes('telefone') || lower.includes('phone') || lower.includes('celular') || lower.includes('whatsapp')) {
         mapping.telefone = header;
-      } else if (lower.includes('disparo') || lower.includes('broadcast') || lower.includes('enviar')) {
-        mapping.disparo = header;
       }
     });
 
@@ -136,12 +130,6 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
     return str;
   };
 
-  const parseDisparo = (value: any): boolean => {
-    if (value === undefined || value === null || value === '') return false;
-    const str = String(value).toLowerCase().trim();
-    return ['sim', 'yes', 'true', '1', 's', 'y'].includes(str);
-  };
-
   const handleImport = async () => {
     const sheet = sheets.find(s => s.name === selectedSheet);
     if (!sheet) return;
@@ -160,7 +148,6 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
         name: row[columnMapping.nome] || null,
         phone_number: normalizePhone(row[columnMapping.telefone]),
         oficina: row[columnMapping.oficina] || null,
-        disparo_enabled: columnMapping.disparo ? parseDisparo(row[columnMapping.disparo]) : false,
         folder_id: targetFolderId !== 'none' ? targetFolderId : null
       })).filter(c => c.phone_number.length >= 10);
 
@@ -293,11 +280,11 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
               {/* Column mapping */}
               <div>
                 <h3 className="text-sm font-medium text-slate-300 mb-3">Mapeamento de Colunas</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {(['nome', 'oficina', 'telefone', 'disparo'] as const).map(field => (
+                <div className="grid grid-cols-3 gap-4">
+                  {(['nome', 'oficina', 'telefone'] as const).map(field => (
                     <div key={field}>
                       <label className="block text-xs text-slate-400 mb-1 capitalize">
-                        {field === 'disparo' ? 'Disparo (Sim/Não)' : field}
+                        {field}
                         {field === 'telefone' && <span className="text-red-400">*</span>}
                       </label>
                       <Select
@@ -352,7 +339,6 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
                           <th className="px-3 py-2 text-left text-xs text-slate-400">Nome</th>
                           <th className="px-3 py-2 text-left text-xs text-slate-400">Oficina</th>
                           <th className="px-3 py-2 text-left text-xs text-slate-400">Telefone</th>
-                          <th className="px-3 py-2 text-left text-xs text-slate-400">Disparo</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800">
@@ -362,13 +348,6 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
                             <td className="px-3 py-2">{row[columnMapping.oficina] || '-'}</td>
                             <td className="px-3 py-2 font-mono text-xs">
                               {normalizePhone(row[columnMapping.telefone]) || '-'}
-                            </td>
-                            <td className="px-3 py-2">
-                              {columnMapping.disparo && parseDisparo(row[columnMapping.disparo]) ? (
-                                <Check className="w-4 h-4 text-emerald-400" />
-                              ) : (
-                                <X className="w-4 h-4 text-slate-600" />
-                              )}
                             </td>
                           </tr>
                         ))}

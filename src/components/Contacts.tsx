@@ -1,21 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Filter, Upload, MessageSquare, Loader2, Phone, Users, Check, X, Send, Folder, UserPlus } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, Tag as TagIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
+import { Badge } from './ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import FolderManager, { ContactFolder } from './contacts/FolderManager';
 import ImportContactsModal from './contacts/ImportContactsModal';
 import BulkActionsBar from './contacts/BulkActionsBar';
 import AddContactModal from './contacts/AddContactModal';
+import TagManager, { TagDefinition } from './contacts/TagManager';
 
 interface ContactRow {
   id: string;
   name: string | null;
   phone_number: string;
   oficina: string | null;
-  disparo_enabled: boolean;
+  tags: string[] | null;
   folder_id: string | null;
   folder?: ContactFolder;
   last_activity: string;
@@ -24,6 +26,7 @@ interface ContactRow {
 const Contacts: React.FC = () => {
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [folders, setFolders] = useState<ContactFolder[]>([]);
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -32,6 +35,21 @@ const Contacts: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const navigate = useNavigate();
+
+  const loadTagDefinitions = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tag_definitions')
+        .select('*')
+        .eq('is_active', true)
+        .order('label');
+
+      if (error) throw error;
+      setTagDefinitions(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar tags:', error);
+    }
+  }, []);
 
   const loadFolders = useCallback(async () => {
     try {
@@ -75,7 +93,7 @@ const Contacts: React.FC = () => {
           name,
           phone_number,
           oficina,
-          disparo_enabled,
+          tags,
           folder_id,
           last_activity
         `)
@@ -99,7 +117,8 @@ const Contacts: React.FC = () => {
 
   useEffect(() => {
     loadFolders();
-  }, [loadFolders]);
+    loadTagDefinitions();
+  }, [loadFolders, loadTagDefinitions]);
 
   useEffect(() => {
     loadContacts();
@@ -154,22 +173,35 @@ const Contacts: React.FC = () => {
     }
   };
 
-  const handleToggleDisparo = async (enabled: boolean) => {
+  const handleAddTagToSelected = async (tagKey: string) => {
     setBulkLoading(true);
     try {
-      const { error } = await supabase
+      // Buscar contatos selecionados com suas tags atuais
+      const { data: currentContacts, error: fetchError } = await supabase
         .from('contacts')
-        .update({ disparo_enabled: enabled })
+        .select('id, tags')
         .in('id', Array.from(selectedIds));
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+
+      // Atualizar cada contato adicionando a tag
+      for (const contact of currentContacts || []) {
+        const currentTags = contact.tags || [];
+        if (!currentTags.includes(tagKey)) {
+          const { error } = await supabase
+            .from('contacts')
+            .update({ tags: [...currentTags, tagKey] })
+            .eq('id', contact.id);
+          if (error) throw error;
+        }
+      }
       
-      toast.success(`Disparo ${enabled ? 'ativado' : 'desativado'} para ${selectedIds.size} contato(s)!`);
+      toast.success(`Tag adicionada a ${selectedIds.size} contato(s)!`);
       setSelectedIds(new Set());
       loadContacts();
     } catch (error) {
-      console.error('Erro ao atualizar disparo:', error);
-      toast.error('Erro ao atualizar disparo');
+      console.error('Erro ao adicionar tag:', error);
+      toast.error('Erro ao adicionar tag');
     } finally {
       setBulkLoading(false);
     }
@@ -207,16 +239,27 @@ const Contacts: React.FC = () => {
     return folders.find(f => f.id === folderId);
   };
 
+  const getTagDefinition = (tagKey: string) => {
+    return tagDefinitions.find(t => t.key === tagKey);
+  };
+
   return (
     <div className="flex h-full bg-slate-950 text-slate-50">
-      {/* Sidebar with folders */}
-      <div className="w-64 p-4 border-r border-slate-800 flex-shrink-0 overflow-y-auto">
+      {/* Sidebar with folders and tags */}
+      <div className="w-64 p-4 border-r border-slate-800 flex-shrink-0 overflow-y-auto space-y-6">
         <FolderManager
           folders={folders}
           selectedFolderId={selectedFolderId}
           onSelectFolder={setSelectedFolderId}
           onFoldersChange={loadFolders}
         />
+        
+        <div className="border-t border-slate-800 pt-4">
+          <TagManager
+            tags={tagDefinitions}
+            onTagsChange={loadTagDefinitions}
+          />
+        </div>
       </div>
 
       {/* Main content */}
@@ -289,7 +332,7 @@ const Contacts: React.FC = () => {
                     <th className="px-4 py-4">Nome</th>
                     <th className="px-4 py-4">Oficina</th>
                     <th className="px-4 py-4">Telefone</th>
-                    <th className="px-4 py-4 text-center">Disparo</th>
+                    <th className="px-4 py-4">Tags</th>
                     <th className="px-4 py-4">Pasta</th>
                     <th className="px-4 py-4 text-right">Ações</th>
                   </tr>
@@ -329,18 +372,35 @@ const Contacts: React.FC = () => {
                             <span className="font-mono text-xs">{contact.phone_number}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          {contact.disparo_enabled ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                              <Check className="w-3 h-3" />
-                              Sim
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-500 border border-slate-700">
-                              <X className="w-3 h-3" />
-                              Não
-                            </span>
-                          )}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {contact.tags && contact.tags.length > 0 ? (
+                              contact.tags.slice(0, 3).map(tagKey => {
+                                const tagDef = getTagDefinition(tagKey);
+                                if (!tagDef) return null;
+                                return (
+                                  <Badge
+                                    key={tagKey}
+                                    className="px-1.5 py-0 text-[10px] font-medium"
+                                    style={{ 
+                                      backgroundColor: `${tagDef.color}20`,
+                                      borderColor: `${tagDef.color}40`,
+                                      color: tagDef.color 
+                                    }}
+                                  >
+                                    {tagDef.label}
+                                  </Badge>
+                                );
+                              })
+                            ) : (
+                              <span className="text-slate-600 text-xs">-</span>
+                            )}
+                            {contact.tags && contact.tags.length > 3 && (
+                              <Badge className="px-1.5 py-0 text-[10px] bg-slate-800 text-slate-400 border-slate-700">
+                                +{contact.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           {folder ? (
@@ -382,8 +442,9 @@ const Contacts: React.FC = () => {
         {/* Stats footer */}
         <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
           <span>{filteredContacts.length} contato(s)</span>
-          <span>
-            {contacts.filter(c => c.disparo_enabled).length} habilitado(s) para disparo
+          <span className="flex items-center gap-1">
+            <TagIcon className="w-3 h-3" />
+            {tagDefinitions.length} tag(s) disponíveis
           </span>
         </div>
       </div>
@@ -392,9 +453,10 @@ const Contacts: React.FC = () => {
       <BulkActionsBar
         selectedCount={selectedIds.size}
         folders={folders}
+        tags={tagDefinitions}
         onClearSelection={() => setSelectedIds(new Set())}
         onMoveToFolder={handleMoveToFolder}
-        onToggleDisparo={handleToggleDisparo}
+        onAddTag={handleAddTagToSelected}
         onDelete={handleBulkDelete}
         loading={bulkLoading}
       />
@@ -415,6 +477,7 @@ const Contacts: React.FC = () => {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         folders={folders}
+        tags={tagDefinitions}
         onContactAdded={() => {
           loadContacts();
           loadFolders();

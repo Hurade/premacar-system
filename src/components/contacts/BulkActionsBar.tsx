@@ -1,15 +1,17 @@
 import React from 'react';
-import { X, FolderInput, Trash2, Send, Loader2 } from 'lucide-react';
+import { X, FolderInput, Trash2, Tag as TagIcon, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ContactFolder } from './FolderManager';
+import { TagDefinition } from './TagManager';
 
 interface BulkActionsBarProps {
   selectedCount: number;
   folders: ContactFolder[];
+  tags: TagDefinition[];
   onClearSelection: () => void;
   onMoveToFolder: (folderId: string | null) => void;
-  onToggleDisparo: (enabled: boolean) => void;
+  onAddTag: (tagKey: string) => void;
   onDelete: () => void;
   loading: boolean;
 }
@@ -17,9 +19,10 @@ interface BulkActionsBarProps {
 const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   selectedCount,
   folders,
+  tags,
   onClearSelection,
   onMoveToFolder,
-  onToggleDisparo,
+  onAddTag,
   onDelete,
   loading
 }) => {
@@ -48,27 +51,31 @@ const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
         </SelectContent>
       </Select>
 
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => onToggleDisparo(true)}
-        disabled={loading}
-        className="h-8 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-      >
-        <Send className="w-3 h-3 mr-1" />
-        Ativar Disparo
-      </Button>
-
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => onToggleDisparo(false)}
-        disabled={loading}
-        className="h-8 bg-slate-700 border-slate-600 text-slate-300"
-      >
-        <X className="w-3 h-3 mr-1" />
-        Desativar
-      </Button>
+      <Select onValueChange={onAddTag}>
+        <SelectTrigger className="w-40 h-8 bg-slate-700 border-slate-600 text-sm">
+          <TagIcon className="w-4 h-4 mr-2" />
+          <span>Adicionar tag...</span>
+        </SelectTrigger>
+        <SelectContent>
+          {tags.filter(t => t.is_active).length === 0 ? (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              Nenhuma tag disponível
+            </div>
+          ) : (
+            tags.filter(t => t.is_active).map(tag => (
+              <SelectItem key={tag.id} value={tag.key}>
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: tag.color }}
+                  />
+                  {tag.label}
+                </div>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
 
       <div className="w-px h-6 bg-slate-600" />
 
