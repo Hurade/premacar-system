@@ -497,6 +497,63 @@ export function useConversations() {
     }
   }, [conversations]);
 
+  // Finalize conversation (mark as inactive)
+  const finalizeConversation = useCallback(async (conversationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ is_active: false, status: 'paused' })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      // Remove from active conversations list
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
+      return true;
+    } catch (err) {
+      console.error('[useConversations] Error finalizing conversation:', err);
+      throw err;
+    }
+  }, []);
+
+  // Delete conversation and all messages
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    try {
+      // First delete all messages in the conversation
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      if (messagesError) throw messagesError;
+
+      // Then delete conversation states
+      const { error: statesError } = await supabase
+        .from('conversation_states')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      // Ignore states error (may not exist)
+
+      // Finally delete the conversation
+      const { error: convError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (convError) throw convError;
+
+      // Remove from state
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
+      return true;
+    } catch (err) {
+      console.error('[useConversations] Error deleting conversation:', err);
+      throw err;
+    }
+  }, []);
+
   return {
     conversations,
     loading,
@@ -506,6 +563,8 @@ export function useConversations() {
     updateStatus,
     markAsRead,
     assignConversation,
+    finalizeConversation,
+    deleteConversation,
     refetch: fetchConversations
   };
 }

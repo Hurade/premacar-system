@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox
+  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -12,11 +12,21 @@ import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 
 type FilterType = 'all' | 'unread';
 
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation } = useConversations();
+  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -31,6 +41,11 @@ const ChatInterface: React.FC = () => {
   // Novos estados de filtro
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [filterTag, setFilterTag] = useState<string | null>(null);
+  
+  // Estados para modais de confirmação
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -164,6 +179,39 @@ const ChatInterface: React.FC = () => {
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
     await updateStatus(activeChat.id, status);
+  };
+
+  const handleFinalizeConversation = async () => {
+    if (!activeChat) return;
+    setIsProcessingAction(true);
+    try {
+      await finalizeConversation(activeChat.id);
+      setShowFinalizeDialog(false);
+      setSelectedChatId(null);
+      toast.success('Atendimento finalizado com sucesso');
+    } catch (error) {
+      console.error('Error finalizing conversation:', error);
+      toast.error('Erro ao finalizar atendimento');
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!activeChat) return;
+    setIsProcessingAction(true);
+    try {
+      await deleteConversation(activeChat.id);
+      setShowDeleteDialog(false);
+      setSelectedChatId(null);
+      toast.success('Conversa excluída com sucesso');
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast.error('Erro ao excluir conversa');
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
   };
 
   const filteredConversations = conversations.filter(chat => {
@@ -563,15 +611,37 @@ const ChatInterface: React.FC = () => {
                 >
                   <Info className="w-5 h-5" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  disabled
-                  title="Em breve: Mais opções"
-                  className="text-slate-500 cursor-not-allowed opacity-50"
-                >
-                  <MoreVertical className="w-5 h-5" />
-                </Button>
+                <div className="h-6 w-px bg-slate-800 mx-1"></div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      title="Mais opções"
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-2 bg-slate-900 border-slate-700" align="end">
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => setShowFinalizeDialog(true)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                      >
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Finalizar Atendimento
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-md transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir Conversa
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -907,6 +977,62 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Finalize Confirmation Dialog */}
+      <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+        <AlertDialogContent className="bg-slate-900 border-slate-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Finalizar Atendimento</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              Tem certeza que deseja finalizar este atendimento? A conversa será arquivada e não aparecerá mais na lista de chats ativos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+              disabled={isProcessingAction}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleFinalizeConversation}
+              disabled={isProcessingAction}
+              className="bg-emerald-600 hover:bg-emerald-500"
+            >
+              {isProcessingAction ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+              Finalizar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-slate-900 border-slate-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Excluir Conversa</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              <span className="text-red-400 font-semibold">Atenção!</span> Esta ação é irreversível. Todas as mensagens desta conversa serão permanentemente excluídas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+              disabled={isProcessingAction}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConversation}
+              disabled={isProcessingAction}
+              className="bg-red-600 hover:bg-red-500"
+            >
+              {isProcessingAction ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
