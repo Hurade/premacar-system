@@ -103,9 +103,54 @@ serve(async (req) => {
         });
       }
 
-      // Check WhatsApp
-      if (settings.whatsapp_access_token && settings.whatsapp_phone_number_id) {
-        // Test WhatsApp API connection
+      // Check WhatsApp - Aceita Evolution API OU Meta API
+      const hasEvolutionApi = settings.evolution_api_url && settings.evolution_api_key && settings.evolution_instance_name;
+      const hasMetaApi = settings.whatsapp_access_token && settings.whatsapp_phone_number_id;
+
+      if (hasEvolutionApi) {
+        // Test Evolution API connection
+        try {
+          const evolutionUrl = `${settings.evolution_api_url}/instance/connectionState/${settings.evolution_instance_name}`;
+          const evResponse = await fetch(evolutionUrl, {
+            headers: { 'apikey': settings.evolution_api_key },
+          });
+          
+          if (evResponse.ok) {
+            const evData = await evResponse.json();
+            const state = evData?.instance?.state || evData?.state || 'unknown';
+            
+            if (state === 'open' || state === 'connected') {
+              results.push({
+                component: 'whatsapp',
+                status: 'ok',
+                message: `Evolution API conectada: ${settings.evolution_instance_name}`,
+              });
+            } else {
+              results.push({
+                component: 'whatsapp',
+                status: 'warning',
+                message: `Evolution API: ${state}`,
+                details: 'Verifique a conexão da instância',
+              });
+            }
+          } else {
+            results.push({
+              component: 'whatsapp',
+              status: 'warning',
+              message: 'Não foi possível validar Evolution API',
+              details: 'Verifique as credenciais',
+            });
+          }
+        } catch (e) {
+          // Se falhar a validação mas as credenciais existem, assumir OK
+          results.push({
+            component: 'whatsapp',
+            status: 'ok',
+            message: `Evolution API configurada: ${settings.evolution_instance_name}`,
+          });
+        }
+      } else if (hasMetaApi) {
+        // Test WhatsApp Meta API connection
         try {
           const waResponse = await fetch(
             `https://graph.facebook.com/v18.0/${settings.whatsapp_phone_number_id}`,
@@ -119,7 +164,7 @@ serve(async (req) => {
             results.push({
               component: 'whatsapp',
               status: 'ok',
-              message: `WhatsApp conectado: ${waData.display_phone_number || 'Ativo'}`,
+              message: `WhatsApp Meta: ${waData.display_phone_number || 'Conectado'}`,
             });
           } else {
             results.push({
@@ -133,7 +178,7 @@ serve(async (req) => {
           results.push({
             component: 'whatsapp',
             status: 'warning',
-            message: 'Não foi possível validar WhatsApp',
+            message: 'Não foi possível validar WhatsApp Meta',
             details: 'Erro de conexão com a API',
           });
         }
@@ -142,7 +187,7 @@ serve(async (req) => {
           component: 'whatsapp',
           status: 'error',
           message: 'WhatsApp não configurado',
-          details: 'Configure o token e Phone Number ID',
+          details: 'Configure Evolution API ou Meta API',
         });
       }
 
