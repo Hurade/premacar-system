@@ -73,7 +73,9 @@ serve(async (req) => {
     // Process each group
     for (const [phoneNumber, messages] of Object.entries(grouped)) {
       try {
-        console.log(`[MessageGrouper] Processing group for ${phoneNumber} with ${messages.length} messages`);
+        console.log(`[MessageGrouper] ========================================`);
+        console.log(`[MessageGrouper] Processing group for ${phoneNumber}`);
+        console.log(`[MessageGrouper] Total messages in group: ${messages.length}`);
 
         // Get the phone_number_id from the first message
         const phoneNumberId = messages[0].phone_number_id;
@@ -130,7 +132,11 @@ serve(async (req) => {
           lovableApiKey
         );
 
-        console.log(`[MessageGrouper] Combined content for ${phoneNumber}:`, combinedContent.substring(0, 200));
+        console.log(`[MessageGrouper] ----------------------------------------`);
+        console.log(`[MessageGrouper] Combined ${dbMessages.length} messages into single context`);
+        console.log(`[MessageGrouper] Combined content preview:`, combinedContent.substring(0, 300));
+        console.log(`[MessageGrouper] Full combined content:`, combinedContent);
+        console.log(`[MessageGrouper] ----------------------------------------`);
 
         // Update the last message with combined content if multiple messages
         if (dbMessages.length > 1) {
@@ -204,7 +210,8 @@ serve(async (req) => {
         }
 
         processedCount += messages.length;
-        console.log(`[MessageGrouper] Group ${phoneNumber} processed successfully`);
+        console.log(`[MessageGrouper] ✓ Group ${phoneNumber} processed successfully (${messages.length} messages combined)`);
+        console.log(`[MessageGrouper] ========================================`);
 
       } catch (groupError) {
         console.error(`[MessageGrouper] Error processing group ${phoneNumber}:`, groupError);

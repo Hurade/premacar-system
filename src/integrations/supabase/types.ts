@@ -936,6 +936,8 @@ export type Database = {
           id: string
           is_active: boolean
           message_breaking_enabled: boolean
+          message_grouping_delay: number | null
+          message_grouping_enabled: boolean | null
           response_delay_max: number
           response_delay_min: number
           route_all_to_receiver_enabled: boolean
@@ -983,6 +985,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           message_breaking_enabled?: boolean
+          message_grouping_delay?: number | null
+          message_grouping_enabled?: boolean | null
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
@@ -1030,6 +1034,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           message_breaking_enabled?: boolean
+          message_grouping_delay?: number | null
+          message_grouping_enabled?: boolean | null
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
