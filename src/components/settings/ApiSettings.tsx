@@ -823,6 +823,200 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           </div>
         </div>
 
+        {/* Meta API Official */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                <span className="text-xs font-bold text-white">M</span>
+              </div>
+              <h3 className="font-semibold text-white">Meta API Oficial (WhatsApp Business)</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+                settings.meta_api_enabled && settings.meta_phone_number_id && settings.meta_access_token
+                  ? 'bg-emerald-500/10 text-emerald-400' 
+                  : 'bg-amber-500/10 text-amber-400'
+              }`}>
+                <span className={`h-2 w-2 rounded-full ${
+                  settings.meta_api_enabled && settings.meta_phone_number_id && settings.meta_access_token
+                    ? 'bg-emerald-500' 
+                    : 'bg-amber-500'
+                }`}></span>
+                {settings.meta_api_enabled && settings.meta_phone_number_id && settings.meta_access_token ? 'Configurado' : 'Aguardando'}
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.meta_api_enabled}
+                  onChange={(e) => setSettings({ ...settings, meta_api_enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+              </label>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 mb-4">
+            API oficial da Meta para envio de disparos e prospecção. Use simultaneamente com a Evolution API.
+          </p>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
+                  Phone Number ID <span className="text-red-400">*</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-slate-500 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>ID do número de telefone no Meta Business</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  value={settings.meta_phone_number_id || ''}
+                  onChange={(e) => setSettings({ ...settings, meta_phone_number_id: e.target.value })}
+                  placeholder="123456789012345"
+                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
+                  Business Account ID
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-slate-500 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>ID da conta business no Meta</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  value={settings.meta_business_account_id || ''}
+                  onChange={(e) => setSettings({ ...settings, meta_business_account_id: e.target.value })}
+                  placeholder="123456789012345"
+                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
+                <Key className="w-3 h-3" />
+                Access Token <span className="text-red-400">*</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-slate-500 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Token de acesso permanente do Meta</p>
+                  </TooltipContent>
+                </Tooltip>
+              </label>
+              <div className="relative">
+                <input
+                  type={showMetaToken ? "text" : "password"}
+                  value={settings.meta_access_token || ''}
+                  onChange={(e) => setSettings({ ...settings, meta_access_token: e.target.value })}
+                  placeholder="EAAxxxxxxxxxx..."
+                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowMetaToken(!showMetaToken)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  {showMetaToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
+                  <Key className="w-3 h-3" />
+                  App Secret
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-slate-500 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Secret do app para validação de webhook</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showMetaSecret ? "text" : "password"}
+                    value={settings.meta_app_secret || ''}
+                    onChange={(e) => setSettings({ ...settings, meta_app_secret: e.target.value })}
+                    placeholder="seu-app-secret"
+                    className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowMetaSecret(!showMetaSecret)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    {showMetaSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
+                  Webhook Verify Token
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-slate-500 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Token para verificação do webhook da Meta</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  value={settings.whatsapp_verify_token || ''}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_verify_token: e.target.value })}
+                  placeholder="meu-verify-token"
+                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Webhook URL for Meta */}
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-xs text-blue-400 font-medium mb-2">URL do Webhook para Meta:</p>
+              <div className="flex gap-2">
+                <code className="flex-1 text-xs text-blue-300 bg-slate-950 px-2 py-1 rounded font-mono break-all">
+                  {import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook
+                </code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook`);
+                    toast.success('URL do webhook Meta copiada!');
+                  }}
+                  className="px-2"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
+              <p className="text-[10px] text-blue-400/60 mt-2">
+                Configure esta URL no painel do Meta Business → Webhooks
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* ElevenLabs */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
           <div className="flex items-center justify-between mb-4">
