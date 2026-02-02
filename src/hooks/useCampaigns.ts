@@ -73,6 +73,7 @@ export interface Campaign {
   paused_until: string | null;
   created_at: string;
   updated_at: string;
+  api_source: 'meta' | 'evolution';
   template?: MessageTemplate | null;
 }
 
@@ -192,6 +193,7 @@ export function useCreateCampaign() {
         pause_duration_minutes: campaign.pause_duration_minutes || 15,
         scheduled_start: campaign.scheduled_start,
         total_leads: campaign.total_leads || 0,
+        api_source: campaign.api_source || 'meta',
       };
 
       const { data, error } = await supabase

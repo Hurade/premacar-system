@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { 
   Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle, 
-  Loader2, Send, Clock, Shield, Calendar, Play, Info, X, Folder, Users, Tag as TagIcon
+  Loader2, Send, Clock, Shield, Calendar, Play, Info, X, Folder, Users, Tag as TagIcon, Zap
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -87,6 +87,7 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
   const [pauseDurationMinutes, setPauseDurationMinutes] = useState(15);
   const [startType, setStartType] = useState<'immediate' | 'scheduled'>('immediate');
   const [scheduledStart, setScheduledStart] = useState('');
+  const [apiSource, setApiSource] = useState<'meta' | 'evolution'>('meta');
 
   // Leads state
   const [leads, setLeads] = useState<ParsedLead[]>([]);
@@ -330,6 +331,7 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
         pause_duration_minutes: pauseDurationMinutes,
         scheduled_start: startType === 'scheduled' ? scheduledStart : null,
         total_leads: leads.length,
+        api_source: apiSource,
       });
 
       // Import leads
@@ -389,6 +391,38 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* API Source Selector */}
+          <div className="space-y-2">
+            <Label>API de Envio *</Label>
+            <Select value={apiSource} onValueChange={(value: 'meta' | 'evolution') => setApiSource(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="meta">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>Meta API Oficial</span>
+                    <span className="text-xs text-muted-foreground">(Recomendado para prospecção)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="evolution">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span>Evolution API</span>
+                    <span className="text-xs text-muted-foreground">(Instância conectada)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {apiSource === 'meta' 
+                ? '🔵 As mensagens serão enviadas pela API oficial da Meta. Requer configuração na aba de APIs.'
+                : '🟢 As mensagens serão enviadas pela Evolution API conectada.'
+              }
+            </p>
           </div>
         </div>
 
