@@ -699,15 +699,26 @@ async function processQueueItem(
   // Get client memory
   const clientMemory = conversation.contact?.client_memory || {};
 
-  // Build enhanced system prompt with context
+  // Detectar origem da conversa (disparo, inbound ou retorno)
+  const origemConversa = await detectarOrigemConversa(
+    supabase,
+    conversation.contact_id,
+    conversation.id,
+    recentMessages || []
+  );
+  
+  console.log('[Nina] Origem da conversa detectada:', origemConversa);
+
+  // Build enhanced system prompt with context (including origem_conversa)
   const enhancedSystemPrompt = buildEnhancedPrompt(
     systemPrompt, 
     conversation.contact, 
-    clientMemory
+    clientMemory,
+    origemConversa
   );
 
-  // Process template variables ({{ data_hora }}, {{ dia_semana }}, etc.)
-  const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact);
+  // Process template variables ({{ data_hora }}, {{ dia_semana }}, {{ origem_conversa }}, etc.)
+  const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact, origemConversa);
 
   console.log('[Nina] Calling Lovable AI...');
 
@@ -1179,7 +1190,98 @@ Nina: "Oi! Bem-vindo ao Viver de IA! Temos 22 soluções incríveis, formações
 </system_instruction>`;
 }
 
-function processPromptTemplate(prompt: string, contact: any): string {
+// Detecta a origem da conversa: 'disparo', 'inbound' ou 'retorno'
+async function detectarOrigemConversa(
+  supabase: any,
+  contactId: string,
+  conversationId: string,
+  recentMessages: any[]
+): Promise<{ origem: string; detalhes: string }> {
+  try {
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    
+    // 1. Verificar se existe disparo recente para este contato (últimas 48h)
+    const { data: disparoRecente } = await supabase
+      .from('campaign_leads')
+      .select('*, campaign:campaigns(*)')
+      .eq('phone', (await supabase.from('contacts').select('phone_number').eq('id', contactId).single()).data?.phone_number || '')
+      .gte('sent_at', twoHoursAgo.toISOString())
+      .is('replied_at', null)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    // 2. Verificar histórico de conversas anteriores
+    const { data: historicoConversas } = await supabase
+      .from('conversations')
+      .select('id, started_at')
+      .eq('contact_id', contactId)
+      .neq('id', conversationId)
+      .order('started_at', { ascending: false })
+      .limit(5);
+    
+    // 3. Verificar se já existem mensagens do usuário na conversa atual (além da mensagem sendo processada)
+    const userMessagesInConversation = recentMessages.filter(m => m.from_type === 'user').length;
+    
+    // 4. Verificar se há mensagens de broadcast na conversa atual
+    const hasBroadcastMessage = recentMessages.some(m => 
+      m.from_type === 'nina' && m.metadata?.is_broadcast === true
+    );
+    
+    // Lógica de detecção:
+    
+    // CASO 1: Disparo respondido
+    // - Existe disparo enviado nas últimas 48h sem resposta
+    // - OU tem mensagem de broadcast na conversa atual e usuário está respondendo
+    if (disparoRecente || (hasBroadcastMessage && userMessagesInConversation <= 2)) {
+      // Marcar disparo como respondido
+      if (disparoRecente) {
+        await supabase
+          .from('campaign_leads')
+          .update({ 
+            replied_at: now.toISOString(),
+            status: 'replied'
+          })
+          .eq('id', disparoRecente.id);
+        
+        console.log('[Nina] Disparo marcado como respondido:', disparoRecente.id);
+      }
+      
+      const campanhaInfo = disparoRecente?.campaign?.name || 'Campanha';
+      return {
+        origem: 'disparo',
+        detalhes: `Lead está respondendo a um disparo automático (${campanhaInfo}). Não precisa se apresentar novamente, continue a conversa naturalmente.`
+      };
+    }
+    
+    // CASO 2: Cliente retornando
+    // - Tem histórico de conversas anteriores
+    // - OU tem muitas mensagens de usuário na conversa atual (conversa em andamento)
+    if ((historicoConversas && historicoConversas.length > 0) || userMessagesInConversation > 3) {
+      return {
+        origem: 'retorno',
+        detalhes: `Cliente já teve ${historicoConversas?.length || 0} conversa(s) anterior(es). Reconheça que já conversaram antes, sem ser excessivamente formal.`
+      };
+    }
+    
+    // CASO 3: Primeiro contato direto (inbound)
+    return {
+      origem: 'inbound',
+      detalhes: 'Primeiro contato do cliente. Apresente-se formalmente e faça perguntas de descoberta para entender o contexto.'
+    };
+    
+  } catch (error) {
+    console.error('[Nina] Erro ao detectar origem da conversa:', error);
+    // Em caso de erro, assume inbound (mais seguro se apresentar)
+    return {
+      origem: 'inbound',
+      detalhes: 'Não foi possível detectar origem. Trate como primeiro contato.'
+    };
+  }
+}
+
+function processPromptTemplate(prompt: string, contact: any, origemConversa?: { origem: string; detalhes: string }): string {
   const now = new Date();
   const brOptions: Intl.DateTimeFormatOptions = { timeZone: 'America/Sao_Paulo' };
   
@@ -1208,6 +1310,7 @@ function processPromptTemplate(prompt: string, contact: any): string {
     'dia_semana': weekdayFormatter.format(now),
     'cliente_nome': contact?.name || contact?.call_name || 'Cliente',
     'cliente_telefone': contact?.phone_number || '',
+    'origem_conversa': origemConversa?.origem || 'inbound',
   };
   
   return prompt.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, varName) => {
@@ -1215,8 +1318,41 @@ function processPromptTemplate(prompt: string, contact: any): string {
   });
 }
 
-function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any): string {
+function buildEnhancedPrompt(
+  basePrompt: string, 
+  contact: any, 
+  memory: any,
+  origemConversa?: { origem: string; detalhes: string }
+): string {
   let contextInfo = '';
+
+  // Adicionar contexto de origem da conversa (PRIORIDADE MÁXIMA)
+  if (origemConversa) {
+    contextInfo += `\n\n<origem_conversa>
+TIPO: ${origemConversa.origem.toUpperCase()}
+INSTRUÇÃO: ${origemConversa.detalhes}
+
+REGRAS BASEADAS NA ORIGEM:
+${origemConversa.origem === 'disparo' ? `
+- NÃO se apresente novamente (o cliente já recebeu mensagem sua)
+- Continue a conversa naturalmente como se estivessem no meio de um papo
+- Agradeça a resposta e avance para descobrir a dor/interesse do cliente
+- Exemplo: "Opa! Que bom que respondeu 😊 Me conta, o que mais te chamou atenção?"
+` : ''}
+${origemConversa.origem === 'inbound' ? `
+- Apresente-se formalmente (é o primeiro contato)
+- Use saudação calorosa e sua persona completa
+- Faça perguntas de descoberta para entender contexto
+- Exemplo: "Olá! 😊 Meu nome é [nome], sou [cargo] da [empresa]. Como posso te ajudar hoje?"
+` : ''}
+${origemConversa.origem === 'retorno' ? `
+- Reconheça que já conversaram antes
+- Seja amigável mas não excessivamente formal
+- Pergunte se pode ajudar com algo novo
+- Exemplo: "Oi! Tudo bem? 😊 Que bom te ver de novo! Em que posso ajudar hoje?"
+` : ''}
+</origem_conversa>`;
+  }
 
   if (contact) {
     contextInfo += `\n\nCONTEXTO DO CLIENTE:`;
