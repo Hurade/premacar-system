@@ -1,91 +1,202 @@
 
-# Plano: Integrar Disparo Automático com Evolution API
+# Plano: Sistema de Delay e Agrupamento de Mensagens Configurável
 
-## Diagnóstico
+## Resumo Executivo
 
-Após análise do código, identifiquei o problema:
+O sistema atual já possui uma arquitetura de agrupamento de mensagens, mas com delay fixo de 10 segundos no código e 20 segundos no banco de dados, causando inconsistência. Este plano vai:
 
-- A função `campaign-processor` está **corretamente integrada** com a Evolution API
-- As configurações da Evolution API estão salvas no banco de dados
-- A campanha "teste 1" está com status "active" e tem 2 leads pendentes
-
-**O Problema**: Não existe nenhum mecanismo para executar a função `campaign-processor` automaticamente. A função existe, mas não é chamada.
-
-## Solução
-
-Vou implementar duas melhorias:
-
-### 1. Botão de Processamento Manual (Rápido)
-Adicionar um botão "Processar Agora" na lista de campanhas para que você possa disparar manualmente o processamento enquanto desenvolve/testa.
-
-### 2. Processamento Automático via Polling (Produção)
-Implementar um sistema que processa campanhas automaticamente usando um timer no frontend que chama a função periodicamente enquanto existirem campanhas ativas.
+1. **Unificar e aumentar o delay** para 20 segundos (configurável)
+2. **Adicionar configurações no banco** para permitir customização
+3. **Melhorar o mecanismo de extensão do timer** quando novas mensagens chegam
+4. **Adicionar logs e monitoramento** para facilitar debug
 
 ---
 
-## Mudanças Técnicas
-
-### Arquivo: `src/components/broadcasts/CampaignsList.tsx`
-- Adicionar botão "Processar Agora" para cada campanha ativa
-- Implementar polling automático que verifica campanhas ativas a cada 60 segundos
-- Mostrar indicador de processamento em andamento
-- Exibir timestamp do último envio
-
-### Arquivo: `supabase/functions/campaign-processor/index.ts`
-- Verificar se a função está corretamente tratando erros da Evolution API
-- Adicionar logs mais detalhados para debug
-
-### Arquivo: `src/hooks/useCampaigns.ts` (se necessário)
-- Adicionar mutation para chamar o campaign-processor diretamente
-
----
-
-## Fluxo do Processamento
+## Arquitetura Atual (Como Funciona Hoje)
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Usuário cria campanha                     │
-│                    Status: "active"                          │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│   Opção A: Clica "Processar Agora"                          │
-│   Opção B: Polling automático (a cada 60s)                  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Edge Function: campaign-processor               │
-│  1. Busca campanhas ativas                                  │
-│  2. Verifica horário comercial e limites                    │
-│  3. Pega próximo lead pendente                              │
-│  4. Envia via Evolution API                                 │
-│  5. Atualiza status do lead e contadores                    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Evolution API envia mensagem                    │
-│              Webhook atualiza status (entregue/lido)        │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────┐
+│  WhatsApp Webhook   │
+│  (recebe mensagem)  │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────┐
+│  message_grouping_queue                                 │
+│  - Adiciona mensagem com process_after = now + 10s     │
+│  - Atualiza process_after de msgs pendentes do mesmo # │
+└─────────┬───────────────────────────────────────────────┘
+          │
+          ▼ (trigger após delay)
+┌─────────────────────┐
+│   Message Grouper   │
+│  - Agrupa mensagens │
+│  - Combina conteúdo │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  Nina Orchestrator  │
+│  (processa IA)      │
+└─────────────────────┘
 ```
+
+**Problema identificado**: O delay no webhook (10s) está diferente do default do banco (20s), e o valor não é configurável pelo usuário.
+
+---
+
+## Alterações Técnicas
+
+### 1. Adicionar Colunas de Configuração no nina_settings
+
+```sql
+ALTER TABLE nina_settings 
+ADD COLUMN IF NOT EXISTS message_grouping_enabled BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS message_grouping_delay INTEGER DEFAULT 20000;
+-- delay em milissegundos (20 segundos)
+```
+
+Isso permitirá que cada usuário configure:
+- Se quer usar o agrupamento de mensagens
+- Qual o delay desejado (padrão: 20 segundos)
+
+---
+
+### 2. Atualizar whatsapp-webhook/index.ts
+
+**Mudanças principais:**
+- Remover constante hardcoded `GROUPING_DELAY_MS = 10000`
+- Buscar delay das configurações do usuário (`message_grouping_delay`)
+- Se `message_grouping_enabled = false`, processar imediatamente sem delay
+- Adicionar logs melhorados para debug
+
+```typescript
+// ANTES
+const GROUPING_DELAY_MS = 10000; // hardcoded
+
+// DEPOIS
+// Buscar das settings do usuário
+const groupingDelay = ownerSettings?.message_grouping_delay || 20000;
+const groupingEnabled = ownerSettings?.message_grouping_enabled !== false;
+
+// Usar o valor dinâmico
+const processAfter = new Date(Date.now() + groupingDelay).toISOString();
+```
+
+**Lógica de extensão do timer melhorada:**
+Quando uma nova mensagem chega do mesmo número, o timer é **reiniciado** para que todas as mensagens sejam agrupadas:
+
+```typescript
+// Atualizar process_after de mensagens pendentes do mesmo telefone
+await supabase
+  .from('message_grouping_queue')
+  .update({ process_after: processAfter })
+  .eq('processed', false)
+  .filter('message_data->>from', 'eq', phoneNumber);
+```
+
+---
+
+### 3. Atualizar message-grouper/index.ts
+
+**Mudanças principais:**
+- Adicionar logs detalhados mostrando quantas mensagens foram agrupadas
+- Melhorar tratamento de erros
+- Log do conteúdo combinado para debug
+
+```typescript
+console.log(`[MessageGrouper] Agrupando ${messages.length} mensagens de ${phoneNumber}`);
+console.log(`[MessageGrouper] Conteúdo combinado: ${combinedContent}`);
+```
+
+---
+
+### 4. (Opcional) Adicionar UI de Configuração
+
+Em Settings → Configurações do Agente, adicionar:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│ Agrupamento de Mensagens                            │
+│ ─────────────────────────────────────────────────── │
+│ [✓] Aguardar mensagens antes de responder           │
+│                                                     │
+│ Tempo de espera: [20] segundos                      │
+│ (Aguarda este tempo após cada mensagem antes de     │
+│  processar. Ideal: 15-30 segundos)                  │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Fluxo Após Implementação
+
+### Cenário 1: Cliente envia 3 mensagens em 10 segundos
+```text
+[00:00] Cliente: "oi"
+        → process_after = 00:20 (agora + 20s)
+        
+[00:03] Cliente: "quero saber da premacar"  
+        → Atualiza process_after = 00:23 (reinicia timer)
+        
+[00:08] Cliente: "tenho uma oficina"
+        → Atualiza process_after = 00:28 (reinicia timer)
+        
+[00:28] Timer expira
+        → Message Grouper combina: "oi\nquero saber da premacar\ntenho uma oficina"
+        → Nina responde UMA vez com contexto completo
+```
+
+### Cenário 2: Mensagem única
+```text
+[00:00] Cliente: "Olá, quero saber sobre a PremaCar"
+        → process_after = 00:20
+        
+[00:20] Timer expira
+        → Message Grouper processa 1 mensagem
+        → Nina responde
+```
+
+### Cenário 3: Conversa alternada (fluxo natural)
+```text
+[00:00] Cliente: "oi"
+[00:20] Nina: "Olá! Como posso ajudar?"
+[01:00] Cliente: "tenho uma oficina"
+[01:20] Nina: "Que legal! Trabalhamos com..."
+
+(Fluxo normal mantido - cada mensagem tem seu próprio timer)
+```
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Tipo de Mudança |
+|---------|-----------------|
+| `supabase/migrations/xxx_add_message_grouping_settings.sql` | Nova migration |
+| `supabase/functions/whatsapp-webhook/index.ts` | Usar delay dinâmico das settings |
+| `supabase/functions/message-grouper/index.ts` | Melhorar logs e tratamento |
+| `src/components/settings/AgentSettings.tsx` | Adicionar UI de configuração (opcional) |
 
 ---
 
 ## Resultado Esperado
 
-Após a implementação:
-- Botão "Processar" visível em campanhas ativas
-- Ao clicar, a função processa 1 lead por campanha ativa
-- Indicador visual mostra quando está processando
-- Logs detalhados no console para debug
-- Opcionalmente: processamento automático periódico
+| Situação | Antes | Depois |
+|----------|-------|--------|
+| 3 mensagens em 5s | 3 respostas da IA | 1 resposta com contexto completo |
+| 1 mensagem | Resposta após 10s | Resposta após 20s (configurável) |
+| Delay configurável | ❌ Hardcoded | ✅ Via settings |
+| Logs de debug | Básicos | Detalhados com contagem |
 
 ---
 
-## Observações
+## Validação e Testes
 
-- O horário comercial configurado na campanha (09:00-18:00, Seg-Sex) será respeitado
-- O sistema anti-ban pausará após enviar 50 mensagens (configurável)
-- Limite diário de 100 mensagens por campanha será respeitado
+Após implementação, testar:
+
+1. ✅ Enviar 3 mensagens seguidas em 5 segundos → Deve responder 1 vez após 20s
+2. ✅ Enviar 1 mensagem → Deve responder 1 vez após 20s  
+3. ✅ Conversa normal (cliente → IA → cliente → IA) → Deve funcionar naturalmente
+4. ✅ Enviar mensagem, aguardar 25s, enviar outra → Deve responder 2 vezes separadas
+5. ✅ Desabilitar agrupamento nas settings → Deve responder imediatamente
