@@ -26,6 +26,8 @@ interface AgentSettings {
   company_name: string | null;
   sdr_name: string | null;
   ai_scheduling_enabled: boolean;
+  message_grouping_enabled: boolean;
+  message_grouping_delay: number;
 }
 
 const DAYS_OF_WEEK = [
@@ -63,6 +65,8 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     company_name: null,
     sdr_name: null,
     ai_scheduling_enabled: true,
+    message_grouping_enabled: true,
+    message_grouping_delay: 20000,
   });
 
   useImperativeHandle(ref, () => ({
@@ -116,6 +120,8 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
         company_name: data.company_name,
         sdr_name: data.sdr_name,
         ai_scheduling_enabled: data.ai_scheduling_enabled ?? true,
+        message_grouping_enabled: data.message_grouping_enabled ?? true,
+        message_grouping_delay: data.message_grouping_delay ?? 20000,
       });
     } catch (error) {
       console.error('[AgentSettings] Error loading settings:', error);
@@ -143,6 +149,8 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           company_name: settings.company_name,
           sdr_name: settings.sdr_name,
           ai_scheduling_enabled: settings.ai_scheduling_enabled,
+          message_grouping_enabled: settings.message_grouping_enabled,
+          message_grouping_delay: settings.message_grouping_delay,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id);
@@ -506,6 +514,66 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
               </label>
             </div>
+          </div>
+
+          {/* Message Grouping Section */}
+          <div className="mt-6 pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-300">Agrupamento de Mensagens</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-slate-500 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[280px]">
+                    <p className="text-xs">
+                      Quando ativo, aguarda um período antes de responder para agrupar mensagens seguidas do cliente em uma única resposta. 
+                      Evita respostas múltiplas quando o cliente envia mensagens "picotadas".
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.message_grouping_enabled}
+                  onChange={(e) => setSettings({ ...settings, message_grouping_enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+              </label>
+            </div>
+            
+            {settings.message_grouping_enabled && (
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-slate-400">
+                      Tempo de espera: <span className="text-cyan-400">{Math.round(settings.message_grouping_delay / 1000)}s</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500">Recomendado: 15-30s</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5000"
+                    max="60000"
+                    step="1000"
+                    value={settings.message_grouping_delay}
+                    onChange={(e) => setSettings({ ...settings, message_grouping_delay: parseInt(e.target.value) })}
+                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+                    <span>5s</span>
+                    <span>30s</span>
+                    <span>60s</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Aguarda este tempo após cada mensagem antes de processar. Se o cliente enviar outra mensagem durante o período, 
+                  o timer reinicia e todas as mensagens são combinadas em uma única resposta.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

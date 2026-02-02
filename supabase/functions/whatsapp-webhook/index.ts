@@ -10,7 +10,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GROUPING_DELAY_MS = 10000; // 10 seconds
+const DEFAULT_GROUPING_DELAY_MS = 20000; // 20 seconds default
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -175,12 +175,18 @@ serve(async (req) => {
         });
       }
 
-      // Find the user who owns this Evolution instance
+      // Find the user who owns this Evolution instance and get grouping settings
       const { data: ownerSettings } = await supabase
         .from('nina_settings')
-        .select('user_id, evolution_api_url, evolution_api_key')
+        .select('user_id, evolution_api_url, evolution_api_key, message_grouping_enabled, message_grouping_delay')
         .eq('evolution_instance_name', instanceName)
         .maybeSingle();
+
+      // Get configurable grouping delay (default 20 seconds)
+      const groupingEnabled = ownerSettings?.message_grouping_enabled !== false;
+      const groupingDelay = ownerSettings?.message_grouping_delay || DEFAULT_GROUPING_DELAY_MS;
+      
+      console.log(`[Webhook] Grouping config - enabled: ${groupingEnabled}, delay: ${groupingDelay}ms`);
 
       let ownerId = ownerSettings?.user_id || null;
       
@@ -417,50 +423,99 @@ serve(async (req) => {
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', conversation.id);
 
-      // 6. Queue for message grouping
-      const processAfter = new Date(Date.now() + GROUPING_DELAY_MS).toISOString();
+      // 6. Queue for message grouping (or process immediately if disabled)
+      if (!groupingEnabled) {
+        // Grouping disabled - process immediately via nina-orchestrator
+        console.log('[Webhook] Grouping disabled, processing immediately');
+        
+        if (conversation.status === 'nina') {
+          const { error: ninaQueueError } = await supabase
+            .from('nina_processing_queue')
+            .insert({
+              message_id: dbMessage.id,
+              conversation_id: conversation.id,
+              contact_id: contact.id,
+              priority: 1,
+              context_data: {
+                phone_number_id: instanceName,
+                contact_name: contactName,
+                message_type: messageType,
+                grouped_count: 1,
+                combined_content: messageContent
+              }
+            });
 
-      await supabase
-        .from('message_grouping_queue')
-        .update({ process_after: processAfter })
-        .eq('processed', false)
-        .filter('message_data->>from', 'eq', phoneNumber);
-
-      const { error: queueError } = await supabase
-        .from('message_grouping_queue')
-        .insert({
-          whatsapp_message_id: messageId,
-          phone_number_id: instanceName, // Using instance name as identifier
-          message_id: dbMessage.id,
-          message_data: { 
-            ...data, 
-            from: phoneNumber,
-            type: messageType 
-          },
-          contacts_data: { 
-            profile: { name: contactName },
-            wa_id: phoneNumber 
-          },
-          process_after: processAfter
-        });
-
-      if (queueError && queueError.code !== '23505') {
-        console.error('[Webhook] Queue insert error:', queueError);
+          if (ninaQueueError) {
+            console.error('[Webhook] Error queuing for Nina:', ninaQueueError);
+          } else {
+            EdgeRuntime.waitUntil(
+              fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`
+                },
+                body: JSON.stringify({ triggered_by: 'whatsapp-webhook-immediate' })
+              }).catch(err => console.error('[Webhook] Error triggering nina-orchestrator:', err))
+            );
+          }
+        }
       } else {
-        console.log('[Webhook] Message queued:', messageId);
-      }
+        // Grouping enabled - use delay queue
+        const processAfter = new Date(Date.now() + groupingDelay).toISOString();
+        
+        console.log(`[Webhook] Grouping message from ${phoneNumber}, process_after: ${processAfter}`);
 
-      // Trigger message-grouper in background
-      EdgeRuntime.waitUntil(
-        fetch(`${supabaseUrl}/functions/v1/message-grouper`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`
-          },
-          body: JSON.stringify({ triggered_by: 'whatsapp-webhook' })
-        }).catch(err => console.error('[Webhook] Error triggering message-grouper:', err))
-      );
+        // Update process_after for ALL pending messages from the same phone (extends timer)
+        const { data: updatedMessages, error: updateError } = await supabase
+          .from('message_grouping_queue')
+          .update({ process_after: processAfter })
+          .eq('processed', false)
+          .filter('message_data->>from', 'eq', phoneNumber)
+          .select('id');
+
+        if (updateError) {
+          console.error('[Webhook] Error extending timer for existing messages:', updateError);
+        } else if (updatedMessages && updatedMessages.length > 0) {
+          console.log(`[Webhook] Extended timer for ${updatedMessages.length} pending messages from ${phoneNumber}`);
+        }
+
+        const { error: queueError } = await supabase
+          .from('message_grouping_queue')
+          .insert({
+            whatsapp_message_id: messageId,
+            phone_number_id: instanceName, // Using instance name as identifier
+            message_id: dbMessage.id,
+            message_data: { 
+              ...data, 
+              from: phoneNumber,
+              type: messageType 
+            },
+            contacts_data: { 
+              profile: { name: contactName },
+              wa_id: phoneNumber 
+            },
+            process_after: processAfter
+          });
+
+        if (queueError && queueError.code !== '23505') {
+          console.error('[Webhook] Queue insert error:', queueError);
+        } else {
+          console.log(`[Webhook] Message queued: ${messageId}, will process after ${groupingDelay}ms`);
+        }
+
+        // Trigger message-grouper in background
+        EdgeRuntime.waitUntil(
+          fetch(`${supabaseUrl}/functions/v1/message-grouper`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`
+            },
+            body: JSON.stringify({ triggered_by: 'whatsapp-webhook' })
+          }).catch(err => console.error('[Webhook] Error triggering message-grouper:', err))
+        );
+      }
 
       return new Response(JSON.stringify({ status: 'processed', message_id: dbMessage.id }), { 
         status: 200, 
