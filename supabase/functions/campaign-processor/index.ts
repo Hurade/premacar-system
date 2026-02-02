@@ -244,6 +244,94 @@ serve(async (req) => {
           })
           .eq("id", lead.id);
 
+        // ===== NOVO: Criar/atualizar contato e criar mensagem no chat =====
+        
+        // Buscar ou criar contato
+        let contactId: string | null = null;
+        const { data: existingContact } = await supabase
+          .from("contacts")
+          .select("id")
+          .eq("phone_number", lead.phone)
+          .maybeSingle();
+
+        if (existingContact) {
+          contactId = existingContact.id;
+        } else {
+          // Criar novo contato
+          const { data: newContact } = await supabase
+            .from("contacts")
+            .insert({
+              phone_number: lead.phone,
+              name: lead.name || null,
+              oficina: lead.company || null,
+              last_activity: new Date().toISOString(),
+            })
+            .select("id")
+            .single();
+          
+          if (newContact) {
+            contactId = newContact.id;
+          }
+        }
+
+        if (contactId) {
+          // Buscar ou criar conversa
+          let conversationId: string | null = null;
+          const { data: existingConv } = await supabase
+            .from("conversations")
+            .select("id")
+            .eq("contact_id", contactId)
+            .eq("is_active", true)
+            .maybeSingle();
+
+          if (existingConv) {
+            conversationId = existingConv.id;
+            // Atualizar last_message_at
+            await supabase
+              .from("conversations")
+              .update({ last_message_at: new Date().toISOString() })
+              .eq("id", conversationId);
+          } else {
+            // Criar nova conversa
+            const { data: newConv } = await supabase
+              .from("conversations")
+              .insert({
+                contact_id: contactId,
+                status: "paused", // Disparo começa pausado para não ter resposta automática
+                last_message_at: new Date().toISOString(),
+              })
+              .select("id")
+              .single();
+            
+            if (newConv) {
+              conversationId = newConv.id;
+            }
+          }
+
+          if (conversationId) {
+            // Criar mensagem no histórico
+            await supabase
+              .from("messages")
+              .insert({
+                conversation_id: conversationId,
+                content: message,
+                from_type: "nina", // Usar nina para identificar como disparo automático
+                type: "text",
+                status: "sent",
+                sent_at: new Date().toISOString(),
+                whatsapp_message_id: responseData.key?.id || null,
+                metadata: {
+                  campaign_id: campaignData.id,
+                  campaign_name: campaignData.name,
+                  is_broadcast: true,
+                },
+              });
+            
+            console.log(`[campaign-processor] Message saved to chat for conversation ${conversationId}`);
+          }
+        }
+        // ===== FIM NOVO =====
+
         // Update campaign counters
         const newSentToday = campaignData.sent_today + 1;
         const newTotalSent = campaignData.total_sent + 1;
