@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus
+  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -12,6 +12,8 @@ import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+
+type FilterType = 'all' | 'unread';
 
 const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation } = useConversations();
@@ -25,6 +27,10 @@ const ChatInterface: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [notesValue, setNotesValue] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  
+  // Novos estados de filtro
+  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterTag, setFilterTag] = useState<string | null>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -161,6 +167,17 @@ const ChatInterface: React.FC = () => {
   };
 
   const filteredConversations = conversations.filter(chat => {
+    // Filtro por não lidas
+    if (filterType === 'unread' && chat.unreadCount === 0) {
+      return false;
+    }
+    
+    // Filtro por tag
+    if (filterTag && !chat.tags.includes(filterTag)) {
+      return false;
+    }
+    
+    // Filtro por busca
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -309,8 +326,10 @@ const ChatInterface: React.FC = () => {
       {/* Left Sidebar: Chat List */}
       <div className="w-80 lg:w-96 border-r border-slate-800 flex flex-col bg-slate-900/50 backdrop-blur-md z-20 flex-shrink-0">
         {/* Search Header */}
-        <div className="p-4 border-b border-slate-800/50">
-          <h2 className="text-lg font-bold text-white mb-4 px-1">Chats Ativos</h2>
+        <div className="p-4 border-b border-slate-800/50 space-y-3">
+          <h2 className="text-lg font-bold text-white px-1">Chats Ativos</h2>
+          
+          {/* Search */}
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
             <input 
@@ -321,6 +340,96 @@ const ChatInterface: React.FC = () => {
               className="w-full pl-9 pr-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none text-slate-200 placeholder:text-slate-600 transition-all"
             />
           </div>
+          
+          {/* Filtros */}
+          <div className="flex items-center gap-2">
+            {/* Filtro por lidas/não lidas */}
+            <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  filterType === 'all' 
+                    ? 'bg-cyan-600 text-white' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setFilterType('unread')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                  filterType === 'unread' 
+                    ? 'bg-cyan-600 text-white' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Inbox className="w-3 h-3" />
+                Não lidas
+              </button>
+            </div>
+            
+            {/* Filtro por tag */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                    filterTag 
+                      ? 'bg-violet-600/20 border-violet-500/50 text-violet-400' 
+                      : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  <Tag className="w-3 h-3" />
+                  {filterTag ? availableTags.find(t => t.key === filterTag)?.label || filterTag : 'Tag'}
+                  {filterTag && (
+                    <X 
+                      className="w-3 h-3 ml-1 hover:text-white" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterTag(null);
+                      }}
+                    />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2 bg-slate-900 border-slate-700">
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setFilterTag(null)}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                      !filterTag ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    Todas as tags
+                  </button>
+                  {availableTags.filter(t => t.is_active).map(tag => (
+                    <button
+                      key={tag.key}
+                      onClick={() => setFilterTag(tag.key)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                        filterTag === tag.key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.label}
+                    </button>
+                  ))}
+                  {availableTags.filter(t => t.is_active).length === 0 && (
+                    <p className="text-xs text-slate-500 text-center py-2">Nenhuma tag criada</p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          
+          {/* Contador de resultados */}
+          {(filterType !== 'all' || filterTag || searchQuery) && (
+            <p className="text-xs text-slate-500">
+              {filteredConversations.length} conversa{filteredConversations.length !== 1 ? 's' : ''} encontrada{filteredConversations.length !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
 
         {/* Conversation List */}
