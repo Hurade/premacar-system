@@ -190,6 +190,7 @@ export type Database = {
       campaigns: {
         Row: {
           anti_ban_enabled: boolean
+          api_source: string | null
           business_days: number[] | null
           business_hours_enabled: boolean
           business_hours_end: string | null
@@ -221,6 +222,7 @@ export type Database = {
         }
         Insert: {
           anti_ban_enabled?: boolean
+          api_source?: string | null
           business_days?: number[] | null
           business_hours_enabled?: boolean
           business_hours_end?: string | null
@@ -252,6 +254,7 @@ export type Database = {
         }
         Update: {
           anti_ban_enabled?: boolean
+          api_source?: string | null
           business_days?: number[] | null
           business_hours_enabled?: boolean
           business_hours_end?: string | null
