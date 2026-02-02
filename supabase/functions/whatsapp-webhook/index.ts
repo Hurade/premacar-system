@@ -326,6 +326,7 @@ serve(async (req) => {
             contact_id: contact.id,
             status: 'nina',
             is_active: true,
+            api_source: 'evolution', // Mark as Evolution API conversation
             user_id: null
           })
           .select()
@@ -379,7 +380,7 @@ serve(async (req) => {
         messageContent = '[mensagem não suportada]';
       }
 
-      // 4. Create message
+      // 4. Create message with api_source
       const { data: dbMessage, error: msgError } = await supabase
         .from('messages')
         .insert({
@@ -390,6 +391,7 @@ serve(async (req) => {
           from_type: 'user',
           status: 'sent',
           media_type: mediaType,
+          api_source: 'evolution', // Mark as Evolution API message
           sent_at: new Date(messageTimestamp * 1000).toISOString(),
           metadata: { 
             original_type: messageType,

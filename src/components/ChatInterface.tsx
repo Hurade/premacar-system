@@ -4,7 +4,8 @@ import {
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2
 } from 'lucide-react';
-import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
+import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, ApiSource } from '../types';
+import { Badge } from './ui/badge';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
 import { toast } from 'sonner';
@@ -245,6 +246,23 @@ const ChatInterface: React.FC = () => {
       <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 ${color}`}>
         <Icon className="w-3 h-3" />
         {label}
+      </span>
+    );
+  };
+
+  const renderApiSourceBadge = (apiSource: ApiSource) => {
+    if (apiSource === 'meta') {
+      return (
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 bg-blue-500/20 text-blue-400 border border-blue-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+          Meta
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        Evolution
       </span>
     );
   };
@@ -528,6 +546,7 @@ const ChatInterface: React.FC = () => {
                   
                   <div className="flex items-center mt-2 gap-1.5">
                     {renderStatusBadge(chat.status)}
+                    {renderApiSourceBadge(chat.apiSource)}
                     {chat.tags.slice(0, 1).map(tag => (
                       <span key={tag} className="px-2 py-0.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-[10px] rounded-md font-medium">
                         {tag}
@@ -567,6 +586,7 @@ const ChatInterface: React.FC = () => {
                   <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                     {activeChat.contactName}
                     {renderStatusBadge(activeChat.status)}
+                    {renderApiSourceBadge(activeChat.apiSource)}
                   </h2>
                   <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
                 </div>
