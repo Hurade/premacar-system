@@ -212,7 +212,6 @@ const ChatInterface: React.FC = () => {
       setIsProcessingAction(false);
     }
   };
-  };
 
   const filteredConversations = conversations.filter(chat => {
     // Filtro por não lidas
