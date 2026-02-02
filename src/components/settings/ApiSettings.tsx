@@ -15,9 +15,19 @@ import {
 
 interface NinaSettings {
   id?: string;
+  // Evolution API
   evolution_api_url: string | null;
   evolution_api_key: string | null;
   evolution_instance_name: string | null;
+  evolution_api_enabled: boolean;
+  // Meta API
+  meta_api_enabled: boolean;
+  meta_phone_number_id: string | null;
+  meta_access_token: string | null;
+  meta_business_account_id: string | null;
+  meta_app_secret: string | null;
+  whatsapp_verify_token: string | null;
+  // ElevenLabs
   elevenlabs_api_key: string | null;
   elevenlabs_voice_id: string;
   elevenlabs_model: string | null;
@@ -72,6 +82,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const [saving, setSaving] = useState(false);
   const [showEvolutionKey, setShowEvolutionKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [showMetaToken, setShowMetaToken] = useState(false);
+  const [showMetaSecret, setShowMetaSecret] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [webhookOpen, setWebhookOpen] = useState(false);
   const [advancedVoiceOpen, setAdvancedVoiceOpen] = useState(false);
@@ -108,9 +120,19 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   
   const [settings, setSettings] = useState<NinaSettings>({
+    // Evolution API
     evolution_api_url: null,
     evolution_api_key: null,
     evolution_instance_name: null,
+    evolution_api_enabled: true,
+    // Meta API
+    meta_api_enabled: false,
+    meta_phone_number_id: null,
+    meta_access_token: null,
+    meta_business_account_id: null,
+    meta_app_secret: null,
+    whatsapp_verify_token: null,
+    // ElevenLabs
     elevenlabs_api_key: null,
     elevenlabs_voice_id: '33B4UnXyTNbgLmdEDh5P',
     elevenlabs_model: 'eleven_turbo_v2_5',
@@ -182,9 +204,19 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
 
       setSettings({
         id: data.id,
+        // Evolution API
         evolution_api_url: (data as any).evolution_api_url || null,
         evolution_api_key: (data as any).evolution_api_key || null,
         evolution_instance_name: (data as any).evolution_instance_name || null,
+        evolution_api_enabled: (data as any).evolution_api_enabled !== false,
+        // Meta API
+        meta_api_enabled: (data as any).meta_api_enabled || false,
+        meta_phone_number_id: (data as any).meta_phone_number_id || null,
+        meta_access_token: (data as any).meta_access_token || null,
+        meta_business_account_id: (data as any).meta_business_account_id || null,
+        meta_app_secret: (data as any).meta_app_secret || null,
+        whatsapp_verify_token: (data as any).whatsapp_verify_token || null,
+        // ElevenLabs
         elevenlabs_api_key: data.elevenlabs_api_key,
         elevenlabs_voice_id: data.elevenlabs_voice_id,
         elevenlabs_model: data.elevenlabs_model,
@@ -223,9 +255,19 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
       const { error } = await supabase
         .from('nina_settings')
         .update({
+          // Evolution API
           evolution_api_url: settings.evolution_api_url,
           evolution_api_key: settings.evolution_api_key,
           evolution_instance_name: settings.evolution_instance_name,
+          evolution_api_enabled: settings.evolution_api_enabled,
+          // Meta API
+          meta_api_enabled: settings.meta_api_enabled,
+          meta_phone_number_id: settings.meta_phone_number_id,
+          meta_access_token: settings.meta_access_token,
+          meta_business_account_id: settings.meta_business_account_id,
+          meta_app_secret: settings.meta_app_secret,
+          whatsapp_verify_token: settings.whatsapp_verify_token,
+          // ElevenLabs
           elevenlabs_api_key: settings.elevenlabs_api_key,
           elevenlabs_voice_id: settings.elevenlabs_voice_id,
           elevenlabs_model: settings.elevenlabs_model,

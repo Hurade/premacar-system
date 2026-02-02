@@ -450,6 +450,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          api_source: string | null
           assigned_team: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id: string | null
           contact_id: string
@@ -466,6 +467,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          api_source?: string | null
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
           contact_id: string
@@ -482,6 +484,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          api_source?: string | null
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
           contact_id?: string
@@ -787,6 +790,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          api_source: string | null
           content: string | null
           conversation_id: string
           created_at: string
@@ -806,6 +810,7 @@ export type Database = {
           whatsapp_message_id: string | null
         }
         Insert: {
+          api_source?: string | null
           content?: string | null
           conversation_id: string
           created_at?: string
@@ -825,6 +830,7 @@ export type Database = {
           whatsapp_message_id?: string | null
         }
         Update: {
+          api_source?: string | null
           content?: string | null
           conversation_id?: string
           created_at?: string
@@ -929,6 +935,7 @@ export type Database = {
           elevenlabs_stability: number
           elevenlabs_style: number
           elevenlabs_voice_id: string
+          evolution_api_enabled: boolean | null
           evolution_api_key: string | null
           evolution_api_url: string | null
           evolution_instance_name: string | null
@@ -938,6 +945,11 @@ export type Database = {
           message_breaking_enabled: boolean
           message_grouping_delay: number | null
           message_grouping_enabled: boolean | null
+          meta_access_token: string | null
+          meta_api_enabled: boolean | null
+          meta_app_secret: string | null
+          meta_business_account_id: string | null
+          meta_phone_number_id: string | null
           response_delay_max: number
           response_delay_min: number
           route_all_to_receiver_enabled: boolean
@@ -978,6 +990,7 @@ export type Database = {
           elevenlabs_stability?: number
           elevenlabs_style?: number
           elevenlabs_voice_id?: string
+          evolution_api_enabled?: boolean | null
           evolution_api_key?: string | null
           evolution_api_url?: string | null
           evolution_instance_name?: string | null
@@ -987,6 +1000,11 @@ export type Database = {
           message_breaking_enabled?: boolean
           message_grouping_delay?: number | null
           message_grouping_enabled?: boolean | null
+          meta_access_token?: string | null
+          meta_api_enabled?: boolean | null
+          meta_app_secret?: string | null
+          meta_business_account_id?: string | null
+          meta_phone_number_id?: string | null
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
@@ -1027,6 +1045,7 @@ export type Database = {
           elevenlabs_stability?: number
           elevenlabs_style?: number
           elevenlabs_voice_id?: string
+          evolution_api_enabled?: boolean | null
           evolution_api_key?: string | null
           evolution_api_url?: string | null
           evolution_instance_name?: string | null
@@ -1036,6 +1055,11 @@ export type Database = {
           message_breaking_enabled?: boolean
           message_grouping_delay?: number | null
           message_grouping_enabled?: boolean | null
+          meta_access_token?: string | null
+          meta_api_enabled?: boolean | null
+          meta_app_secret?: string | null
+          meta_business_account_id?: string | null
+          meta_phone_number_id?: string | null
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean

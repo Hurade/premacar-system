@@ -231,6 +231,8 @@ export interface DBContact {
   updated_at: string;
 }
 
+export type ApiSource = 'meta' | 'evolution';
+
 export interface DBConversation {
   id: string;
   contact_id: string;
@@ -241,6 +243,7 @@ export interface DBConversation {
   tags: string[];
   metadata: Record<string, any>;
   nina_context: Record<string, any>;
+  api_source: ApiSource;
   started_at: string;
   last_message_at: string;
   created_at: string;
@@ -283,6 +286,7 @@ export interface UIConversation {
   assignedTeam: string | null;
   assignedUserId: string | null;
   assignedUserName: string | null;
+  apiSource: ApiSource;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
@@ -330,6 +334,7 @@ export function transformDBToUIConversation(
     assignedTeam: conv.assigned_team,
     assignedUserId: conv.assigned_user_id,
     assignedUserName: null, // Will be populated if needed
+    apiSource: (conv.api_source as ApiSource) || 'evolution',
     lastMessage: lastMsg?.content || '',
     lastMessageTime: formatRelativeTime(conv.last_message_at),
     unreadCount,

@@ -328,7 +328,8 @@ export function useConversations() {
                   ...conv,
                   status: updated.status,
                   isActive: updated.is_active,
-                  assignedTeam: updated.assigned_team
+                  assignedTeam: updated.assigned_team,
+                  apiSource: updated.api_source || conv.apiSource
                 };
               }
               return conv;
