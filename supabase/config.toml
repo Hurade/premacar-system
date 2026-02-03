@@ -2,3 +2,6 @@ project_id = "tkwwpcgmpemkrsubilhi"
 
 [functions.meta-webhook]
 verify_jwt = false
+
+[functions.test-meta-webhook]
+verify_jwt = false
