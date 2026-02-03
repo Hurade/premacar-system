@@ -48,7 +48,7 @@ interface TemplateFormData {
 
 const defaultFormData: TemplateFormData = {
   name: '',
-  variations: ['', '', ''],
+  variations: [''],
   media_type: 'none',
   media_urls: [],
 };
@@ -74,7 +74,7 @@ export const BroadcastTemplates: React.FC = () => {
     setEditingTemplate(template);
     setFormData({
       name: template.name,
-      variations: template.variations.length >= 3 ? template.variations : [...template.variations, '', '', ''].slice(0, Math.max(3, template.variations.length)),
+      variations: template.variations.length >= 1 ? template.variations : [''],
       media_type: template.media_type,
       media_urls: template.media_urls,
     });
@@ -93,8 +93,8 @@ export const BroadcastTemplates: React.FC = () => {
   };
 
   const removeVariation = (index: number) => {
-    if (formData.variations.length <= 3) {
-      toast.error('Mínimo de 3 variações obrigatório');
+    if (formData.variations.length <= 1) {
+      toast.error('Mínimo de 1 variação obrigatório');
       return;
     }
     setFormData(prev => ({
@@ -117,8 +117,8 @@ export const BroadcastTemplates: React.FC = () => {
     }
 
     const validVariations = formData.variations.filter(v => v.trim());
-    if (validVariations.length < 3) {
-      toast.error('Mínimo de 3 variações de mensagem obrigatório');
+    if (validVariations.length < 1) {
+      toast.error('Mínimo de 1 variação de mensagem obrigatório');
       return;
     }
 
@@ -284,7 +284,7 @@ export const BroadcastTemplates: React.FC = () => {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Variações da Mensagem (mínimo 3)</Label>
+                <Label>Variações da Mensagem (mínimo 1)</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -317,7 +317,7 @@ export const BroadcastTemplates: React.FC = () => {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  {formData.variations.length > 3 && (
+                  {formData.variations.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
