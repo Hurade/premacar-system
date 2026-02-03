@@ -130,9 +130,8 @@ const ChatInterface: React.FC = () => {
       }).finally(() => {
         setIsCreatingConversation(false);
       });
-    } else if (conversations.length > 0 && !selectedChatId && !newContactParam) {
-      setSelectedChatId(conversations[0].id);
     }
+    // Removido: auto-seleção do primeiro chat ao entrar na página
   }, [conversations, selectedChatId, searchParams, createConversation, setSearchParams, isCreatingConversation]);
 
   // Mark as read when selecting conversation
@@ -265,8 +264,7 @@ const ChatInterface: React.FC = () => {
       const { data, error } = await supabase
         .from('contacts')
         .select('id, name, phone_number')
-        .order('name', { ascending: true })
-        .limit(100);
+        .order('name', { ascending: true });
       
       if (error) throw error;
       setContactsList(data || []);
