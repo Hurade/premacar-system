@@ -13,7 +13,7 @@ import viaLogoWhite from '@/assets/logo-via-white.png';
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'pipeline', label: 'Pipeline', icon: Kanban },
-  { id: 'chat', label: 'Chat Ao Vivo', icon: MessageSquare },
+  { id: 'chat', label: 'Chat', icon: MessageSquare },
   { id: 'contacts', label: 'Contatos', icon: Users },
   { id: 'broadcasts', label: 'Disparos', icon: Send },
   { id: 'scheduling', label: 'Agendamentos', icon: Calendar },

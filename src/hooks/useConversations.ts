@@ -555,6 +555,49 @@ export function useConversations() {
     }
   }, []);
 
+  // Create new conversation for a contact
+  const createConversation = useCallback(async (contactId: string): Promise<string> => {
+    try {
+      // First check if there's already an active conversation for this contact
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('contact_id', contactId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingConv) {
+        console.log('[useConversations] Conversation already exists:', existingConv.id);
+        return existingConv.id;
+      }
+
+      // Create new conversation
+      const { data: newConv, error } = await supabase
+        .from('conversations')
+        .insert({
+          contact_id: contactId,
+          status: 'human', // Start in human mode since it's manual
+          is_active: true,
+          started_at: new Date().toISOString(),
+          last_message_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('[useConversations] Created new conversation:', newConv.id);
+
+      // Fetch the full conversation with contact data
+      await fetchAndAddConversation(newConv.id);
+
+      return newConv.id;
+    } catch (err) {
+      console.error('[useConversations] Error creating conversation:', err);
+      throw err;
+    }
+  }, [fetchAndAddConversation]);
+
   return {
     conversations,
     loading,
@@ -566,6 +609,7 @@ export function useConversations() {
     assignConversation,
     finalizeConversation,
     deleteConversation,
+    createConversation,
     refetch: fetchConversations
   };
 }

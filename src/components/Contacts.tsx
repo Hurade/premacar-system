@@ -231,8 +231,22 @@ const Contacts: React.FC = () => {
     }
   };
 
-  const handleStartConversation = (phone: string) => {
-    navigate(`/chat?contact=${encodeURIComponent(phone)}`);
+  const handleStartConversation = async (contactId: string, phone: string) => {
+    // Primeiro verifica se já existe uma conversa ativa para esse contato
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('contact_id', contactId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (existingConv) {
+      // Se existe, navega diretamente para a conversa
+      navigate(`/chat?conversation=${existingConv.id}`);
+    } else {
+      // Se não existe, navega com parâmetro para criar nova conversa
+      navigate(`/chat?newContact=${contactId}&phone=${encodeURIComponent(phone)}`);
+    }
   };
 
   const getFolderById = (folderId: string | null) => {
@@ -425,7 +439,7 @@ const Contacts: React.FC = () => {
                             variant="ghost"
                             className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity" 
                             title="Iniciar Conversa"
-                            onClick={() => handleStartConversation(contact.phone_number)}
+                            onClick={() => handleStartConversation(contact.id, contact.phone_number)}
                           >
                             <MessageSquare className="w-4 h-4" />
                           </Button>

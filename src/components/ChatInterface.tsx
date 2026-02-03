@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2
+  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, ApiSource } from '../types';
 import { Badge } from './ui/badge';
@@ -13,6 +14,7 @@ import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +25,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Input } from './ui/input';
 
 type FilterType = 'all' | 'unread';
 
+interface ContactOption {
+  id: string;
+  name: string | null;
+  phone_number: string;
+}
+
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation } = useConversations();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -47,6 +65,12 @@ const ChatInterface: React.FC = () => {
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  
+  // Estados para modal de nova conversa
+  const [showNewConversationModal, setShowNewConversationModal] = useState(false);
+  const [contactsList, setContactsList] = useState<ContactOption[]>([]);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -77,18 +101,36 @@ const ChatInterface: React.FC = () => {
     });
   }, []);
 
-  // Auto-select first conversation or from URL param
+  // Handle URL params for conversation selection and new contact
   useEffect(() => {
-    // Check for conversation param in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const conversationParam = urlParams.get('conversation');
+    const conversationParam = searchParams.get('conversation');
+    const newContactParam = searchParams.get('newContact');
     
     if (conversationParam && conversations.some(c => c.id === conversationParam)) {
       setSelectedChatId(conversationParam);
-    } else if (conversations.length > 0 && !selectedChatId) {
+      // Limpar o parâmetro da URL após selecionar
+      searchParams.delete('conversation');
+      setSearchParams(searchParams, { replace: true });
+    } else if (newContactParam && !isCreatingConversation) {
+      // Criar nova conversa para o contato
+      setIsCreatingConversation(true);
+      createConversation(newContactParam).then(newConvId => {
+        setSelectedChatId(newConvId);
+        // Limpar parâmetros da URL
+        searchParams.delete('newContact');
+        searchParams.delete('phone');
+        setSearchParams(searchParams, { replace: true });
+        toast.success('Conversa iniciada!');
+      }).catch(err => {
+        console.error('Error creating conversation:', err);
+        toast.error('Erro ao iniciar conversa');
+      }).finally(() => {
+        setIsCreatingConversation(false);
+      });
+    } else if (conversations.length > 0 && !selectedChatId && !newContactParam) {
       setSelectedChatId(conversations[0].id);
     }
-  }, [conversations, selectedChatId]);
+  }, [conversations, selectedChatId, searchParams, createConversation, setSearchParams, isCreatingConversation]);
 
   // Mark as read when selecting conversation
   useEffect(() => {
@@ -213,6 +255,52 @@ const ChatInterface: React.FC = () => {
       setIsProcessingAction(false);
     }
   };
+
+  // Carregar lista de contatos para modal de nova conversa
+  const loadContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, name, phone_number')
+        .order('name', { ascending: true })
+        .limit(100);
+      
+      if (error) throw error;
+      setContactsList(data || []);
+    } catch (err) {
+      console.error('Error loading contacts:', err);
+      toast.error('Erro ao carregar contatos');
+    }
+  };
+
+  const handleOpenNewConversationModal = () => {
+    loadContacts();
+    setContactSearchQuery('');
+    setShowNewConversationModal(true);
+  };
+
+  const handleStartNewConversation = async (contact: ContactOption) => {
+    setIsCreatingConversation(true);
+    try {
+      const newConvId = await createConversation(contact.id);
+      setSelectedChatId(newConvId);
+      setShowNewConversationModal(false);
+      toast.success('Conversa iniciada com sucesso!');
+    } catch (err) {
+      console.error('Error starting conversation:', err);
+      toast.error('Erro ao iniciar conversa');
+    } finally {
+      setIsCreatingConversation(false);
+    }
+  };
+
+  const filteredContactsList = contactsList.filter(contact => {
+    const query = contactSearchQuery.toLowerCase();
+    return (
+      (contact.name?.toLowerCase() || '').includes(query) ||
+      contact.phone_number.includes(query)
+    );
+  });
 
   const filteredConversations = conversations.filter(chat => {
     // Filtro por não lidas
@@ -392,7 +480,18 @@ const ChatInterface: React.FC = () => {
       <div className="w-80 lg:w-96 border-r border-slate-800 flex flex-col bg-slate-900/50 backdrop-blur-md z-20 flex-shrink-0">
         {/* Search Header */}
         <div className="p-4 border-b border-slate-800/50 space-y-3">
-          <h2 className="text-lg font-bold text-white px-1">Chats Ativos</h2>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+            <Button
+              size="sm"
+              onClick={handleOpenNewConversationModal}
+              className="h-8 px-3 gap-1.5"
+              title="Iniciar nova conversa"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Novo</span>
+            </Button>
+          </div>
           
           {/* Search */}
           <div className="relative group">
@@ -1052,6 +1151,64 @@ const ChatInterface: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* New Conversation Modal */}
+      <Dialog open={showNewConversationModal} onOpenChange={setShowNewConversationModal}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-cyan-400" />
+              Nova Conversa
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Selecione um contato para iniciar uma nova conversa
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Busca de contatos */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <Input
+                placeholder="Buscar por nome ou telefone..."
+                value={contactSearchQuery}
+                onChange={(e) => setContactSearchQuery(e.target.value)}
+                className="pl-9 bg-slate-800 border-slate-700 text-slate-200 placeholder:text-slate-500"
+              />
+            </div>
+
+            {/* Lista de contatos */}
+            <div className="max-h-64 overflow-y-auto space-y-1 border border-slate-800 rounded-lg p-2 bg-slate-950/50">
+              {filteredContactsList.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Phone className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Nenhum contato encontrado</p>
+                </div>
+              ) : (
+                filteredContactsList.map((contact) => (
+                  <button
+                    key={contact.id}
+                    onClick={() => handleStartNewConversation(contact)}
+                    disabled={isCreatingConversation}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-left group disabled:opacity-50"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-cyan-400 flex-shrink-0">
+                      {(contact.name || contact.phone_number).substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
+                        {contact.name || 'Sem nome'}
+                      </p>
+                      <p className="text-xs text-slate-500 font-mono">{contact.phone_number}</p>
+                    </div>
+                    <MessageSquare className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
