@@ -68,12 +68,27 @@ export const SystemHealthCard: React.FC = () => {
   const fetchHealth = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('validate-setup');
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
+      const { data, error } = await supabase.functions.invoke('validate-setup', {
+        body: {},
+      });
+      
+      clearTimeout(timeoutId);
       
       if (error) throw error;
       setHealthData(data);
     } catch (error) {
       console.error('Error fetching health:', error);
+      // Set fallback data on error
+      setHealthData({
+        results: [],
+        overallStatus: 'warning',
+        summary: { ok: 0, total: 0, percentage: 0 },
+        message: '⚠️ Não foi possível verificar o sistema'
+      });
     } finally {
       setLoading(false);
     }
@@ -120,10 +135,18 @@ export const SystemHealthCard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className={`rounded-2xl border bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50 p-6`}>
-        <div className="flex items-center justify-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
-          <span className="text-sm text-slate-400">Verificando sistema...</span>
+      <div className={`rounded-2xl border bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50 p-4`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+            <span className="text-sm text-slate-400">Verificando sistema...</span>
+          </div>
+          <button
+            onClick={() => setLoading(false)}
+            className="text-xs text-slate-500 hover:text-slate-400"
+          >
+            Pular
+          </button>
         </div>
       </div>
     );

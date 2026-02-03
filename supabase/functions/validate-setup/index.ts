@@ -108,12 +108,18 @@ serve(async (req) => {
       const hasMetaApi = settings.whatsapp_access_token && settings.whatsapp_phone_number_id;
 
       if (hasEvolutionApi) {
-        // Test Evolution API connection
+        // Test Evolution API connection with timeout
         try {
           const evolutionUrl = `${settings.evolution_api_url}/instance/connectionState/${settings.evolution_instance_name}`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          
           const evResponse = await fetch(evolutionUrl, {
             headers: { 'apikey': settings.evolution_api_key },
+            signal: controller.signal,
           });
+          
+          clearTimeout(timeoutId);
           
           if (evResponse.ok) {
             const evData = await evResponse.json();
@@ -150,14 +156,20 @@ serve(async (req) => {
           });
         }
       } else if (hasMetaApi) {
-        // Test WhatsApp Meta API connection
+        // Test WhatsApp Meta API connection with timeout
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          
           const waResponse = await fetch(
             `https://graph.facebook.com/v18.0/${settings.whatsapp_phone_number_id}`,
             {
               headers: { Authorization: `Bearer ${settings.whatsapp_access_token}` },
+              signal: controller.signal,
             }
           );
+          
+          clearTimeout(timeoutId);
           
           if (waResponse.ok) {
             const waData = await waResponse.json();
@@ -179,7 +191,7 @@ serve(async (req) => {
             component: 'whatsapp',
             status: 'warning',
             message: 'Não foi possível validar WhatsApp Meta',
-            details: 'Erro de conexão com a API',
+            details: 'Timeout ou erro de conexão',
           });
         }
       } else {
@@ -207,12 +219,18 @@ serve(async (req) => {
         });
       }
 
-      // Check ElevenLabs (optional)
+      // Check ElevenLabs (optional) with timeout
       if (settings.elevenlabs_api_key) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          
           const elResponse = await fetch('https://api.elevenlabs.io/v1/user', {
             headers: { 'xi-api-key': settings.elevenlabs_api_key },
+            signal: controller.signal,
           });
+          
+          clearTimeout(timeoutId);
           
           if (elResponse.ok) {
             results.push({
