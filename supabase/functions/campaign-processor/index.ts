@@ -10,6 +10,7 @@ interface Campaign {
   id: string;
   name: string;
   template_id: string;
+  meta_template_id: string | null;
   status: string;
   daily_limit: number;
   interval_type: string;
@@ -26,6 +27,7 @@ interface Campaign {
   sent_today: number;
   total_sent: number;
   paused_until: string | null;
+  api_source: 'meta' | 'evolution';
 }
 
 interface Lead {
@@ -50,11 +52,174 @@ interface Template {
   media_urls: string[];
 }
 
+interface MetaTemplate {
+  id: string;
+  name: string;
+  display_name: string;
+  category: string;
+  language_code: string;
+  body_text: string;
+  header_text: string | null;
+  footer_text: string | null;
+  parameters_count: number;
+  parameters_mapping: Array<{index: number; field: string}>;
+}
+
 interface NinaSettings {
   evolution_api_url: string | null;
   evolution_api_key: string | null;
   evolution_instance_name: string | null;
+  meta_phone_number_id: string | null;
+  meta_access_token: string | null;
   timezone: string;
+}
+
+// Função para enviar template via Meta API
+async function sendTemplateViaMeta(
+  phoneNumber: string,
+  metaTemplate: MetaTemplate,
+  lead: Lead,
+  settings: NinaSettings
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const url = `https://graph.facebook.com/v18.0/${settings.meta_phone_number_id}/messages`;
+  
+  // Formatar número: remover caracteres especiais e adicionar código do país
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  
+  console.log('[Meta Template] Enviando template');
+  console.log('[Meta Template] Para:', formattedPhone);
+  console.log('[Meta Template] Template:', metaTemplate.name);
+  
+  // Mapear parâmetros do lead para o template
+  const parameters: { type: string; text: string }[] = [];
+  
+  if (metaTemplate.parameters_mapping && metaTemplate.parameters_mapping.length > 0) {
+    // Usar mapeamento configurado
+    for (const mapping of metaTemplate.parameters_mapping) {
+      let value = '';
+      switch (mapping.field) {
+        case 'name': value = lead.name || 'Cliente'; break;
+        case 'company': value = lead.company || ''; break;
+        case 'city': value = lead.city || ''; break;
+        case 'product': value = lead.product || ''; break;
+        case 'custom1': value = lead.custom1 || ''; break;
+        case 'custom2': value = lead.custom2 || ''; break;
+        case 'custom3': value = lead.custom3 || ''; break;
+        default: value = lead.name || 'Cliente';
+      }
+      parameters.push({ type: 'text', text: value || 'Cliente' });
+    }
+  } else if (metaTemplate.parameters_count > 0) {
+    // Fallback: usar nome como primeiro parâmetro
+    for (let i = 0; i < metaTemplate.parameters_count; i++) {
+      if (i === 0) {
+        parameters.push({ type: 'text', text: lead.name || 'Cliente' });
+      } else {
+        parameters.push({ type: 'text', text: '' });
+      }
+    }
+  }
+  
+  console.log('[Meta Template] Parâmetros:', parameters);
+  
+  // Construir payload do template
+  const payload: Record<string, unknown> = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: formattedPhone,
+    type: 'template',
+    template: {
+      name: metaTemplate.name,
+      language: {
+        code: metaTemplate.language_code || 'pt_BR'
+      },
+      components: parameters.length > 0 ? [
+        {
+          type: 'body',
+          parameters: parameters
+        }
+      ] : []
+    }
+  };
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${settings.meta_access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('[Meta Template] Erro na resposta:', data);
+      return {
+        success: false,
+        error: data.error?.message || 'Erro ao enviar template Meta'
+      };
+    }
+    
+    console.log('[Meta Template] Sucesso:', data);
+    return {
+      success: true,
+      messageId: data.messages?.[0]?.id
+    };
+    
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('[Meta Template] Erro ao enviar:', error);
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+}
+
+// Função para enviar mensagem via Evolution API
+async function sendMessageViaEvolution(
+  phoneNumber: string,
+  message: string,
+  settings: NinaSettings
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const evolutionUrl = `${settings.evolution_api_url}/message/sendText/${settings.evolution_instance_name}`;
+  
+  try {
+    const response = await fetch(evolutionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": settings.evolution_api_key!,
+      },
+      body: JSON.stringify({
+        number: phoneNumber,
+        text: message,
+      }),
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: responseData.message || "Evolution API error"
+      };
+    }
+
+    return {
+      success: true,
+      messageId: responseData.key?.id || null
+    };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
 }
 
 serve(async (req) => {
@@ -69,20 +234,12 @@ serve(async (req) => {
 
     console.log("[campaign-processor] Starting campaign processing...");
 
-    // Get nina settings for Evolution API config
+    // Get nina settings for API configs
     const { data: settings } = await supabase
       .from("nina_settings")
-      .select("evolution_api_url, evolution_api_key, evolution_instance_name, timezone")
+      .select("evolution_api_url, evolution_api_key, evolution_instance_name, meta_phone_number_id, meta_access_token, timezone")
       .limit(1)
       .single();
-
-    if (!settings?.evolution_api_url || !settings?.evolution_api_key || !settings?.evolution_instance_name) {
-      console.log("[campaign-processor] Evolution API not configured, skipping.");
-      return new Response(
-        JSON.stringify({ success: false, message: "Evolution API not configured" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     const ninaSettings = settings as NinaSettings;
     const now = new Date();
@@ -106,7 +263,22 @@ serve(async (req) => {
 
     for (const campaign of campaigns || []) {
       const campaignData = campaign as Campaign;
-      console.log(`[campaign-processor] Processing campaign: ${campaignData.name}`);
+      console.log(`[campaign-processor] Processing campaign: ${campaignData.name} (API: ${campaignData.api_source})`);
+
+      // Verificar configuração da API baseada na fonte
+      if (campaignData.api_source === 'meta') {
+        if (!ninaSettings?.meta_phone_number_id || !ninaSettings?.meta_access_token) {
+          console.log(`[campaign-processor] Meta API not configured for campaign ${campaignData.name}`);
+          results.push({ campaignId: campaignData.id, sent: false, reason: "meta_api_not_configured" });
+          continue;
+        }
+      } else {
+        if (!ninaSettings?.evolution_api_url || !ninaSettings?.evolution_api_key || !ninaSettings?.evolution_instance_name) {
+          console.log(`[campaign-processor] Evolution API not configured for campaign ${campaignData.name}`);
+          results.push({ campaignId: campaignData.id, sent: false, reason: "evolution_api_not_configured" });
+          continue;
+        }
+      }
 
       // Check if scheduled start is in the future
       if (campaignData.scheduled_start && new Date(campaignData.scheduled_start) > now) {
@@ -171,82 +343,110 @@ serve(async (req) => {
       }
 
       const lead = leads[0] as Lead;
+      let message = "";
+      let sendResult: { success: boolean; messageId?: string; error?: string };
 
-      // Get message template
-      const { data: template, error: templateError } = await supabase
-        .from("message_templates")
-        .select("*")
-        .eq("id", campaignData.template_id)
-        .single();
-
-      if (templateError || !template) {
-        console.error(`[campaign-processor] Template not found: ${campaignData.template_id}`);
-        continue;
-      }
-
-      const templateData = template as Template;
-      const variations = templateData.variations as string[];
-
-      if (!variations || variations.length === 0) {
-        console.error(`[campaign-processor] Template has no variations`);
-        continue;
-      }
-
-      // Select random variation
-      const variationIndex = Math.floor(Math.random() * variations.length);
-      let message = variations[variationIndex];
-
-      // Replace variables
-      message = message
-        .replace(/{nome}/g, lead.name || "")
-        .replace(/{empresa}/g, lead.company || "")
-        .replace(/{cidade}/g, lead.city || "")
-        .replace(/{produto}/g, lead.product || "")
-        .replace(/{custom1}/g, lead.custom1 || "")
-        .replace(/{custom2}/g, lead.custom2 || "")
-        .replace(/{custom3}/g, lead.custom3 || "");
-
-      // Clean up extra spaces from empty variables
-      message = message.replace(/\s+/g, " ").trim();
-
-      console.log(`[campaign-processor] Sending to ${lead.phone}: ${message.substring(0, 50)}...`);
-
-      try {
-        // Send via Evolution API
-        const evolutionUrl = `${ninaSettings.evolution_api_url}/message/sendText/${ninaSettings.evolution_instance_name}`;
-        
-        const response = await fetch(evolutionUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": ninaSettings.evolution_api_key!,
-          },
-          body: JSON.stringify({
-            number: lead.phone,
-            text: message,
-          }),
-        });
-
-        const responseData = await response.json();
-
-        if (!response.ok) {
-          throw new Error(responseData.message || "Evolution API error");
+      // Lógica diferente para Meta vs Evolution
+      if (campaignData.api_source === 'meta') {
+        // Para Meta: usar template aprovado
+        if (!campaignData.meta_template_id) {
+          console.error(`[campaign-processor] Campaign ${campaignData.name} uses Meta API but has no meta_template_id`);
+          results.push({ campaignId: campaignData.id, sent: false, reason: "no_meta_template" });
+          continue;
         }
 
+        // Buscar meta template
+        const { data: metaTemplate, error: metaTemplateError } = await supabase
+          .from("meta_templates")
+          .select("*")
+          .eq("id", campaignData.meta_template_id)
+          .single();
+
+        if (metaTemplateError || !metaTemplate) {
+          console.error(`[campaign-processor] Meta template not found: ${campaignData.meta_template_id}`);
+          results.push({ campaignId: campaignData.id, sent: false, reason: "meta_template_not_found" });
+          continue;
+        }
+
+        const metaTemplateData = metaTemplate as MetaTemplate;
+        
+        // Verificar se template está aprovado
+        if (metaTemplate.status !== 'approved') {
+          console.error(`[campaign-processor] Meta template not approved: ${metaTemplateData.name}`);
+          results.push({ campaignId: campaignData.id, sent: false, reason: "meta_template_not_approved" });
+          continue;
+        }
+
+        console.log(`[campaign-processor] Sending template "${metaTemplateData.name}" to ${lead.phone}`);
+
+        // Enviar via Meta Template API
+        sendResult = await sendTemplateViaMeta(lead.phone, metaTemplateData, lead, ninaSettings);
+        
+        // Gerar mensagem para log (substituir variáveis no body_text)
+        message = metaTemplateData.body_text
+          .replace(/\{\{1\}\}/g, lead.name || 'Cliente')
+          .replace(/\{\{2\}\}/g, lead.company || '')
+          .replace(/\{\{3\}\}/g, lead.city || '')
+          .replace(/\{\{4\}\}/g, lead.product || '');
+
+      } else {
+        // Para Evolution: usar message_templates existente
+        const { data: template, error: templateError } = await supabase
+          .from("message_templates")
+          .select("*")
+          .eq("id", campaignData.template_id)
+          .single();
+
+        if (templateError || !template) {
+          console.error(`[campaign-processor] Template not found: ${campaignData.template_id}`);
+          continue;
+        }
+
+        const templateData = template as Template;
+        const variations = templateData.variations as string[];
+
+        if (!variations || variations.length === 0) {
+          console.error(`[campaign-processor] Template has no variations`);
+          continue;
+        }
+
+        // Select random variation
+        const variationIndex = Math.floor(Math.random() * variations.length);
+        message = variations[variationIndex];
+
+        // Replace variables
+        message = message
+          .replace(/{nome}/g, lead.name || "")
+          .replace(/{empresa}/g, lead.company || "")
+          .replace(/{cidade}/g, lead.city || "")
+          .replace(/{produto}/g, lead.product || "")
+          .replace(/{custom1}/g, lead.custom1 || "")
+          .replace(/{custom2}/g, lead.custom2 || "")
+          .replace(/{custom3}/g, lead.custom3 || "");
+
+        // Clean up extra spaces from empty variables
+        message = message.replace(/\s+/g, " ").trim();
+
+        console.log(`[campaign-processor] Sending to ${lead.phone}: ${message.substring(0, 50)}...`);
+
+        // Enviar via Evolution API
+        sendResult = await sendMessageViaEvolution(lead.phone, message, ninaSettings);
+      }
+
+      // Processar resultado do envio
+      if (sendResult.success) {
         // Update lead status
         await supabase
           .from("campaign_leads")
           .update({
             status: "sent",
-            variation_used: variationIndex,
+            variation_used: 0,
             sent_at: new Date().toISOString(),
-            whatsapp_message_id: responseData.key?.id || null,
+            whatsapp_message_id: sendResult.messageId || null,
           })
           .eq("id", lead.id);
 
-        // ===== NOVO: Criar/atualizar contato e criar mensagem no chat =====
-        
-        // Buscar ou criar contato
+        // ===== Criar/atualizar contato e criar mensagem no chat =====
         let contactId: string | null = null;
         const { data: existingContact } = await supabase
           .from("contacts")
@@ -282,6 +482,7 @@ serve(async (req) => {
             .select("id")
             .eq("contact_id", contactId)
             .eq("is_active", true)
+            .eq("api_source", campaignData.api_source)
             .maybeSingle();
 
           if (existingConv) {
@@ -299,6 +500,7 @@ serve(async (req) => {
                 contact_id: contactId,
                 status: "paused", // Disparo começa pausado para não ter resposta automática
                 last_message_at: new Date().toISOString(),
+                api_source: campaignData.api_source,
               })
               .select("id")
               .single();
@@ -315,28 +517,29 @@ serve(async (req) => {
               .insert({
                 conversation_id: conversationId,
                 content: message,
-                from_type: "nina", // Usar nina para identificar como disparo automático
+                from_type: "nina",
                 type: "text",
                 status: "sent",
                 sent_at: new Date().toISOString(),
-                whatsapp_message_id: responseData.key?.id || null,
+                whatsapp_message_id: sendResult.messageId || null,
+                api_source: campaignData.api_source,
                 metadata: {
                   campaign_id: campaignData.id,
                   campaign_name: campaignData.name,
                   is_broadcast: true,
+                  is_template: campaignData.api_source === 'meta',
                 },
               });
             
             console.log(`[campaign-processor] Message saved to chat for conversation ${conversationId}`);
           }
         }
-        // ===== FIM NOVO =====
 
         // Update campaign counters
         const newSentToday = campaignData.sent_today + 1;
         const newTotalSent = campaignData.total_sent + 1;
 
-        let updateData: Record<string, any> = {
+        const updateData: Record<string, unknown> = {
           sent_today: newSentToday,
           total_sent: newTotalSent,
           last_sent_at: new Date().toISOString(),
@@ -359,16 +562,16 @@ serve(async (req) => {
         results.push({ campaignId: campaignData.id, sent: true });
         console.log(`[campaign-processor] Successfully sent message to ${lead.phone}`);
 
-      } catch (sendError: any) {
-        console.error(`[campaign-processor] Error sending message: ${sendError.message}`);
+      } else {
+        console.error(`[campaign-processor] Error sending message: ${sendResult.error}`);
 
         // Update lead with error
-        const attempts = (lead as any).attempts || 0;
+        const attempts = (lead as Lead & { attempts?: number }).attempts || 0;
         await supabase
           .from("campaign_leads")
           .update({
             status: attempts >= 2 ? "error" : "pending",
-            error_message: sendError.message,
+            error_message: sendResult.error,
             attempts: attempts + 1,
           })
           .eq("id", lead.id);
@@ -379,7 +582,7 @@ serve(async (req) => {
           .update({ total_errors: campaignData.total_sent + 1 })
           .eq("id", campaignData.id);
 
-        results.push({ campaignId: campaignData.id, sent: false, reason: sendError.message });
+        results.push({ campaignId: campaignData.id, sent: false, reason: sendResult.error });
       }
     }
 
@@ -388,10 +591,11 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     console.error("[campaign-processor] Error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }

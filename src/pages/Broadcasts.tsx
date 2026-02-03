@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, PlusCircle, FileText, History, Zap, MessageSquare, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Send, PlusCircle, FileText, History, Zap, MessageSquare, CheckCircle, AlertTriangle, Layers } from 'lucide-react';
 import { BroadcastCampaignsList } from '@/components/broadcasts/CampaignsList';
 import { BroadcastNewCampaign } from '@/components/broadcasts/NewCampaign';
 import { BroadcastTemplates } from '@/components/broadcasts/Templates';
 import { BroadcastHistory } from '@/components/broadcasts/History';
+import { MetaTemplatesManager } from '@/components/broadcasts/MetaTemplates';
 import { useCampaignStats } from '@/hooks/useCampaigns';
 
 const Broadcasts: React.FC = () => {
@@ -80,9 +81,13 @@ const Broadcasts: React.FC = () => {
                 <PlusCircle className="w-4 h-4" />
                 Nova Campanha
               </TabsTrigger>
+              <TabsTrigger value="meta-templates" className="flex items-center gap-2">
+                <Layers className="w-4 h-4" />
+                Templates Meta
+              </TabsTrigger>
               <TabsTrigger value="templates" className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
-                Modelos
+                Modelos Evolution
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
                 <History className="w-4 h-4" />
@@ -97,6 +102,9 @@ const Broadcasts: React.FC = () => {
             </TabsContent>
             <TabsContent value="new" className="h-full m-0 p-6">
               <BroadcastNewCampaign onSuccess={() => setActiveTab('campaigns')} />
+            </TabsContent>
+            <TabsContent value="meta-templates" className="h-full m-0 p-6">
+              <MetaTemplatesManager />
             </TabsContent>
             <TabsContent value="templates" className="h-full m-0 p-6">
               <BroadcastTemplates />

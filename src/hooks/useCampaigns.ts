@@ -49,6 +49,7 @@ export interface Campaign {
   name: string;
   description: string | null;
   template_id: string | null;
+  meta_template_id: string | null;
   status: 'draft' | 'active' | 'paused' | 'completed' | 'scheduled';
   daily_limit: number;
   interval_type: 'fixed' | 'random';
@@ -179,6 +180,7 @@ export function useCreateCampaign() {
         user_id: user.id,
         description: campaign.description,
         template_id: campaign.template_id,
+        meta_template_id: campaign.meta_template_id,
         status: campaign.status || 'draft',
         daily_limit: campaign.daily_limit || 100,
         interval_type: campaign.interval_type || 'random',
