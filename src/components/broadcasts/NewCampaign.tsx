@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useCreateCampaign, useImportLeads } from '@/hooks/useCampaigns';
 import { useMessageTemplates } from '@/hooks/useMessageTemplates';
+import { useApprovedMetaTemplates, MetaTemplate } from '@/hooks/useMetaTemplates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,6 +68,7 @@ const weekDays = [
 
 export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) => {
   const { data: templates } = useMessageTemplates();
+  const { data: metaTemplates } = useApprovedMetaTemplates();
   const createCampaign = useCreateCampaign();
   const importLeads = useImportLeads();
 
@@ -74,6 +76,7 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [templateId, setTemplateId] = useState('');
+  const [metaTemplateId, setMetaTemplateId] = useState('');
   const [dailyLimit, setDailyLimit] = useState(100);
   const [intervalType, setIntervalType] = useState<'fixed' | 'random'>('random');
   const [intervalMin, setIntervalMin] = useState(60);
@@ -294,10 +297,20 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
       toast.error('Nome da campanha é obrigatório');
       return;
     }
-    if (!templateId) {
-      toast.error('Selecione um modelo de mensagem');
-      return;
+    
+    // Validar template baseado na API selecionada
+    if (apiSource === 'meta') {
+      if (!metaTemplateId) {
+        toast.error('Selecione um Template Meta aprovado para usar a API oficial');
+        return;
+      }
+    } else {
+      if (!templateId) {
+        toast.error('Selecione um modelo de mensagem');
+        return;
+      }
     }
+    
     if (leads.length === 0) {
       toast.error('Importe pelo menos um lead');
       return;
@@ -316,7 +329,8 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
       const campaign = await createCampaign.mutateAsync({
         name: name.trim(),
         description: description.trim() || null,
-        template_id: templateId,
+        template_id: apiSource === 'evolution' ? templateId : null,
+        meta_template_id: apiSource === 'meta' ? metaTemplateId : null,
         status: startType === 'immediate' ? 'active' : 'scheduled',
         daily_limit: dailyLimit,
         interval_type: intervalType,
@@ -357,7 +371,7 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
   };
 
   const selectedTemplate = templates?.find(t => t.id === templateId);
-
+  const selectedMetaTemplate = metaTemplates?.find(t => t.id === metaTemplateId);
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Section 1: Basic Info */}
@@ -377,40 +391,32 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="template">Modelo de Mensagem *</Label>
-            <Select value={templateId} onValueChange={setTemplateId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um modelo" />
-              </SelectTrigger>
-              <SelectContent>
-                {templates?.map(template => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name} ({template.variations.length} variações)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* API Source Selector */}
           <div className="space-y-2">
             <Label>API de Envio *</Label>
-            <Select value={apiSource} onValueChange={(value: 'meta' | 'evolution') => setApiSource(value)}>
+            <Select value={apiSource} onValueChange={(value: 'meta' | 'evolution') => {
+              setApiSource(value);
+              // Limpar templates ao trocar de API
+              if (value === 'meta') {
+                setTemplateId('');
+              } else {
+                setMetaTemplateId('');
+              }
+            }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="meta">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <div className="w-2 h-2 rounded-full bg-primary" />
                     <span>Meta API Oficial</span>
                     <span className="text-xs text-muted-foreground">(Recomendado para prospecção)</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="evolution">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <div className="w-2 h-2 rounded-full bg-accent" />
                     <span>Evolution API</span>
                     <span className="text-xs text-muted-foreground">(Instância conectada)</span>
                   </div>
@@ -419,10 +425,63 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
             </Select>
             <p className="text-xs text-muted-foreground">
               {apiSource === 'meta' 
-                ? '🔵 As mensagens serão enviadas pela API oficial da Meta. Requer configuração na aba de APIs.'
-                : '🟢 As mensagens serão enviadas pela Evolution API conectada.'
+                ? '🔵 Templates pré-aprovados pela Meta para iniciar conversas.'
+                : '🟢 Mensagens personalizadas via Evolution API.'
               }
             </p>
+          </div>
+
+          {/* Template Selector - Condicional baseado na API */}
+          <div className="space-y-2">
+            <Label htmlFor="template">
+              {apiSource === 'meta' ? 'Template Meta *' : 'Modelo de Mensagem *'}
+            </Label>
+            {apiSource === 'meta' ? (
+              <>
+                <Select value={metaTemplateId} onValueChange={setMetaTemplateId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um template aprovado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {metaTemplates && metaTemplates.length > 0 ? (
+                      metaTemplates.map(template => (
+                        <SelectItem key={template.id} value={template.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{template.display_name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {template.parameters_count} params
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Nenhum template aprovado. Cadastre na aba "Templates Meta".
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+                {(!metaTemplates || metaTemplates.length === 0) && (
+                  <p className="text-xs text-yellow-500 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Cadastre templates na aba "Templates Meta" primeiro
+                  </p>
+                )}
+              </>
+            ) : (
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um modelo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates?.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name} ({template.variations.length} variações)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
@@ -436,7 +495,20 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
           />
         </div>
 
-        {selectedTemplate && (
+        {/* Preview do template selecionado */}
+        {apiSource === 'meta' && selectedMetaTemplate && (
+          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-primary mb-2">Preview do Template Meta:</h4>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{selectedMetaTemplate.body_text}</p>
+            {selectedMetaTemplate.parameters_count > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                * Variáveis {"{{1}}, {{2}}"}, etc. serão substituídas pelos dados do lead
+              </p>
+            )}
+          </div>
+        )}
+        
+        {apiSource === 'evolution' && selectedTemplate && (
           <div className="bg-secondary/30 rounded-lg p-4">
             <h4 className="text-sm font-medium text-muted-foreground mb-2">Preview do modelo:</h4>
             <p className="text-sm text-foreground">{selectedTemplate.variations[0]}</p>

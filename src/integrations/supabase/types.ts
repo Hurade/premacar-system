@@ -203,6 +203,7 @@ export type Database = {
           interval_min: number
           interval_type: string
           last_sent_at: string | null
+          meta_template_id: string | null
           name: string
           pause_after_count: number | null
           pause_duration_minutes: number | null
@@ -235,6 +236,7 @@ export type Database = {
           interval_min?: number
           interval_type?: string
           last_sent_at?: string | null
+          meta_template_id?: string | null
           name: string
           pause_after_count?: number | null
           pause_duration_minutes?: number | null
@@ -267,6 +269,7 @@ export type Database = {
           interval_min?: number
           interval_type?: string
           last_sent_at?: string | null
+          meta_template_id?: string | null
           name?: string
           pause_after_count?: number | null
           pause_duration_minutes?: number | null
@@ -285,6 +288,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "campaigns_meta_template_id_fkey"
+            columns: ["meta_template_id"]
+            isOneToOne: false
+            referencedRelation: "meta_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "campaigns_template_id_fkey"
             columns: ["template_id"]
@@ -868,6 +878,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meta_templates: {
+        Row: {
+          approved_at: string | null
+          body_text: string
+          category: string
+          created_at: string
+          display_name: string
+          footer_text: string | null
+          header_text: string | null
+          id: string
+          language_code: string
+          name: string
+          parameters_count: number
+          parameters_mapping: Json | null
+          rejected_reason: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          body_text: string
+          category?: string
+          created_at?: string
+          display_name: string
+          footer_text?: string | null
+          header_text?: string | null
+          id?: string
+          language_code?: string
+          name: string
+          parameters_count?: number
+          parameters_mapping?: Json | null
+          rejected_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          body_text?: string
+          category?: string
+          created_at?: string
+          display_name?: string
+          footer_text?: string | null
+          header_text?: string | null
+          id?: string
+          language_code?: string
+          name?: string
+          parameters_count?: number
+          parameters_mapping?: Json | null
+          rejected_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       nina_processing_queue: {
         Row: {
