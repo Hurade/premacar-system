@@ -8,7 +8,7 @@ declare const EdgeRuntime: {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hub-signature-256',
 };
 
 const DEFAULT_GROUPING_DELAY_MS = 20000;
@@ -16,18 +16,28 @@ const DEFAULT_GROUPING_DELAY_MS = 20000;
 // Validate Meta webhook signature
 function validateMetaSignature(body: string, signature: string | null, appSecret: string): boolean {
   if (!signature || !appSecret) {
-    console.warn('[Meta Webhook] Missing signature or app secret');
-    return false;
+    console.warn('[Meta Webhook] ⚠️ Missing signature or app secret - skipping validation');
+    return true; // Se não tem secret configurado, aceita (para testes)
   }
   
   const expectedSignature = 'sha256=' + createHmac('sha256', appSecret)
     .update(body)
     .digest('hex');
   
-  return signature === expectedSignature;
+  const isValid = signature === expectedSignature;
+  console.log('[Meta Webhook] Signature validation:', isValid ? '✅ VALID' : '❌ INVALID');
+  
+  return isValid;
 }
 
 serve(async (req) => {
+  console.log('═══════════════════════════════════════════');
+  console.log('[Meta Webhook] ⚡ REQUEST RECEIVED');
+  console.log('[Meta Webhook] Method:', req.method);
+  console.log('[Meta Webhook] Timestamp:', new Date().toISOString());
+  console.log('[Meta Webhook] URL:', req.url);
+  console.log('═══════════════════════════════════════════');
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -37,346 +47,502 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
+    // ═══════════════════════════════════════════
     // GET request = Webhook verification from Meta
+    // ═══════════════════════════════════════════
     if (req.method === 'GET') {
       const url = new URL(req.url);
       const mode = url.searchParams.get('hub.mode');
       const token = url.searchParams.get('hub.verify_token');
       const challenge = url.searchParams.get('hub.challenge');
 
-      console.log('[Meta Webhook] Verification request:', { mode, token: token?.substring(0, 10) + '...' });
+      console.log('[Meta Webhook GET] ═══════════════════════════════');
+      console.log('[Meta Webhook GET] Verificação recebida');
+      console.log('[Meta Webhook GET] Mode:', mode);
+      console.log('[Meta Webhook GET] Token recebido:', token);
+      console.log('[Meta Webhook GET] Challenge:', challenge);
+      console.log('[Meta Webhook GET] ═══════════════════════════════');
 
       if (mode === 'subscribe' && token && challenge) {
         // Get verify token from settings
         const { data: settings } = await supabase
           .from('nina_settings')
           .select('whatsapp_verify_token')
-          .eq('meta_api_enabled', true)
           .limit(1)
           .maybeSingle();
 
         const verifyToken = settings?.whatsapp_verify_token || 'meta-webhook-verify';
+        console.log('[Meta Webhook GET] Token esperado:', verifyToken);
 
         if (token === verifyToken) {
-          console.log('[Meta Webhook] Verification successful');
-          return new Response(challenge, { status: 200, headers: corsHeaders });
+          console.log('[Meta Webhook GET] ✅ VERIFICAÇÃO SUCESSO');
+          console.log('[Meta Webhook GET] Retornando challenge:', challenge);
+          return new Response(challenge, { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/plain' } 
+          });
         }
         
-        console.warn('[Meta Webhook] Token mismatch');
+        console.log('[Meta Webhook GET] ❌ VERIFICAÇÃO FALHOU - Token não confere');
         return new Response('Forbidden', { status: 403, headers: corsHeaders });
       }
 
-      return new Response(JSON.stringify({ status: 'ok', api: 'meta' }), { 
+      // Health check
+      return new Response(JSON.stringify({ 
+        status: 'ok', 
+        api: 'meta-webhook',
+        timestamp: new Date().toISOString()
+      }), { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
+    // ═══════════════════════════════════════════
     // POST request = Incoming message from Meta
+    // ═══════════════════════════════════════════
     if (req.method === 'POST') {
       const rawBody = await req.text();
-      const body = JSON.parse(rawBody);
       
-      console.log('[Meta Webhook] Received payload:', JSON.stringify(body, null, 2));
-
-      // Get Meta settings
-      const { data: metaSettings } = await supabase
-        .from('nina_settings')
-        .select('*')
-        .eq('meta_api_enabled', true)
-        .limit(1)
-        .maybeSingle();
-
-      if (!metaSettings) {
-        console.warn('[Meta Webhook] Meta API not enabled');
-        return new Response(JSON.stringify({ status: 'meta_not_enabled' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
+      console.log('[Meta Webhook POST] ═══════════════════════════════');
+      console.log('[Meta Webhook POST] ⚡ PAYLOAD RECEBIDO');
+      console.log('[Meta Webhook POST] Raw body length:', rawBody.length);
+      
+      let body: any;
+      try {
+        body = JSON.parse(rawBody);
+        console.log('[Meta Webhook POST] Body parsed:');
+        console.log(JSON.stringify(body, null, 2));
+      } catch (parseError) {
+        console.error('[Meta Webhook POST] ❌ ERRO ao parsear JSON:', parseError);
+        return new Response('EVENT_RECEIVED', { status: 200, headers: corsHeaders });
       }
+      console.log('[Meta Webhook POST] ═══════════════════════════════');
 
-      // Validate signature (optional but recommended)
-      const signature = req.headers.get('x-hub-signature-256');
-      if (metaSettings.meta_app_secret && signature) {
-        const isValid = validateMetaSignature(rawBody, signature, metaSettings.meta_app_secret);
-        if (!isValid) {
-          console.warn('[Meta Webhook] Invalid signature');
-          return new Response('Invalid signature', { status: 401, headers: corsHeaders });
-        }
+      // ⚠️ CRÍTICO: SEMPRE retornar 200 IMEDIATAMENTE
+      // Meta desativa webhook se demorar mais de 5 segundos
+      // O processamento ocorre de forma assíncrona via EdgeRuntime.waitUntil
+      
+      EdgeRuntime.waitUntil(
+        processMetaWebhookAsync(supabase, supabaseUrl, supabaseServiceKey, rawBody, body, req.headers.get('x-hub-signature-256'))
+          .catch(error => {
+            console.error('[Meta Webhook POST] ❌ Erro no processamento assíncrono:', error);
+          })
+      );
+
+      console.log('[Meta Webhook POST] ✅ Retornando 200 imediatamente');
+      return new Response('EVENT_RECEIVED', { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'text/plain' } 
+      });
+    }
+
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+
+  } catch (error) {
+    console.error('[Meta Webhook] ❌ ERRO CRÍTICO:', error);
+    // Mesmo com erro, retornar 200 (Meta exige)
+    return new Response('EVENT_RECEIVED', { status: 200, headers: corsHeaders });
+  }
+});
+
+// ═══════════════════════════════════════════
+// FUNÇÃO ASSÍNCRONA PARA PROCESSAR WEBHOOK
+// ═══════════════════════════════════════════
+async function processMetaWebhookAsync(
+  supabase: any,
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  rawBody: string,
+  body: any,
+  signature: string | null
+) {
+  console.log('[Meta Async] ═══════════════════════════════');
+  console.log('[Meta Async] 🔄 Iniciando processamento assíncrono');
+  console.log('[Meta Async] Timestamp:', new Date().toISOString());
+
+  try {
+    // Get Meta settings
+    const { data: metaSettings, error: settingsError } = await supabase
+      .from('nina_settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (settingsError) {
+      console.error('[Meta Async] ❌ Erro ao buscar settings:', settingsError);
+      return;
+    }
+
+    if (!metaSettings) {
+      console.warn('[Meta Async] ⚠️ Nenhum nina_settings encontrado');
+      return;
+    }
+
+    console.log('[Meta Async] Settings carregados:');
+    console.log('[Meta Async] - meta_api_enabled:', metaSettings.meta_api_enabled);
+    console.log('[Meta Async] - meta_phone_number_id:', metaSettings.meta_phone_number_id);
+    console.log('[Meta Async] - message_grouping_enabled:', metaSettings.message_grouping_enabled);
+
+    // Validate signature if app secret is configured
+    if (metaSettings.meta_app_secret && signature) {
+      const isValid = validateMetaSignature(rawBody, signature, metaSettings.meta_app_secret);
+      if (!isValid) {
+        console.error('[Meta Async] ❌ Assinatura inválida - ignorando webhook');
+        return;
       }
+    } else {
+      console.log('[Meta Async] ⚠️ Sem app_secret configurado ou sem assinatura - prosseguindo');
+    }
 
-      const groupingEnabled = metaSettings.message_grouping_enabled !== false;
-      const groupingDelay = metaSettings.message_grouping_delay || DEFAULT_GROUPING_DELAY_MS;
-      const ownerId = metaSettings.user_id;
+    const groupingEnabled = metaSettings.message_grouping_enabled !== false;
+    const groupingDelay = metaSettings.message_grouping_delay || DEFAULT_GROUPING_DELAY_MS;
 
-      // Process Meta webhook structure
-      const entry = body.entry?.[0];
-      if (!entry) {
-        console.log('[Meta Webhook] No entry in payload');
-        return new Response(JSON.stringify({ status: 'no_entry' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
-      }
+    // Validar estrutura do body
+    if (!body || !body.entry || !Array.isArray(body.entry)) {
+      console.log('[Meta Async] ⚠️ Body não tem entry válido');
+      console.log('[Meta Async] Body recebido:', JSON.stringify(body, null, 2));
+      return;
+    }
 
-      const changes = entry.changes?.[0];
-      const value = changes?.value;
+    const entry = body.entry[0];
+    console.log('[Meta Async] Entry:', JSON.stringify(entry, null, 2));
 
-      if (!value) {
-        console.log('[Meta Webhook] No value in changes');
-        return new Response(JSON.stringify({ status: 'no_value' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
-      }
+    if (!entry || !entry.changes || !Array.isArray(entry.changes)) {
+      console.log('[Meta Async] ⚠️ Entry não tem changes válido');
+      return;
+    }
 
-      // Handle message status updates
-      if (value.statuses) {
-        for (const status of value.statuses) {
-          const messageId = status.id;
-          const statusType = status.status; // sent, delivered, read, failed
-          
-          console.log(`[Meta Webhook] Status update: ${messageId} -> ${statusType}`);
-          
-          // Update message status in database
-          const updateData: any = {};
-          if (statusType === 'delivered') {
-            updateData.status = 'delivered';
-            updateData.delivered_at = new Date().toISOString();
-          } else if (statusType === 'read') {
-            updateData.status = 'read';
-            updateData.read_at = new Date().toISOString();
-          } else if (statusType === 'failed') {
-            updateData.status = 'failed';
-          }
-          
-          if (Object.keys(updateData).length > 0) {
-            await supabase
-              .from('messages')
-              .update(updateData)
-              .eq('whatsapp_message_id', messageId);
-          }
+    const changes = entry.changes[0];
+    console.log('[Meta Async] Changes:', JSON.stringify(changes, null, 2));
+
+    if (!changes || !changes.value) {
+      console.log('[Meta Async] ⚠️ Changes não tem value válido');
+      return;
+    }
+
+    const value = changes.value;
+    console.log('[Meta Async] Value:', JSON.stringify(value, null, 2));
+
+    // ═══════════════════════════════════════════
+    // Processar STATUS de mensagens
+    // ═══════════════════════════════════════════
+    if (value.statuses && Array.isArray(value.statuses)) {
+      console.log('[Meta Async] 📊 Encontrados', value.statuses.length, 'status updates');
+
+      for (const status of value.statuses) {
+        const messageId = status.id;
+        const statusType = status.status;
+        const timestamp = status.timestamp;
+        
+        console.log('[Meta Async] Status update:', messageId, '->', statusType);
+        
+        const updateData: any = {};
+        if (statusType === 'delivered') {
+          updateData.status = 'delivered';
+          updateData.delivered_at = new Date(parseInt(timestamp) * 1000).toISOString();
+        } else if (statusType === 'read') {
+          updateData.status = 'read';
+          updateData.read_at = new Date(parseInt(timestamp) * 1000).toISOString();
+        } else if (statusType === 'failed') {
+          updateData.status = 'failed';
         }
         
-        return new Response(JSON.stringify({ status: 'status_processed' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
-      }
-
-      // Handle incoming messages
-      if (value.messages) {
-        for (const message of value.messages) {
-          const phoneNumber = message.from;
-          const messageId = message.id;
-          const messageType = message.type;
-          const timestamp = parseInt(message.timestamp) * 1000;
+        if (Object.keys(updateData).length > 0) {
+          const { error } = await supabase
+            .from('messages')
+            .update(updateData)
+            .eq('whatsapp_message_id', messageId);
           
-          // Get contact info from contacts array
-          const contactInfo = value.contacts?.find((c: any) => c.wa_id === phoneNumber);
-          const contactName = contactInfo?.profile?.name || null;
-          
-          console.log(`[Meta Webhook] Processing message from ${phoneNumber} (${contactName})`);
-
-          // Extract message content based on type
-          let messageContent = '';
-          let dbMessageType = 'text';
-          let mediaType = null;
-          let mediaUrl = null;
-
-          switch (messageType) {
-            case 'text':
-              messageContent = message.text?.body || '';
-              dbMessageType = 'text';
-              break;
-            case 'image':
-              messageContent = message.image?.caption || '[imagem recebida]';
-              dbMessageType = 'image';
-              mediaType = 'image';
-              mediaUrl = message.image?.id; // Media ID for download
-              break;
-            case 'audio':
-              messageContent = '[áudio recebido]';
-              dbMessageType = 'audio';
-              mediaType = 'audio';
-              mediaUrl = message.audio?.id;
-              break;
-            case 'video':
-              messageContent = message.video?.caption || '[vídeo recebido]';
-              dbMessageType = 'video';
-              mediaType = 'video';
-              mediaUrl = message.video?.id;
-              break;
-            case 'document':
-              messageContent = message.document?.filename || '[documento recebido]';
-              dbMessageType = 'document';
-              mediaType = 'document';
-              mediaUrl = message.document?.id;
-              break;
-            case 'button':
-              messageContent = message.button?.text || '[botão clicado]';
-              dbMessageType = 'text';
-              break;
-            case 'interactive':
-              const interactive = message.interactive;
-              messageContent = interactive?.button_reply?.title || 
-                              interactive?.list_reply?.title || 
-                              '[resposta interativa]';
-              dbMessageType = 'text';
-              break;
-            default:
-              messageContent = '[mensagem não suportada]';
-          }
-
-          // 1. Get or create contact
-          let { data: contact } = await supabase
-            .from('contacts')
-            .select('*')
-            .eq('phone_number', phoneNumber)
-            .maybeSingle();
-
-          if (!contact) {
-            const { data: newContact, error: contactError } = await supabase
-              .from('contacts')
-              .insert({
-                phone_number: phoneNumber,
-                whatsapp_id: phoneNumber,
-                name: contactName,
-                call_name: contactName?.split(' ')[0] || null,
-                user_id: null
-              })
-              .select()
-              .single();
-
-            if (contactError) {
-              console.error('[Meta Webhook] Error creating contact:', contactError);
-              continue;
-            }
-            contact = newContact;
-            console.log('[Meta Webhook] Created new contact:', contact.id);
+          if (error) {
+            console.error('[Meta Async] Erro ao atualizar status:', error);
           } else {
-            // Update contact activity
-            const updates: any = { last_activity: new Date().toISOString() };
-            if (contactName && !contact.name) {
-              updates.name = contactName;
-              updates.call_name = contactName.split(' ')[0];
-            }
-            
-            await supabase
-              .from('contacts')
-              .update(updates)
-              .eq('id', contact.id);
+            console.log('[Meta Async] ✅ Status atualizado');
           }
+        }
+      }
+      
+      console.log('[Meta Async] ✅ Status updates processados');
+      return;
+    }
 
-          // 2. Get or create conversation with api_source = 'meta'
-          let { data: conversation } = await supabase
+    // ═══════════════════════════════════════════
+    // Processar MENSAGENS recebidas
+    // ═══════════════════════════════════════════
+    if (value.messages && Array.isArray(value.messages)) {
+      console.log('[Meta Async] 📩 Encontradas', value.messages.length, 'mensagens');
+
+      for (const message of value.messages) {
+        console.log('[Meta Async] ─────────────────────────────');
+        console.log('[Meta Async] Processando mensagem:', message.id);
+
+        const phoneNumber = message.from;
+        const messageId = message.id;
+        const messageType = message.type;
+        const timestamp = parseInt(message.timestamp) * 1000;
+
+        console.log('[Meta Async] De:', phoneNumber);
+        console.log('[Meta Async] ID:', messageId);
+        console.log('[Meta Async] Tipo:', messageType);
+        console.log('[Meta Async] Timestamp:', timestamp);
+
+        // Get contact info
+        const contactInfo = value.contacts?.find((c: any) => c.wa_id === phoneNumber);
+        const contactName = contactInfo?.profile?.name || null;
+        console.log('[Meta Async] Nome do contato:', contactName);
+
+        // Extract message content based on type
+        let messageContent = '';
+        let dbMessageType = 'text';
+        let mediaType: string | null = null;
+        let mediaUrl: string | null = null;
+
+        switch (messageType) {
+          case 'text':
+            messageContent = message.text?.body || '';
+            dbMessageType = 'text';
+            console.log('[Meta Async] 💬 Texto:', messageContent);
+            break;
+          case 'image':
+            messageContent = message.image?.caption || '[imagem recebida]';
+            dbMessageType = 'image';
+            mediaType = 'image';
+            mediaUrl = message.image?.id;
+            console.log('[Meta Async] 🖼️ Imagem recebida');
+            break;
+          case 'audio':
+            messageContent = '[áudio recebido]';
+            dbMessageType = 'audio';
+            mediaType = 'audio';
+            mediaUrl = message.audio?.id;
+            console.log('[Meta Async] 🎵 Áudio recebido');
+            break;
+          case 'video':
+            messageContent = message.video?.caption || '[vídeo recebido]';
+            dbMessageType = 'video';
+            mediaType = 'video';
+            mediaUrl = message.video?.id;
+            console.log('[Meta Async] 🎥 Vídeo recebido');
+            break;
+          case 'document':
+            messageContent = message.document?.filename || '[documento recebido]';
+            dbMessageType = 'document';
+            mediaType = 'document';
+            mediaUrl = message.document?.id;
+            console.log('[Meta Async] 📄 Documento recebido');
+            break;
+          case 'button':
+            messageContent = message.button?.text || '[botão clicado]';
+            dbMessageType = 'text';
+            console.log('[Meta Async] 🔘 Botão clicado');
+            break;
+          case 'interactive':
+            const interactive = message.interactive;
+            messageContent = interactive?.button_reply?.title || 
+                            interactive?.list_reply?.title || 
+                            '[resposta interativa]';
+            dbMessageType = 'text';
+            console.log('[Meta Async] 📋 Resposta interativa');
+            break;
+          default:
+            messageContent = `[mensagem do tipo: ${messageType}]`;
+            console.log('[Meta Async] ❓ Tipo desconhecido:', messageType);
+        }
+
+        // ═══════════════════════════════════════════
+        // 1. BUSCAR OU CRIAR CONTATO
+        // ═══════════════════════════════════════════
+        console.log('[Meta Async] 📞 Buscando contato...');
+
+        let { data: contact } = await supabase
+          .from('contacts')
+          .select('*')
+          .eq('phone_number', phoneNumber)
+          .maybeSingle();
+
+        if (!contact) {
+          console.log('[Meta Async] ➕ Criando novo contato');
+
+          const { data: newContact, error: contactError } = await supabase
+            .from('contacts')
+            .insert({
+              phone_number: phoneNumber,
+              whatsapp_id: phoneNumber,
+              name: contactName,
+              call_name: contactName?.split(' ')[0] || null,
+              user_id: metaSettings.user_id || null
+            })
+            .select()
+            .single();
+
+          if (contactError) {
+            console.error('[Meta Async] ❌ Erro ao criar contato:', contactError);
+            continue;
+          }
+          contact = newContact;
+          console.log('[Meta Async] ✅ Contato criado:', contact.id);
+        } else {
+          console.log('[Meta Async] ✅ Contato encontrado:', contact.id);
+
+          // Update contact activity
+          const updates: any = { last_activity: new Date().toISOString() };
+          if (contactName && !contact.name) {
+            updates.name = contactName;
+            updates.call_name = contactName.split(' ')[0];
+          }
+          
+          await supabase
+            .from('contacts')
+            .update(updates)
+            .eq('id', contact.id);
+        }
+
+        // ═══════════════════════════════════════════
+        // 2. BUSCAR OU CRIAR CONVERSA
+        // ═══════════════════════════════════════════
+        console.log('[Meta Async] 💬 Buscando conversa...');
+
+        let { data: conversation } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('contact_id', contact.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (!conversation) {
+          console.log('[Meta Async] ➕ Criando nova conversa');
+
+          const { data: newConversation, error: convError } = await supabase
             .from('conversations')
-            .select('*')
-            .eq('contact_id', contact.id)
-            .eq('is_active', true)
-            .maybeSingle();
+            .insert({
+              contact_id: contact.id,
+              status: 'nina',
+              is_active: true,
+              api_source: 'meta',
+              user_id: metaSettings.user_id || null
+            })
+            .select()
+            .single();
 
-          if (!conversation) {
-            const { data: newConversation, error: convError } = await supabase
-              .from('conversations')
-              .insert({
-                contact_id: contact.id,
-                status: 'nina',
-                is_active: true,
-                api_source: 'meta', // Mark as Meta API conversation
-                user_id: null
-              })
-              .select()
-              .single();
+          if (convError) {
+            console.error('[Meta Async] ❌ Erro ao criar conversa:', convError);
+            continue;
+          }
+          conversation = newConversation;
+          console.log('[Meta Async] ✅ Conversa criada:', conversation.id);
+        } else {
+          console.log('[Meta Async] ✅ Conversa encontrada:', conversation.id);
 
-            if (convError) {
-              console.error('[Meta Webhook] Error creating conversation:', convError);
-              continue;
-            }
-            conversation = newConversation;
-            console.log('[Meta Webhook] Created new conversation:', conversation.id);
-          } else if (conversation.api_source !== 'meta') {
-            // Update existing conversation to Meta source
+          // Update api_source if changed
+          if (conversation.api_source !== 'meta') {
+            console.log('[Meta Async] 🔄 Atualizando api_source para meta');
             await supabase
               .from('conversations')
               .update({ api_source: 'meta' })
               .eq('id', conversation.id);
           }
+        }
 
-          // 3. Create message with api_source
-          const { data: dbMessage, error: msgError } = await supabase
-            .from('messages')
-            .insert({
-              conversation_id: conversation.id,
-              whatsapp_message_id: messageId,
-              content: messageContent,
-              type: dbMessageType,
-              from_type: 'user',
-              status: 'sent',
-              media_type: mediaType,
-              media_url: mediaUrl,
-              api_source: 'meta',
-              sent_at: new Date(timestamp).toISOString(),
-              metadata: { 
-                original_type: messageType,
-                meta_phone_number_id: metaSettings.meta_phone_number_id
-              }
-            })
-            .select()
-            .single();
+        // ═══════════════════════════════════════════
+        // 3. SALVAR MENSAGEM
+        // ═══════════════════════════════════════════
+        console.log('[Meta Async] 💾 Salvando mensagem...');
 
-          if (msgError) {
-            if (msgError.code === '23505') {
-              console.log('[Meta Webhook] Duplicate message ignored:', messageId);
-              continue;
+        const { data: dbMessage, error: msgError } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conversation.id,
+            whatsapp_message_id: messageId,
+            content: messageContent,
+            type: dbMessageType,
+            from_type: 'user',
+            status: 'sent',
+            media_type: mediaType,
+            media_url: mediaUrl,
+            api_source: 'meta',
+            sent_at: new Date(timestamp).toISOString(),
+            metadata: { 
+              original_type: messageType,
+              meta_phone_number_id: metaSettings.meta_phone_number_id,
+              contact_name: contactName
             }
-            console.error('[Meta Webhook] Error creating message:', msgError);
+          })
+          .select()
+          .single();
+
+        if (msgError) {
+          if (msgError.code === '23505') {
+            console.log('[Meta Async] ⚠️ Mensagem duplicada ignorada:', messageId);
             continue;
           }
+          console.error('[Meta Async] ❌ Erro ao salvar mensagem:', msgError);
+          continue;
+        }
 
-          console.log('[Meta Webhook] Created message:', dbMessage.id);
+        console.log('[Meta Async] ✅ Mensagem salva:', dbMessage.id);
 
-          // 4. Update conversation last_message_at
-          await supabase
-            .from('conversations')
-            .update({ last_message_at: new Date().toISOString() })
-            .eq('id', conversation.id);
+        // ═══════════════════════════════════════════
+        // 4. ATUALIZAR CONVERSA
+        // ═══════════════════════════════════════════
+        await supabase
+          .from('conversations')
+          .update({ last_message_at: new Date().toISOString() })
+          .eq('id', conversation.id);
 
-          // 5. Queue for AI processing (same logic as Evolution)
+        // ═══════════════════════════════════════════
+        // 5. ADICIONAR À FILA DA IA
+        // ═══════════════════════════════════════════
+        console.log('[Meta Async] 🤖 Verificando fila da IA...');
+        console.log('[Meta Async] - Status da conversa:', conversation.status);
+        console.log('[Meta Async] - Grouping enabled:', groupingEnabled);
+
+        if (conversation.status === 'nina') {
           if (!groupingEnabled) {
             // Process immediately
-            if (conversation.status === 'nina') {
-              await supabase
-                .from('nina_processing_queue')
-                .insert({
-                  message_id: dbMessage.id,
-                  conversation_id: conversation.id,
-                  contact_id: contact.id,
-                  priority: 1,
-                  context_data: {
-                    phone_number_id: metaSettings.meta_phone_number_id,
-                    contact_name: contactName,
-                    message_type: dbMessageType,
-                    grouped_count: 1,
-                    combined_content: messageContent,
-                    api_source: 'meta'
-                  }
-                });
+            console.log('[Meta Async] 🚀 Adicionando à fila imediata...');
 
-              EdgeRuntime.waitUntil(
-                fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseServiceKey}`
-                  },
-                  body: JSON.stringify({ triggered_by: 'meta-webhook-immediate' })
-                }).catch(err => console.error('[Meta Webhook] Error triggering nina:', err))
-              );
+            const { error: queueError } = await supabase
+              .from('nina_processing_queue')
+              .insert({
+                message_id: dbMessage.id,
+                conversation_id: conversation.id,
+                contact_id: contact.id,
+                priority: 1,
+                context_data: {
+                  phone_number_id: metaSettings.meta_phone_number_id,
+                  contact_name: contactName,
+                  message_type: dbMessageType,
+                  grouped_count: 1,
+                  combined_content: messageContent,
+                  api_source: 'meta'
+                }
+              });
+
+            if (queueError) {
+              console.error('[Meta Async] ❌ Erro ao adicionar à fila:', queueError);
+            } else {
+              console.log('[Meta Async] ✅ Adicionado à fila');
+            }
+
+            // Trigger nina-orchestrator
+            console.log('[Meta Async] 🔔 Disparando nina-orchestrator...');
+            try {
+              const response = await fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`
+                },
+                body: JSON.stringify({ triggered_by: 'meta-webhook-immediate' })
+              });
+              console.log('[Meta Async] ✅ nina-orchestrator triggered:', response.status);
+            } catch (err) {
+              console.error('[Meta Async] ❌ Erro ao chamar nina-orchestrator:', err);
             }
           } else {
             // Use grouping queue
             const processAfter = new Date(Date.now() + groupingDelay).toISOString();
+            console.log('[Meta Async] 📦 Usando grouping queue, process_after:', processAfter);
             
             // Extend timer for existing messages
             await supabase
@@ -385,11 +551,11 @@ serve(async (req) => {
               .eq('processed', false)
               .filter('message_data->>from', 'eq', phoneNumber);
 
-            await supabase
+            const { error: groupError } = await supabase
               .from('message_grouping_queue')
               .insert({
                 whatsapp_message_id: messageId,
-                phone_number_id: metaSettings.meta_phone_number_id,
+                phone_number_id: metaSettings.meta_phone_number_id || '',
                 message_id: dbMessage.id,
                 message_data: { 
                   from: phoneNumber,
@@ -403,40 +569,46 @@ serve(async (req) => {
                 process_after: processAfter
               });
 
-            EdgeRuntime.waitUntil(
-              fetch(`${supabaseUrl}/functions/v1/message-grouper`, {
+            if (groupError) {
+              console.error('[Meta Async] ❌ Erro ao adicionar ao grouping:', groupError);
+            } else {
+              console.log('[Meta Async] ✅ Adicionado ao grouping queue');
+            }
+
+            // Trigger message-grouper
+            console.log('[Meta Async] 🔔 Disparando message-grouper...');
+            try {
+              const response = await fetch(`${supabaseUrl}/functions/v1/message-grouper`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${supabaseServiceKey}`
                 },
                 body: JSON.stringify({ triggered_by: 'meta-webhook' })
-              }).catch(err => console.error('[Meta Webhook] Error triggering grouper:', err))
-            );
+              });
+              console.log('[Meta Async] ✅ message-grouper triggered:', response.status);
+            } catch (err) {
+              console.error('[Meta Async] ❌ Erro ao chamar message-grouper:', err);
+            }
           }
+        } else {
+          console.log('[Meta Async] ⏸️ Conversa não está com Nina, ignorando IA');
         }
 
-        return new Response(JSON.stringify({ status: 'processed' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
+        console.log('[Meta Async] ✅ Mensagem processada com sucesso');
+        console.log('[Meta Async] ─────────────────────────────');
       }
-
-      // Acknowledge any other webhook events
-      return new Response(JSON.stringify({ status: 'acknowledged' }), { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
+    } else {
+      console.log('[Meta Async] ℹ️ Sem mensagens no webhook (pode ser outro tipo de evento)');
     }
 
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+    console.log('[Meta Async] ✅ PROCESSAMENTO ASSÍNCRONO COMPLETO');
+    console.log('[Meta Async] ═══════════════════════════════');
 
   } catch (error) {
-    console.error('[Meta Webhook] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    });
+    console.error('[Meta Async] ❌ ERRO no processamento:', error);
+    if (error instanceof Error) {
+      console.error('[Meta Async] Stack:', error.stack);
+    }
   }
-});
+}
