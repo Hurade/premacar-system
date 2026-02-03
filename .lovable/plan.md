@@ -1,202 +1,51 @@
 
-# Plano: Sistema de Delay e Agrupamento de Mensagens Configurável
+# Plano: Permitir Modelo de Mensagem com 1 Variação
 
-## Resumo Executivo
+## Objetivo
+Alterar o sistema de modelos de mensagem para permitir criar modelos com apenas 1 variação de texto, em vez do mínimo obrigatório de 3 variações.
 
-O sistema atual já possui uma arquitetura de agrupamento de mensagens, mas com delay fixo de 10 segundos no código e 20 segundos no banco de dados, causando inconsistência. Este plano vai:
+## Alterações no Arquivo
 
-1. **Unificar e aumentar o delay** para 20 segundos (configurável)
-2. **Adicionar configurações no banco** para permitir customização
-3. **Melhorar o mecanismo de extensão do timer** quando novas mensagens chegam
-4. **Adicionar logs e monitoramento** para facilitar debug
+**Arquivo:** `src/components/broadcasts/Templates.tsx`
 
----
+### 1. Alterar o Estado Inicial do Formulário
+- **Linha 51**: Mudar de 3 variações vazias para apenas 1
+- De: `variations: ['', '', '']`
+- Para: `variations: ['']`
 
-## Arquitetura Atual (Como Funciona Hoje)
+### 2. Remover Padding de Variações ao Editar
+- **Linhas 77-78**: Remover lógica que força mínimo de 3 ao editar
+- Usar as variações existentes do modelo diretamente
 
-```text
-┌─────────────────────┐
-│  WhatsApp Webhook   │
-│  (recebe mensagem)  │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────────────────────────────────────────┐
-│  message_grouping_queue                                 │
-│  - Adiciona mensagem com process_after = now + 10s     │
-│  - Atualiza process_after de msgs pendentes do mesmo # │
-└─────────┬───────────────────────────────────────────────┘
-          │
-          ▼ (trigger após delay)
-┌─────────────────────┐
-│   Message Grouper   │
-│  - Agrupa mensagens │
-│  - Combina conteúdo │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│  Nina Orchestrator  │
-│  (processa IA)      │
-└─────────────────────┘
-```
+### 3. Permitir Remoção até 1 Variação
+- **Linha 96**: Mudar validação de mínimo de 3 para 1
+- De: `if (formData.variations.length <= 3)`
+- Para: `if (formData.variations.length <= 1)`
 
-**Problema identificado**: O delay no webhook (10s) está diferente do default do banco (20s), e o valor não é configurável pelo usuário.
+### 4. Validação ao Salvar
+- **Linha 120**: Mudar validação de 3 para 1
+- De: `if (validVariations.length < 3)`
+- Para: `if (validVariations.length < 1)`
 
----
+### 5. Atualizar Mensagens da Interface
+- **Linha 287**: Atualizar label de "mínimo 3" para "mínimo 1"
+- De: `Variações da Mensagem (mínimo 3)`
+- Para: `Variações da Mensagem (mínimo 1)`
 
-## Alterações Técnicas
+### 6. Botão de Remover Variação
+- **Linha 320**: Permitir remover se tiver mais de 1
+- De: `{formData.variations.length > 3 && ...}`
+- Para: `{formData.variations.length > 1 && ...}`
 
-### 1. Adicionar Colunas de Configuração no nina_settings
+## Resumo Visual
 
-```sql
-ALTER TABLE nina_settings 
-ADD COLUMN IF NOT EXISTS message_grouping_enabled BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS message_grouping_delay INTEGER DEFAULT 20000;
--- delay em milissegundos (20 segundos)
-```
+| Componente | Antes | Depois |
+|------------|-------|--------|
+| Variações iniciais | 3 | 1 |
+| Mínimo para remover | 3 | 1 |
+| Validação ao salvar | ≥ 3 | ≥ 1 |
+| Label do campo | "mínimo 3" | "mínimo 1" |
 
-Isso permitirá que cada usuário configure:
-- Se quer usar o agrupamento de mensagens
-- Qual o delay desejado (padrão: 20 segundos)
+## Observação
 
----
-
-### 2. Atualizar whatsapp-webhook/index.ts
-
-**Mudanças principais:**
-- Remover constante hardcoded `GROUPING_DELAY_MS = 10000`
-- Buscar delay das configurações do usuário (`message_grouping_delay`)
-- Se `message_grouping_enabled = false`, processar imediatamente sem delay
-- Adicionar logs melhorados para debug
-
-```typescript
-// ANTES
-const GROUPING_DELAY_MS = 10000; // hardcoded
-
-// DEPOIS
-// Buscar das settings do usuário
-const groupingDelay = ownerSettings?.message_grouping_delay || 20000;
-const groupingEnabled = ownerSettings?.message_grouping_enabled !== false;
-
-// Usar o valor dinâmico
-const processAfter = new Date(Date.now() + groupingDelay).toISOString();
-```
-
-**Lógica de extensão do timer melhorada:**
-Quando uma nova mensagem chega do mesmo número, o timer é **reiniciado** para que todas as mensagens sejam agrupadas:
-
-```typescript
-// Atualizar process_after de mensagens pendentes do mesmo telefone
-await supabase
-  .from('message_grouping_queue')
-  .update({ process_after: processAfter })
-  .eq('processed', false)
-  .filter('message_data->>from', 'eq', phoneNumber);
-```
-
----
-
-### 3. Atualizar message-grouper/index.ts
-
-**Mudanças principais:**
-- Adicionar logs detalhados mostrando quantas mensagens foram agrupadas
-- Melhorar tratamento de erros
-- Log do conteúdo combinado para debug
-
-```typescript
-console.log(`[MessageGrouper] Agrupando ${messages.length} mensagens de ${phoneNumber}`);
-console.log(`[MessageGrouper] Conteúdo combinado: ${combinedContent}`);
-```
-
----
-
-### 4. (Opcional) Adicionar UI de Configuração
-
-Em Settings → Configurações do Agente, adicionar:
-
-```text
-┌─────────────────────────────────────────────────────┐
-│ Agrupamento de Mensagens                            │
-│ ─────────────────────────────────────────────────── │
-│ [✓] Aguardar mensagens antes de responder           │
-│                                                     │
-│ Tempo de espera: [20] segundos                      │
-│ (Aguarda este tempo após cada mensagem antes de     │
-│  processar. Ideal: 15-30 segundos)                  │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Fluxo Após Implementação
-
-### Cenário 1: Cliente envia 3 mensagens em 10 segundos
-```text
-[00:00] Cliente: "oi"
-        → process_after = 00:20 (agora + 20s)
-        
-[00:03] Cliente: "quero saber da premacar"  
-        → Atualiza process_after = 00:23 (reinicia timer)
-        
-[00:08] Cliente: "tenho uma oficina"
-        → Atualiza process_after = 00:28 (reinicia timer)
-        
-[00:28] Timer expira
-        → Message Grouper combina: "oi\nquero saber da premacar\ntenho uma oficina"
-        → Nina responde UMA vez com contexto completo
-```
-
-### Cenário 2: Mensagem única
-```text
-[00:00] Cliente: "Olá, quero saber sobre a PremaCar"
-        → process_after = 00:20
-        
-[00:20] Timer expira
-        → Message Grouper processa 1 mensagem
-        → Nina responde
-```
-
-### Cenário 3: Conversa alternada (fluxo natural)
-```text
-[00:00] Cliente: "oi"
-[00:20] Nina: "Olá! Como posso ajudar?"
-[01:00] Cliente: "tenho uma oficina"
-[01:20] Nina: "Que legal! Trabalhamos com..."
-
-(Fluxo normal mantido - cada mensagem tem seu próprio timer)
-```
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Tipo de Mudança |
-|---------|-----------------|
-| `supabase/migrations/xxx_add_message_grouping_settings.sql` | Nova migration |
-| `supabase/functions/whatsapp-webhook/index.ts` | Usar delay dinâmico das settings |
-| `supabase/functions/message-grouper/index.ts` | Melhorar logs e tratamento |
-| `src/components/settings/AgentSettings.tsx` | Adicionar UI de configuração (opcional) |
-
----
-
-## Resultado Esperado
-
-| Situação | Antes | Depois |
-|----------|-------|--------|
-| 3 mensagens em 5s | 3 respostas da IA | 1 resposta com contexto completo |
-| 1 mensagem | Resposta após 10s | Resposta após 20s (configurável) |
-| Delay configurável | ❌ Hardcoded | ✅ Via settings |
-| Logs de debug | Básicos | Detalhados com contagem |
-
----
-
-## Validação e Testes
-
-Após implementação, testar:
-
-1. ✅ Enviar 3 mensagens seguidas em 5 segundos → Deve responder 1 vez após 20s
-2. ✅ Enviar 1 mensagem → Deve responder 1 vez após 20s  
-3. ✅ Conversa normal (cliente → IA → cliente → IA) → Deve funcionar naturalmente
-4. ✅ Enviar mensagem, aguardar 25s, enviar outra → Deve responder 2 vezes separadas
-5. ✅ Desabilitar agrupamento nas settings → Deve responder imediatamente
+Essa alteração mantém a flexibilidade de adicionar até 10 variações para quem quiser usar a rotação de mensagens, mas remove a obrigatoriedade para campanhas simples que precisam de apenas 1 mensagem.
