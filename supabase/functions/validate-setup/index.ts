@@ -103,16 +103,16 @@ serve(async (req) => {
         });
       }
 
-      // Check WhatsApp - Aceita Evolution API OU Meta API
+      // Check WhatsApp APIs - Validate both if configured
       const hasEvolutionApi = settings.evolution_api_url && settings.evolution_api_key && settings.evolution_instance_name;
-      const hasMetaApi = settings.whatsapp_access_token && settings.whatsapp_phone_number_id;
+      const hasMetaApi = settings.meta_access_token && settings.meta_phone_number_id && settings.meta_api_enabled;
 
+      // Validate Evolution API if configured
       if (hasEvolutionApi) {
-        // Test Evolution API connection with timeout
         try {
           const evolutionUrl = `${settings.evolution_api_url}/instance/connectionState/${settings.evolution_instance_name}`;
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
           const evResponse = await fetch(evolutionUrl, {
             headers: { 'apikey': settings.evolution_api_key },
@@ -127,13 +127,13 @@ serve(async (req) => {
             
             if (state === 'open' || state === 'connected') {
               results.push({
-                component: 'whatsapp',
+                component: 'whatsapp_evolution',
                 status: 'ok',
                 message: `Evolution API conectada: ${settings.evolution_instance_name}`,
               });
             } else {
               results.push({
-                component: 'whatsapp',
+                component: 'whatsapp_evolution',
                 status: 'warning',
                 message: `Evolution API: ${state}`,
                 details: 'Verifique a conexão da instância',
@@ -141,30 +141,31 @@ serve(async (req) => {
             }
           } else {
             results.push({
-              component: 'whatsapp',
+              component: 'whatsapp_evolution',
               status: 'warning',
               message: 'Não foi possível validar Evolution API',
               details: 'Verifique as credenciais',
             });
           }
         } catch (e) {
-          // Se falhar a validação mas as credenciais existem, assumir OK
           results.push({
-            component: 'whatsapp',
+            component: 'whatsapp_evolution',
             status: 'ok',
             message: `Evolution API configurada: ${settings.evolution_instance_name}`,
           });
         }
-      } else if (hasMetaApi) {
-        // Test WhatsApp Meta API connection with timeout
+      }
+
+      // Validate Meta API if configured
+      if (hasMetaApi) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
           const waResponse = await fetch(
-            `https://graph.facebook.com/v18.0/${settings.whatsapp_phone_number_id}`,
+            `https://graph.facebook.com/v18.0/${settings.meta_phone_number_id}`,
             {
-              headers: { Authorization: `Bearer ${settings.whatsapp_access_token}` },
+              headers: { Authorization: `Bearer ${settings.meta_access_token}` },
               signal: controller.signal,
             }
           );
@@ -174,27 +175,30 @@ serve(async (req) => {
           if (waResponse.ok) {
             const waData = await waResponse.json();
             results.push({
-              component: 'whatsapp',
+              component: 'whatsapp_meta',
               status: 'ok',
-              message: `WhatsApp Meta: ${waData.display_phone_number || 'Conectado'}`,
+              message: `Meta API: ${waData.display_phone_number || 'Conectado'}`,
             });
           } else {
             results.push({
-              component: 'whatsapp',
+              component: 'whatsapp_meta',
               status: 'error',
-              message: 'Token do WhatsApp inválido ou expirado',
+              message: 'Token do WhatsApp Meta inválido ou expirado',
               details: 'Verifique as credenciais no Facebook Developer',
             });
           }
         } catch (e) {
           results.push({
-            component: 'whatsapp',
+            component: 'whatsapp_meta',
             status: 'warning',
             message: 'Não foi possível validar WhatsApp Meta',
             details: 'Timeout ou erro de conexão',
           });
         }
-      } else {
+      }
+
+      // If neither is configured
+      if (!hasEvolutionApi && !hasMetaApi) {
         results.push({
           component: 'whatsapp',
           status: 'error',
