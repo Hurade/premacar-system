@@ -561,16 +561,17 @@ export function useConversations() {
     apiSource: 'meta' | 'evolution' = 'evolution'
   ): Promise<string> => {
     try {
-      // First check if there's already an active conversation for this contact
+      // Check if there's already an active conversation for this contact WITH THE SAME API SOURCE
       const { data: existingConv } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, api_source')
         .eq('contact_id', contactId)
         .eq('is_active', true)
+        .eq('api_source', apiSource) // Only check for same API source
         .maybeSingle();
 
       if (existingConv) {
-        console.log('[useConversations] Conversation already exists:', existingConv.id);
+        console.log('[useConversations] Conversation already exists for this API:', existingConv.id);
         return existingConv.id;
       }
 
