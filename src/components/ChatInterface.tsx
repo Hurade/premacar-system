@@ -71,6 +71,9 @@ const ChatInterface: React.FC = () => {
   const [contactsList, setContactsList] = useState<ContactOption[]>([]);
   const [contactSearchQuery, setContactSearchQuery] = useState('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [selectedContactForConv, setSelectedContactForConv] = useState<ContactOption | null>(null);
+  const [selectedTagsForConv, setSelectedTagsForConv] = useState<string[]>([]);
+  const [selectedApiSource, setSelectedApiSource] = useState<'meta' | 'evolution'>('evolution');
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -276,16 +279,38 @@ const ChatInterface: React.FC = () => {
   const handleOpenNewConversationModal = () => {
     loadContacts();
     setContactSearchQuery('');
+    setSelectedContactForConv(null);
+    setSelectedTagsForConv([]);
+    setSelectedApiSource('evolution');
     setShowNewConversationModal(true);
   };
 
-  const handleStartNewConversation = async (contact: ContactOption) => {
+  const handleSelectContactForConv = (contact: ContactOption) => {
+    setSelectedContactForConv(contact);
+  };
+
+  const handleToggleTagForConv = (tagKey: string) => {
+    setSelectedTagsForConv(prev => 
+      prev.includes(tagKey) 
+        ? prev.filter(t => t !== tagKey)
+        : [...prev, tagKey]
+    );
+  };
+
+  const handleStartNewConversation = async () => {
+    if (!selectedContactForConv) return;
+    
     setIsCreatingConversation(true);
     try {
-      const newConvId = await createConversation(contact.id);
+      // Atualizar tags do contato se selecionadas
+      if (selectedTagsForConv.length > 0) {
+        await api.updateContactTags(selectedContactForConv.id, selectedTagsForConv);
+      }
+      
+      const newConvId = await createConversation(selectedContactForConv.id, selectedApiSource);
       setSelectedChatId(newConvId);
       setShowNewConversationModal(false);
-      toast.success('Conversa iniciada com sucesso!');
+      toast.success(`Conversa iniciada via ${selectedApiSource === 'meta' ? 'Meta API' : 'Evolution API'}!`);
     } catch (err) {
       console.error('Error starting conversation:', err);
       toast.error('Erro ao iniciar conversa');
@@ -1154,58 +1179,171 @@ const ChatInterface: React.FC = () => {
 
       {/* New Conversation Modal */}
       <Dialog open={showNewConversationModal} onOpenChange={setShowNewConversationModal}>
-        <DialogContent className="bg-slate-900 border-slate-700 max-w-md">
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-cyan-400" />
               Nova Conversa
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Selecione um contato para iniciar uma nova conversa
+              {selectedContactForConv 
+                ? `Configurar conversa com ${selectedContactForConv.name || selectedContactForConv.phone_number}`
+                : 'Selecione um contato para iniciar'}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            {/* Busca de contatos */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-              <Input
-                placeholder="Buscar por nome ou telefone..."
-                value={contactSearchQuery}
-                onChange={(e) => setContactSearchQuery(e.target.value)}
-                className="pl-9 bg-slate-800 border-slate-700 text-slate-200 placeholder:text-slate-500"
-              />
-            </div>
-
-            {/* Lista de contatos */}
-            <div className="max-h-64 overflow-y-auto space-y-1 border border-slate-800 rounded-lg p-2 bg-slate-950/50">
-              {filteredContactsList.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <Phone className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Nenhum contato encontrado</p>
+          <div className="space-y-4 overflow-y-auto flex-1">
+            {!selectedContactForConv ? (
+              <>
+                {/* Busca de contatos */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Input
+                    placeholder="Buscar por nome ou telefone..."
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    className="pl-9 bg-slate-800 border-slate-700 text-slate-200 placeholder:text-slate-500"
+                  />
                 </div>
-              ) : (
-                filteredContactsList.map((contact) => (
-                  <button
-                    key={contact.id}
-                    onClick={() => handleStartNewConversation(contact)}
-                    disabled={isCreatingConversation}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-left group disabled:opacity-50"
+
+                {/* Lista de contatos */}
+                <div className="max-h-64 overflow-y-auto space-y-1 border border-slate-800 rounded-lg p-2 bg-slate-950/50">
+                  {filteredContactsList.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">
+                      <Phone className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Nenhum contato encontrado</p>
+                    </div>
+                  ) : (
+                    filteredContactsList.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onClick={() => handleSelectContactForConv(contact)}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-left group"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-cyan-400 flex-shrink-0">
+                          {(contact.name || contact.phone_number).substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
+                            {contact.name || 'Sem nome'}
+                          </p>
+                          <p className="text-xs text-slate-500 font-mono">{contact.phone_number}</p>
+                        </div>
+                        <MessageSquare className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Contato selecionado */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-600 to-teal-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+                    {(selectedContactForConv.name || selectedContactForConv.phone_number).substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white truncate">
+                      {selectedContactForConv.name || 'Sem nome'}
+                    </p>
+                    <p className="text-sm text-slate-400 font-mono">{selectedContactForConv.phone_number}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setSelectedContactForConv(null)}
+                    className="text-slate-400 hover:text-white"
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-cyan-400 flex-shrink-0">
-                      {(contact.name || contact.phone_number).substring(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
-                        {contact.name || 'Sem nome'}
-                      </p>
-                      <p className="text-xs text-slate-500 font-mono">{contact.phone_number}</p>
-                    </div>
-                    <MessageSquare className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
-                  </button>
-                ))
-              )}
-            </div>
+                    Trocar
+                  </Button>
+                </div>
+
+                {/* Seleção de API */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Conexão de Envio</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setSelectedApiSource('evolution')}
+                      className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                        selectedApiSource === 'evolution'
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                      }`}
+                    >
+                      <div className={`w-3 h-3 rounded-full ${selectedApiSource === 'evolution' ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                      <span className={`text-sm font-medium ${selectedApiSource === 'evolution' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                        Evolution API
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedApiSource('meta')}
+                      className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                        selectedApiSource === 'meta'
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                      }`}
+                    >
+                      <div className={`w-3 h-3 rounded-full ${selectedApiSource === 'meta' ? 'bg-blue-400' : 'bg-slate-600'}`} />
+                      <span className={`text-sm font-medium ${selectedApiSource === 'meta' ? 'text-blue-400' : 'text-slate-400'}`}>
+                        Meta API
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Seleção de Tags */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                    <Tag className="w-4 h-4" />
+                    Tags (opcional)
+                  </label>
+                  <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-slate-700 bg-slate-800/30 min-h-[60px]">
+                    {availableTags.filter(t => t.is_active).length === 0 ? (
+                      <p className="text-xs text-slate-500">Nenhuma tag disponível</p>
+                    ) : (
+                      availableTags.filter(t => t.is_active).map(tag => (
+                        <button
+                          key={tag.key}
+                          onClick={() => handleToggleTagForConv(tag.key)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                            selectedTagsForConv.includes(tag.key)
+                              ? 'ring-2 ring-offset-2 ring-offset-slate-900'
+                              : 'opacity-70 hover:opacity-100'
+                          }`}
+                          style={{
+                            backgroundColor: `${tag.color}20`,
+                            borderColor: `${tag.color}50`,
+                            color: tag.color,
+                            ...(selectedTagsForConv.includes(tag.key) ? { ringColor: tag.color } : {})
+                          }}
+                        >
+                          {tag.label}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Botão de iniciar */}
+                <Button
+                  onClick={handleStartNewConversation}
+                  disabled={isCreatingConversation}
+                  className="w-full h-11 gap-2"
+                >
+                  {isCreatingConversation ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Iniciando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Iniciar Conversa
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

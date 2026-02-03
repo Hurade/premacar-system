@@ -556,7 +556,10 @@ export function useConversations() {
   }, []);
 
   // Create new conversation for a contact
-  const createConversation = useCallback(async (contactId: string): Promise<string> => {
+  const createConversation = useCallback(async (
+    contactId: string, 
+    apiSource: 'meta' | 'evolution' = 'evolution'
+  ): Promise<string> => {
     try {
       // First check if there's already an active conversation for this contact
       const { data: existingConv } = await supabase
@@ -571,7 +574,7 @@ export function useConversations() {
         return existingConv.id;
       }
 
-      // Create new conversation
+      // Create new conversation with specified API source
       const { data: newConv, error } = await supabase
         .from('conversations')
         .insert({
@@ -579,14 +582,15 @@ export function useConversations() {
           status: 'human', // Start in human mode since it's manual
           is_active: true,
           started_at: new Date().toISOString(),
-          last_message_at: new Date().toISOString()
+          last_message_at: new Date().toISOString(),
+          api_source: apiSource
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      console.log('[useConversations] Created new conversation:', newConv.id);
+      console.log('[useConversations] Created new conversation:', newConv.id, 'with API:', apiSource);
 
       // Fetch the full conversation with contact data
       await fetchAndAddConversation(newConv.id);
