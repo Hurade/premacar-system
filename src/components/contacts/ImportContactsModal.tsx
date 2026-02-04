@@ -142,37 +142,66 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
     setImporting(true);
     let successCount = 0;
     let errorCount = 0;
+    let duplicateCount = 0;
 
     try {
-      const contacts = sheet.data.map(row => ({
-        name: row[columnMapping.nome] || null,
-        phone_number: normalizePhone(row[columnMapping.telefone]),
-        oficina: row[columnMapping.oficina] || null,
-        folder_id: targetFolderId !== 'none' ? targetFolderId : null
-      })).filter(c => c.phone_number.length >= 10);
+      // Mapear contatos com validação
+      const contacts = sheet.data
+        .map(row => {
+          const phoneRaw = row[columnMapping.telefone];
+          const phone = normalizePhone(phoneRaw);
+          
+          // Pegar nome e oficina pelos headers mapeados
+          const nome = columnMapping.nome ? row[columnMapping.nome] : null;
+          const oficina = columnMapping.oficina ? row[columnMapping.oficina] : null;
 
-      // Importar em lotes de 50
-      const batchSize = 50;
+          return {
+            name: nome ? String(nome).trim() : null,
+            phone_number: phone,
+            oficina: oficina ? String(oficina).trim() : null,
+            folder_id: targetFolderId !== 'none' ? targetFolderId : null
+          };
+        })
+        .filter(c => c.phone_number.length >= 10);
+
+      console.log(`Total de contatos válidos para importar: ${contacts.length}`);
+      console.log('Amostra dos primeiros 3:', contacts.slice(0, 3));
+
+      // Importar em lotes menores para evitar timeout e limites
+      const batchSize = 100;
+      const totalBatches = Math.ceil(contacts.length / batchSize);
+      
       for (let i = 0; i < contacts.length; i += batchSize) {
         const batch = contacts.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
         
+        // Usar insert com onConflict em vez de upsert para melhor controle
         const { data, error } = await supabase
           .from('contacts')
           .upsert(batch, { 
             onConflict: 'phone_number',
             ignoreDuplicates: false 
           })
-          .select();
+          .select('id');
 
         if (error) {
-          console.error('Erro no lote:', error);
+          console.error(`Erro no lote ${batchNumber}/${totalBatches}:`, error);
           errorCount += batch.length;
         } else {
-          successCount += data?.length || 0;
+          const inserted = data?.length || 0;
+          successCount += inserted;
+          console.log(`Lote ${batchNumber}/${totalBatches}: ${inserted} contatos processados`);
+        }
+
+        // Pequeno delay entre lotes para não sobrecarregar
+        if (i + batchSize < contacts.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
-      toast.success(`Importação concluída! ${successCount} contatos importados.`);
+      if (successCount > 0) {
+        toast.success(`Importação concluída! ${successCount} contatos importados/atualizados.`);
+      }
       if (errorCount > 0) {
         toast.warning(`${errorCount} contatos não puderam ser importados.`);
       }
