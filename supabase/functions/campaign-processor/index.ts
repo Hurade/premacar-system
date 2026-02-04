@@ -242,10 +242,18 @@ serve(async (req) => {
       .single();
 
     const ninaSettings = settings as NinaSettings;
+    const timezone = ninaSettings?.timezone || 'America/Sao_Paulo';
+    
+    // Obter hora atual no fuso horário correto (Brasil por padrão)
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentDay = now.getDay();
+    const localTimeStr = now.toLocaleString('en-US', { timeZone: timezone });
+    const localDate = new Date(localTimeStr);
+    
+    const currentHour = localDate.getHours();
+    const currentMinute = localDate.getMinutes();
+    const currentDay = localDate.getDay();
+    
+    console.log(`[campaign-processor] Timezone: ${timezone}, Local time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Day: ${currentDay}`);
 
     // Get all active campaigns
     const { data: campaigns, error: campaignsError } = await supabase
