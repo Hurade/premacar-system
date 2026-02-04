@@ -506,7 +506,7 @@ serve(async (req) => {
               .from("conversations")
               .insert({
                 contact_id: contactId,
-                status: "paused", // Disparo começa pausado para não ter resposta automática
+                status: "nina", // IA ativa para responder quando o contato responder
                 last_message_at: new Date().toISOString(),
                 api_source: campaignData.api_source,
               })
