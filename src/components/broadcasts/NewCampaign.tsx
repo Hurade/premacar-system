@@ -315,8 +315,8 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
       toast.error('Importe pelo menos um lead');
       return;
     }
-    if (intervalMin < 30) {
-      toast.error('Intervalo mínimo deve ser de 30 segundos');
+    if (intervalMin < 1) {
+      toast.error('Intervalo mínimo deve ser de pelo menos 1 segundo');
       return;
     }
     if (dailyLimit > 500) {
