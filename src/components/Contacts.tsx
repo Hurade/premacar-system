@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, Tag as TagIcon } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, Tag as TagIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -23,6 +23,8 @@ interface ContactRow {
   last_activity: string;
 }
 
+type PageSize = 10 | 50 | 100 | 'all';
+
 const Contacts: React.FC = () => {
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [folders, setFolders] = useState<ContactFolder[]>([]);
@@ -34,6 +36,8 @@ const Contacts: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [pageSize, setPageSize] = useState<PageSize>(50);
+  const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
 
   const loadTagDefinitions = useCallback(async () => {
@@ -133,11 +137,23 @@ const Contacts: React.FC = () => {
     );
   });
 
+  // Pagination logic
+  const totalContacts = filteredContacts.length;
+  const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalContacts / pageSize);
+  const paginatedContacts = pageSize === 'all' 
+    ? filteredContacts 
+    : filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Reset to page 1 when filter/search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedFolderId, pageSize]);
+
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredContacts.length) {
+    if (selectedIds.size === paginatedContacts.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+      setSelectedIds(new Set(paginatedContacts.map(c => c.id)));
     }
   };
 
@@ -339,7 +355,7 @@ const Contacts: React.FC = () => {
                   <tr>
                     <th className="px-4 py-4 w-10">
                       <Checkbox
-                        checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0}
+                        checked={selectedIds.size === paginatedContacts.length && paginatedContacts.length > 0}
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
@@ -352,7 +368,7 @@ const Contacts: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {filteredContacts.map((contact) => {
+                  {paginatedContacts.map((contact) => {
                     const folder = getFolderById(contact.folder_id);
                     return (
                       <tr 
@@ -453,13 +469,90 @@ const Contacts: React.FC = () => {
           )}
         </div>
 
-        {/* Stats footer */}
+        {/* Pagination and stats footer */}
         <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-          <span>{filteredContacts.length} contato(s)</span>
-          <span className="flex items-center gap-1">
-            <TagIcon className="w-3 h-3" />
-            {tagDefinitions.length} tag(s) disponíveis
-          </span>
+          <div className="flex items-center gap-4">
+            <span>{totalContacts} contato(s) no total</span>
+            {pageSize !== 'all' && totalPages > 1 && (
+              <span className="text-slate-400">
+                Página {currentPage} de {totalPages}
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Page size selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Exibir:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value) as PageSize)}
+                className="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              >
+                <option value={10}>10</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value="all">Todos</option>
+              </select>
+            </div>
+
+            {/* Pagination controls */}
+            {pageSize !== 'all' && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                {/* Page numbers */}
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        size="sm"
+                        variant={currentPage === pageNum ? "default" : "ghost"}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            <span className="flex items-center gap-1">
+              <TagIcon className="w-3 h-3" />
+              {tagDefinitions.length} tag(s)
+            </span>
+          </div>
         </div>
       </div>
 
