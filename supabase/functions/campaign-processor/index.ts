@@ -28,6 +28,8 @@ interface Campaign {
   total_sent: number;
   paused_until: string | null;
   api_source: 'meta' | 'evolution';
+  tag_on_delivered: string | null;
+  tag_on_no_whatsapp: string | null;
 }
 
 interface Lead {
@@ -458,14 +460,31 @@ serve(async (req) => {
         let contactId: string | null = null;
         const { data: existingContact } = await supabase
           .from("contacts")
-          .select("id")
+          .select("id, tags")
           .eq("phone_number", lead.phone)
           .maybeSingle();
 
         if (existingContact) {
           contactId = existingContact.id;
+          
+          // Aplicar tag de entrega se configurada
+          if (campaignData.tag_on_delivered) {
+            const currentTags = (existingContact.tags as string[]) || [];
+            if (!currentTags.includes(campaignData.tag_on_delivered)) {
+              await supabase
+                .from("contacts")
+                .update({ 
+                  tags: [...currentTags, campaignData.tag_on_delivered],
+                  last_activity: new Date().toISOString()
+                })
+                .eq("id", contactId);
+              console.log(`[campaign-processor] Tag "${campaignData.tag_on_delivered}" aplicada ao contato ${contactId}`);
+            }
+          }
         } else {
-          // Criar novo contato
+          // Criar novo contato com tag se configurada
+          const tagsToApply = campaignData.tag_on_delivered ? [campaignData.tag_on_delivered] : [];
+          
           const { data: newContact } = await supabase
             .from("contacts")
             .insert({
@@ -473,12 +492,16 @@ serve(async (req) => {
               name: lead.name || null,
               oficina: lead.company || null,
               last_activity: new Date().toISOString(),
+              tags: tagsToApply,
             })
             .select("id")
             .single();
           
           if (newContact) {
             contactId = newContact.id;
+            if (tagsToApply.length > 0) {
+              console.log(`[campaign-processor] Novo contato criado com tag "${campaignData.tag_on_delivered}"`);
+            }
           }
         }
 
@@ -578,6 +601,35 @@ serve(async (req) => {
 
       } else {
         console.error(`[campaign-processor] Error sending message: ${sendResult.error}`);
+
+        // Verificar se o erro indica que não é um número WhatsApp válido
+        const isNotWhatsAppError = sendResult.error?.toLowerCase().includes('not a valid whatsapp') ||
+          sendResult.error?.toLowerCase().includes('invalid') ||
+          sendResult.error?.toLowerCase().includes('not registered') ||
+          sendResult.error?.toLowerCase().includes('número inválido') ||
+          sendResult.error?.toLowerCase().includes('recipient');
+
+        // Aplicar tag de "sem WhatsApp" se configurada e aplicável
+        if (isNotWhatsAppError && campaignData.tag_on_no_whatsapp) {
+          const { data: existingContact } = await supabase
+            .from("contacts")
+            .select("id, tags")
+            .eq("phone_number", lead.phone)
+            .maybeSingle();
+
+          if (existingContact) {
+            const currentTags = (existingContact.tags as string[]) || [];
+            if (!currentTags.includes(campaignData.tag_on_no_whatsapp)) {
+              await supabase
+                .from("contacts")
+                .update({ 
+                  tags: [...currentTags, campaignData.tag_on_no_whatsapp]
+                })
+                .eq("id", existingContact.id);
+              console.log(`[campaign-processor] Tag "${campaignData.tag_on_no_whatsapp}" aplicada ao contato sem WhatsApp`);
+            }
+          }
+        }
 
         // Update lead with error
         const attempts = (lead as Lead & { attempts?: number }).attempts || 0;

@@ -346,6 +346,8 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
         scheduled_start: startType === 'scheduled' ? scheduledStart : null,
         total_leads: leads.length,
         api_source: apiSource,
+        tag_on_delivered: tagOnDelivered && tagOnDelivered !== 'none' ? tagOnDelivered : null,
+        tag_on_no_whatsapp: tagOnNoWhatsApp && tagOnNoWhatsApp !== 'none' ? tagOnNoWhatsApp : null,
       });
 
       // Import leads

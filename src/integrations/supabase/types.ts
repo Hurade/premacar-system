@@ -211,6 +211,8 @@ export type Database = {
           scheduled_start: string | null
           sent_today: number | null
           status: string
+          tag_on_delivered: string | null
+          tag_on_no_whatsapp: string | null
           template_id: string | null
           total_delivered: number | null
           total_errors: number | null
@@ -244,6 +246,8 @@ export type Database = {
           scheduled_start?: string | null
           sent_today?: number | null
           status?: string
+          tag_on_delivered?: string | null
+          tag_on_no_whatsapp?: string | null
           template_id?: string | null
           total_delivered?: number | null
           total_errors?: number | null
@@ -277,6 +281,8 @@ export type Database = {
           scheduled_start?: string | null
           sent_today?: number | null
           status?: string
+          tag_on_delivered?: string | null
+          tag_on_no_whatsapp?: string | null
           template_id?: string | null
           total_delivered?: number | null
           total_errors?: number | null
