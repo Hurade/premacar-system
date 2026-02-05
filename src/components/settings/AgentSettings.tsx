@@ -28,6 +28,7 @@ interface AgentSettings {
   ai_scheduling_enabled: boolean;
   message_grouping_enabled: boolean;
   message_grouping_delay: number;
+  ai_activation_delay_minutes: number;
 }
 
 const DAYS_OF_WEEK = [
@@ -67,6 +68,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     ai_scheduling_enabled: true,
     message_grouping_enabled: true,
     message_grouping_delay: 20000,
+    ai_activation_delay_minutes: 5,
   });
 
   useImperativeHandle(ref, () => ({
@@ -122,6 +124,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
         ai_scheduling_enabled: data.ai_scheduling_enabled ?? true,
         message_grouping_enabled: data.message_grouping_enabled ?? true,
         message_grouping_delay: data.message_grouping_delay ?? 20000,
+        ai_activation_delay_minutes: data.ai_activation_delay_minutes ?? 5,
       });
     } catch (error) {
       console.error('[AgentSettings] Error loading settings:', error);
@@ -151,6 +154,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           ai_scheduling_enabled: settings.ai_scheduling_enabled,
           message_grouping_enabled: settings.message_grouping_enabled,
           message_grouping_delay: settings.message_grouping_delay,
+          ai_activation_delay_minutes: settings.ai_activation_delay_minutes,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id);
@@ -574,6 +578,54 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* AI Activation Delay Section */}
+          <div className="mt-6 pt-4 border-t border-slate-800">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-sm font-medium text-slate-300">⏱️ Delay de Ativação após Disparo</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-slate-500 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[300px]">
+                  <p className="text-xs">
+                    Tempo que a IA aguarda antes de responder após um disparo de campanha. 
+                    Evita loops com outros bots que respondem imediatamente. 
+                    Apenas pessoas reais (que demoram mais) serão atendidas.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            
+            <div className="space-y-3">
+              <select
+                value={settings.ai_activation_delay_minutes}
+                onChange={(e) => setSettings({ ...settings, ai_activation_delay_minutes: parseInt(e.target.value) })}
+                className="w-full h-10 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              >
+                <option value="0">Sem delay (responder imediatamente)</option>
+                <option value="1">1 minuto</option>
+                <option value="3">3 minutos</option>
+                <option value="5">5 minutos (recomendado)</option>
+                <option value="10">10 minutos</option>
+                <option value="15">15 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="60">1 hora</option>
+              </select>
+              
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-[11px] text-amber-300 leading-relaxed">
+                  <strong>⚠️ Anti-Bot:</strong> A IA só começará a responder após esse tempo do envio do disparo. 
+                  Mensagens recebidas antes serão armazenadas mas não processadas até o delay expirar.
+                  {settings.ai_activation_delay_minutes === 0 && (
+                    <span className="block mt-1 text-amber-400">
+                      ⚡ Delay desabilitado - a IA responderá imediatamente (risco de loops com bots).
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

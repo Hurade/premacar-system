@@ -495,13 +495,17 @@ serve(async (req) => {
 
           if (existingConv) {
             conversationId = existingConv.id;
-            // Atualizar last_message_at
+            // Atualizar last_message_at e dispatch_sent_at (novo disparo = reiniciar delay)
             await supabase
               .from("conversations")
-              .update({ last_message_at: new Date().toISOString() })
+              .update({ 
+                last_message_at: new Date().toISOString(),
+                dispatch_sent_at: new Date().toISOString()
+              })
               .eq("id", conversationId);
+            console.log(`[campaign-processor] Conversa existente atualizada com novo dispatch_sent_at`);
           } else {
-            // Criar nova conversa
+            // Criar nova conversa com dispatch_sent_at para controle do delay
             const { data: newConv } = await supabase
               .from("conversations")
               .insert({
@@ -509,12 +513,14 @@ serve(async (req) => {
                 status: "nina", // IA ativa para responder quando o contato responder
                 last_message_at: new Date().toISOString(),
                 api_source: campaignData.api_source,
+                dispatch_sent_at: new Date().toISOString(), // Registrar timestamp do disparo
               })
               .select("id")
               .single();
             
             if (newConv) {
               conversationId = newConv.id;
+              console.log(`[campaign-processor] Conversa criada com dispatch_sent_at para delay de IA`);
             }
           }
 

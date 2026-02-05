@@ -468,6 +468,7 @@ export type Database = {
           assigned_user_id: string | null
           contact_id: string
           created_at: string
+          dispatch_sent_at: string | null
           id: string
           is_active: boolean
           last_message_at: string
@@ -485,6 +486,7 @@ export type Database = {
           assigned_user_id?: string | null
           contact_id: string
           created_at?: string
+          dispatch_sent_at?: string | null
           id?: string
           is_active?: boolean
           last_message_at?: string
@@ -502,6 +504,7 @@ export type Database = {
           assigned_user_id?: string | null
           contact_id?: string
           created_at?: string
+          dispatch_sent_at?: string | null
           id?: string
           is_active?: boolean
           last_message_at?: string
@@ -1016,6 +1019,7 @@ export type Database = {
       nina_settings: {
         Row: {
           adaptive_response_enabled: boolean
+          ai_activation_delay_minutes: number | null
           ai_model_mode: string | null
           ai_scheduling_enabled: boolean | null
           async_booking_enabled: boolean | null
@@ -1071,6 +1075,7 @@ export type Database = {
         }
         Insert: {
           adaptive_response_enabled?: boolean
+          ai_activation_delay_minutes?: number | null
           ai_model_mode?: string | null
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
@@ -1126,6 +1131,7 @@ export type Database = {
         }
         Update: {
           adaptive_response_enabled?: boolean
+          ai_activation_delay_minutes?: number | null
           ai_model_mode?: string | null
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
