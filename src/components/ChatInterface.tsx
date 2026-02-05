@@ -35,6 +35,7 @@ import {
 import { Input } from './ui/input';
 
 type FilterType = 'all' | 'unread';
+type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
 
 interface ContactOption {
   id: string;
@@ -60,6 +61,9 @@ const ChatInterface: React.FC = () => {
   // Novos estados de filtro
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [filterTag, setFilterTag] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [excludedTags, setExcludedTags] = useState<string[]>([]);
+  const [filterAssignedUser, setFilterAssignedUser] = useState<string | null>(null);
   
   // Estados para modais de confirmação
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
@@ -331,8 +335,23 @@ const ChatInterface: React.FC = () => {
       return false;
     }
     
-    // Filtro por tag
+    // Filtro por status da conversa
+    if (statusFilter !== 'all' && chat.status !== statusFilter) {
+      return false;
+    }
+    
+    // Filtro por membro da equipe atribuído
+    if (filterAssignedUser && chat.assignedUserId !== filterAssignedUser) {
+      return false;
+    }
+    
+    // Filtro por tag (incluir apenas conversas com esta tag)
     if (filterTag && !chat.tags.includes(filterTag)) {
+      return false;
+    }
+    
+    // Excluir conversas que tenham alguma das tags excluídas
+    if (excludedTags.length > 0 && excludedTags.some(tag => chat.tags.includes(tag))) {
       return false;
     }
     
@@ -529,90 +548,293 @@ const ChatInterface: React.FC = () => {
           </div>
           
           {/* Filtros */}
-          <div className="flex items-center gap-2">
-            {/* Filtro por lidas/não lidas */}
-            <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800">
-              <button
-                onClick={() => setFilterType('all')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  filterType === 'all' 
-                    ? 'bg-cyan-600 text-white' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => setFilterType('unread')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
-                  filterType === 'unread' 
-                    ? 'bg-cyan-600 text-white' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Inbox className="w-3 h-3" />
-                Não lidas
-              </button>
-            </div>
-            
-            {/* Filtro por tag */}
-            <Popover>
-              <PopoverTrigger asChild>
+          <div className="space-y-2">
+            {/* Linha 1: Todas/Não lidas + Status */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Filtro por lidas/não lidas */}
+              <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800">
                 <button
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                    filterTag 
-                      ? 'bg-violet-600/20 border-violet-500/50 text-violet-400' 
-                      : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  onClick={() => setFilterType('all')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    filterType === 'all' 
+                      ? 'bg-cyan-600 text-white' 
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <Tag className="w-3 h-3" />
-                  {filterTag ? availableTags.find(t => t.key === filterTag)?.label || filterTag : 'Tag'}
-                  {filterTag && (
-                    <X 
-                      className="w-3 h-3 ml-1 hover:text-white" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterTag(null);
-                      }}
-                    />
-                  )}
+                  Todas
                 </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2 bg-slate-900 border-slate-700">
-                <div className="space-y-1">
+                <button
+                  onClick={() => setFilterType('unread')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                    filterType === 'unread' 
+                      ? 'bg-cyan-600 text-white' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Inbox className="w-3 h-3" />
+                  Não lidas
+                </button>
+              </div>
+              
+              {/* Filtro por status */}
+              <Popover>
+                <PopoverTrigger asChild>
                   <button
-                    onClick={() => setFilterTag(null)}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                      !filterTag ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      statusFilter !== 'all' 
+                        ? statusFilter === 'nina' 
+                          ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+                          : statusFilter === 'human'
+                            ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                            : 'bg-amber-600/20 border-amber-500/50 text-amber-400'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    Todas as tags
+                    {statusFilter === 'nina' && <Bot className="w-3 h-3" />}
+                    {statusFilter === 'human' && <User className="w-3 h-3" />}
+                    {statusFilter === 'paused' && <Pause className="w-3 h-3" />}
+                    {statusFilter === 'all' && <Filter className="w-3 h-3" />}
+                    {statusFilter === 'all' ? 'Status' : statusFilter === 'nina' ? sdrName : statusFilter === 'human' ? 'Humano' : 'Pausado'}
+                    {statusFilter !== 'all' && (
+                      <X 
+                        className="w-3 h-3 ml-1 hover:text-white" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStatusFilter('all');
+                        }}
+                      />
+                    )}
                   </button>
-                  {availableTags.filter(t => t.is_active).map(tag => (
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2 bg-slate-900 border-slate-700">
+                  <div className="space-y-1">
                     <button
-                      key={tag.key}
-                      onClick={() => setFilterTag(tag.key)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                        filterTag === tag.key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      onClick={() => setStatusFilter('all')}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        statusFilter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
-                      <span 
-                        className="w-2.5 h-2.5 rounded-full" 
-                        style={{ backgroundColor: tag.color }}
-                      />
-                      {tag.label}
+                      Todos os status
                     </button>
-                  ))}
-                  {availableTags.filter(t => t.is_active).length === 0 && (
-                    <p className="text-xs text-slate-500 text-center py-2">Nenhuma tag criada</p>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+                    <button
+                      onClick={() => setStatusFilter('nina')}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                        statusFilter === 'nina' ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Bot className="w-4 h-4" />
+                      {sdrName}
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('human')}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                        statusFilter === 'human' ? 'bg-emerald-600/20 text-emerald-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <User className="w-4 h-4" />
+                      Humano
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('paused')}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                        statusFilter === 'paused' ? 'bg-amber-600/20 text-amber-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Pause className="w-4 h-4" />
+                      Pausado
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {/* Linha 2: Tag, Excluir Tags, Membro */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Filtro por tag (incluir) */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      filterTag 
+                        ? 'bg-violet-600/20 border-violet-500/50 text-violet-400' 
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <Tag className="w-3 h-3" />
+                    {filterTag ? availableTags.find(t => t.key === filterTag)?.label || filterTag : 'Tag'}
+                    {filterTag && (
+                      <X 
+                        className="w-3 h-3 ml-1 hover:text-white" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterTag(null);
+                        }}
+                      />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2 bg-slate-900 border-slate-700">
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 px-3 py-1 font-medium">Mostrar apenas com:</p>
+                    <button
+                      onClick={() => setFilterTag(null)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        !filterTag ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      Todas as tags
+                    </button>
+                    {availableTags.filter(t => t.is_active).map(tag => (
+                      <button
+                        key={tag.key}
+                        onClick={() => setFilterTag(tag.key)}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                          filterTag === tag.key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <span 
+                          className="w-2.5 h-2.5 rounded-full" 
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        {tag.label}
+                      </button>
+                    ))}
+                    {availableTags.filter(t => t.is_active).length === 0 && (
+                      <p className="text-xs text-slate-500 text-center py-2">Nenhuma tag criada</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Filtro para excluir tags */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      excludedTags.length > 0 
+                        ? 'bg-red-600/20 border-red-500/50 text-red-400' 
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                    {excludedTags.length > 0 ? `Ocultar (${excludedTags.length})` : 'Ocultar tag'}
+                    {excludedTags.length > 0 && (
+                      <X 
+                        className="w-3 h-3 ml-1 hover:text-white" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExcludedTags([]);
+                        }}
+                      />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2 bg-slate-900 border-slate-700">
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 px-3 py-1 font-medium">Ocultar conversas com:</p>
+                    {availableTags.filter(t => t.is_active).map(tag => {
+                      const isExcluded = excludedTags.includes(tag.key);
+                      return (
+                        <button
+                          key={tag.key}
+                          onClick={() => {
+                            if (isExcluded) {
+                              setExcludedTags(prev => prev.filter(t => t !== tag.key));
+                            } else {
+                              setExcludedTags(prev => [...prev, tag.key]);
+                            }
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                            isExcluded ? 'bg-red-600/20 text-red-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          <span 
+                            className="w-2.5 h-2.5 rounded-full" 
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          {tag.label}
+                          {isExcluded && <Check className="w-3 h-3 ml-auto" />}
+                        </button>
+                      );
+                    })}
+                    {availableTags.filter(t => t.is_active).length === 0 && (
+                      <p className="text-xs text-slate-500 text-center py-2">Nenhuma tag criada</p>
+                    )}
+                    {excludedTags.length > 0 && (
+                      <button
+                        onClick={() => setExcludedTags([])}
+                        className="w-full text-left px-3 py-2 text-sm rounded-md transition-colors text-red-400 hover:bg-slate-800 mt-2 border-t border-slate-700 pt-2"
+                      >
+                        Limpar exclusões
+                      </button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Filtro por membro da equipe */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      filterAssignedUser 
+                        ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' 
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    {filterAssignedUser 
+                      ? teamMembers.find(m => m.id === filterAssignedUser)?.name || 'Membro' 
+                      : 'Atribuído a'}
+                    {filterAssignedUser && (
+                      <X 
+                        className="w-3 h-3 ml-1 hover:text-white" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterAssignedUser(null);
+                        }}
+                      />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2 bg-slate-900 border-slate-700">
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 px-3 py-1 font-medium">Ver conversas de:</p>
+                    <button
+                      onClick={() => setFilterAssignedUser(null)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        !filterAssignedUser ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      Todos os membros
+                    </button>
+                    {teamMembers.filter(m => m.status === 'active').map(member => (
+                      <button
+                        key={member.id}
+                        onClick={() => setFilterAssignedUser(member.id)}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                          filterAssignedUser === member.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <img 
+                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0ea5e9&color=fff`}
+                          alt={member.name}
+                          className="w-5 h-5 rounded-full"
+                        />
+                        {member.name}
+                      </button>
+                    ))}
+                    {teamMembers.filter(m => m.status === 'active').length === 0 && (
+                      <p className="text-xs text-slate-500 text-center py-2">Nenhum membro na equipe</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           
           {/* Contador de resultados */}
-          {(filterType !== 'all' || filterTag || searchQuery) && (
+          {(filterType !== 'all' || filterTag || statusFilter !== 'all' || excludedTags.length > 0 || filterAssignedUser || searchQuery) && (
             <p className="text-xs text-slate-500">
               {filteredConversations.length} conversa{filteredConversations.length !== 1 ? 's' : ''} encontrada{filteredConversations.length !== 1 ? 's' : ''}
             </p>
