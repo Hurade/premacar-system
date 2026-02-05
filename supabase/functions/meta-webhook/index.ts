@@ -183,6 +183,7 @@ async function processMetaWebhookAsync(
     console.log('[Meta Async] - meta_api_enabled:', metaSettings.meta_api_enabled);
     console.log('[Meta Async] - meta_phone_number_id:', metaSettings.meta_phone_number_id);
     console.log('[Meta Async] - message_grouping_enabled:', metaSettings.message_grouping_enabled);
+    console.log('[Meta Async] - ai_activation_delay_minutes:', metaSettings.ai_activation_delay_minutes);
 
     // Validate signature if app secret is configured
     if (metaSettings.meta_app_secret && signature) {
@@ -197,6 +198,7 @@ async function processMetaWebhookAsync(
 
     const groupingEnabled = metaSettings.message_grouping_enabled !== false;
     const groupingDelay = metaSettings.message_grouping_delay || DEFAULT_GROUPING_DELAY_MS;
+    const aiActivationDelayMinutes = metaSettings.ai_activation_delay_minutes ?? 5;
 
     // Validar estrutura do body
     if (!body || !body.entry || !Array.isArray(body.entry)) {
@@ -490,106 +492,151 @@ async function processMetaWebhookAsync(
           .eq('id', conversation.id);
 
         // ═══════════════════════════════════════════
-        // 5. ADICIONAR À FILA DA IA
+        // 5. VERIFICAR DELAY DE ATIVAÇÃO DA IA E ADICIONAR À FILA
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 🤖 Verificando fila da IA...');
         console.log('[Meta Async] - Status da conversa:', conversation.status);
         console.log('[Meta Async] - Grouping enabled:', groupingEnabled);
+        console.log('[Meta Async] - AI Activation Delay (min):', aiActivationDelayMinutes);
+        console.log('[Meta Async] - dispatch_sent_at:', conversation.dispatch_sent_at);
 
         if (conversation.status === 'nina') {
-          if (!groupingEnabled) {
-            // Process immediately
-            console.log('[Meta Async] 🚀 Adicionando à fila imediata...');
+          // ═══════════════════════════════════════════
+          // VERIFICAR DELAY DE ATIVAÇÃO APÓS DISPARO
+          // ═══════════════════════════════════════════
+          let canProcessAI = true;
+          let delayRemainingMinutes = 0;
 
-            const { error: queueError } = await supabase
-              .from('nina_processing_queue')
-              .insert({
-                message_id: dbMessage.id,
-                conversation_id: conversation.id,
-                contact_id: contact.id,
-                priority: 1,
-                context_data: {
-                  phone_number_id: metaSettings.meta_phone_number_id,
-                  contact_name: contactName,
-                  message_type: dbMessageType,
-                  grouped_count: 1,
-                  combined_content: messageContent,
-                  api_source: 'meta'
-                }
-              });
+          if (aiActivationDelayMinutes > 0 && conversation.dispatch_sent_at) {
+            const dispatchTime = new Date(conversation.dispatch_sent_at);
+            const now = new Date();
+            const minutesSinceDispatch = (now.getTime() - dispatchTime.getTime()) / 1000 / 60;
+            
+            console.log('[Meta Async] 📊 Verificando delay de ativação:');
+            console.log('[Meta Async] - Disparo enviado em:', dispatchTime.toISOString());
+            console.log('[Meta Async] - Hora atual:', now.toISOString());
+            console.log('[Meta Async] - Minutos desde disparo:', minutesSinceDispatch.toFixed(2));
+            console.log('[Meta Async] - Delay configurado:', aiActivationDelayMinutes, 'minutos');
 
-            if (queueError) {
-              console.error('[Meta Async] ❌ Erro ao adicionar à fila:', queueError);
+            if (minutesSinceDispatch < aiActivationDelayMinutes) {
+              canProcessAI = false;
+              delayRemainingMinutes = Math.ceil(aiActivationDelayMinutes - minutesSinceDispatch);
+              console.log('[Meta Async] ⏸️ IA AINDA EM DELAY');
+              console.log('[Meta Async] - Faltam:', delayRemainingMinutes, 'minutos');
+              console.log('[Meta Async] - Mensagem será armazenada mas NÃO processada pela IA');
             } else {
-              console.log('[Meta Async] ✅ Adicionado à fila');
+              console.log('[Meta Async] ✅ Delay expirado, IA pode responder');
+              // Limpar dispatch_sent_at após delay expirar (opcional: evita verificar novamente)
+              await supabase
+                .from('conversations')
+                .update({ dispatch_sent_at: null })
+                .eq('id', conversation.id);
             }
+          } else if (!conversation.dispatch_sent_at) {
+            console.log('[Meta Async] ℹ️ Não é conversa de disparo (inbound), processando normalmente');
+          } else {
+            console.log('[Meta Async] ℹ️ Delay desabilitado (0 min), processando imediatamente');
+          }
 
-            // Trigger nina-orchestrator
-            console.log('[Meta Async] 🔔 Disparando nina-orchestrator...');
-            try {
-              const response = await fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`
-                },
-                body: JSON.stringify({ triggered_by: 'meta-webhook-immediate' })
-              });
-              console.log('[Meta Async] ✅ nina-orchestrator triggered:', response.status);
-            } catch (err) {
-              console.error('[Meta Async] ❌ Erro ao chamar nina-orchestrator:', err);
+          // Só adiciona à fila se delay permitir
+          if (canProcessAI) {
+            if (!groupingEnabled) {
+              // Process immediately
+              console.log('[Meta Async] 🚀 Adicionando à fila imediata...');
+
+              const { error: queueError } = await supabase
+                .from('nina_processing_queue')
+                .insert({
+                  message_id: dbMessage.id,
+                  conversation_id: conversation.id,
+                  contact_id: contact.id,
+                  priority: 1,
+                  context_data: {
+                    phone_number_id: metaSettings.meta_phone_number_id,
+                    contact_name: contactName,
+                    message_type: dbMessageType,
+                    grouped_count: 1,
+                    combined_content: messageContent,
+                    api_source: 'meta'
+                  }
+                });
+
+              if (queueError) {
+                console.error('[Meta Async] ❌ Erro ao adicionar à fila:', queueError);
+              } else {
+                console.log('[Meta Async] ✅ Adicionado à fila');
+              }
+
+              // Trigger nina-orchestrator
+              console.log('[Meta Async] 🔔 Disparando nina-orchestrator...');
+              try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`
+                  },
+                  body: JSON.stringify({ triggered_by: 'meta-webhook-immediate' })
+                });
+                console.log('[Meta Async] ✅ nina-orchestrator triggered:', response.status);
+              } catch (err) {
+                console.error('[Meta Async] ❌ Erro ao chamar nina-orchestrator:', err);
+              }
+            } else {
+              // Use grouping queue
+              const processAfter = new Date(Date.now() + groupingDelay).toISOString();
+              console.log('[Meta Async] 📦 Usando grouping queue, process_after:', processAfter);
+              
+              // Extend timer for existing messages
+              await supabase
+                .from('message_grouping_queue')
+                .update({ process_after: processAfter })
+                .eq('processed', false)
+                .filter('message_data->>from', 'eq', phoneNumber);
+
+              const { error: groupError } = await supabase
+                .from('message_grouping_queue')
+                .insert({
+                  whatsapp_message_id: messageId,
+                  phone_number_id: metaSettings.meta_phone_number_id || '',
+                  message_id: dbMessage.id,
+                  message_data: { 
+                    from: phoneNumber,
+                    type: dbMessageType,
+                    api_source: 'meta'
+                  },
+                  contacts_data: { 
+                    profile: { name: contactName },
+                    wa_id: phoneNumber 
+                  },
+                  process_after: processAfter
+                });
+
+              if (groupError) {
+                console.error('[Meta Async] ❌ Erro ao adicionar ao grouping:', groupError);
+              } else {
+                console.log('[Meta Async] ✅ Adicionado ao grouping queue');
+              }
+
+              // Trigger message-grouper
+              console.log('[Meta Async] 🔔 Disparando message-grouper...');
+              try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/message-grouper`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`
+                  },
+                  body: JSON.stringify({ triggered_by: 'meta-webhook' })
+                });
+                console.log('[Meta Async] ✅ message-grouper triggered:', response.status);
+              } catch (err) {
+                console.error('[Meta Async] ❌ Erro ao chamar message-grouper:', err);
+              }
             }
           } else {
-            // Use grouping queue
-            const processAfter = new Date(Date.now() + groupingDelay).toISOString();
-            console.log('[Meta Async] 📦 Usando grouping queue, process_after:', processAfter);
-            
-            // Extend timer for existing messages
-            await supabase
-              .from('message_grouping_queue')
-              .update({ process_after: processAfter })
-              .eq('processed', false)
-              .filter('message_data->>from', 'eq', phoneNumber);
-
-            const { error: groupError } = await supabase
-              .from('message_grouping_queue')
-              .insert({
-                whatsapp_message_id: messageId,
-                phone_number_id: metaSettings.meta_phone_number_id || '',
-                message_id: dbMessage.id,
-                message_data: { 
-                  from: phoneNumber,
-                  type: dbMessageType,
-                  api_source: 'meta'
-                },
-                contacts_data: { 
-                  profile: { name: contactName },
-                  wa_id: phoneNumber 
-                },
-                process_after: processAfter
-              });
-
-            if (groupError) {
-              console.error('[Meta Async] ❌ Erro ao adicionar ao grouping:', groupError);
-            } else {
-              console.log('[Meta Async] ✅ Adicionado ao grouping queue');
-            }
-
-            // Trigger message-grouper
-            console.log('[Meta Async] 🔔 Disparando message-grouper...');
-            try {
-              const response = await fetch(`${supabaseUrl}/functions/v1/message-grouper`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`
-                },
-                body: JSON.stringify({ triggered_by: 'meta-webhook' })
-              });
-              console.log('[Meta Async] ✅ message-grouper triggered:', response.status);
-            } catch (err) {
-              console.error('[Meta Async] ❌ Erro ao chamar message-grouper:', err);
-            }
+            console.log('[Meta Async] ⏸️ IA em delay - mensagem armazenada mas NÃO processada');
+            console.log('[Meta Async] ⏱️ IA será ativada em', delayRemainingMinutes, 'minuto(s)');
           }
         } else {
           console.log('[Meta Async] ⏸️ Conversa não está com Nina, ignorando IA');
