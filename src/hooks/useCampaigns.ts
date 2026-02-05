@@ -75,6 +75,8 @@ export interface Campaign {
   created_at: string;
   updated_at: string;
   api_source: 'meta' | 'evolution';
+  tag_on_delivered: string | null;
+  tag_on_no_whatsapp: string | null;
   template?: MessageTemplate | null;
 }
 
@@ -196,6 +198,8 @@ export function useCreateCampaign() {
         scheduled_start: campaign.scheduled_start,
         total_leads: campaign.total_leads || 0,
         api_source: campaign.api_source || 'meta',
+        tag_on_delivered: campaign.tag_on_delivered || null,
+        tag_on_no_whatsapp: campaign.tag_on_no_whatsapp || null,
       };
 
       const { data, error } = await supabase
