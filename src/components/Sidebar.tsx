@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import premaLogo from '@/assets/logo-prema.png';
+import premaLogoFull from '@/assets/logo-prema-full.png';
 const menuItems = [{
   id: 'dashboard',
   label: 'Dashboard',
@@ -149,7 +150,7 @@ const SidebarContent = () => {
     }} transition={{
       duration: 0.3
     }} className="py-4 flex justify-center">
-          <img alt="PremaCar" className="h-8 transition-opacity opacity-100 object-contain rounded-lg" src={premaLogo} />
+          <img alt="Prema" className="h-6 max-w-[140px] transition-opacity opacity-100 object-contain" src={premaLogoFull} />
         </motion.div>}
 
       {/* User Footer */}
