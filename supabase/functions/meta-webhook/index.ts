@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -13,21 +12,36 @@ const corsHeaders = {
 
 const DEFAULT_GROUPING_DELAY_MS = 20000;
 
-// Validate Meta webhook signature
-function validateMetaSignature(body: string, signature: string | null, appSecret: string): boolean {
+// Validate Meta webhook signature using Web Crypto API
+async function validateMetaSignature(body: string, signature: string | null, appSecret: string): Promise<boolean> {
   if (!signature || !appSecret) {
     console.warn('[Meta Webhook] ⚠️ Missing signature or app secret - skipping validation');
     return true; // Se não tem secret configurado, aceita (para testes)
   }
   
-  const expectedSignature = 'sha256=' + createHmac('sha256', appSecret)
-    .update(body)
-    .digest('hex');
-  
-  const isValid = signature === expectedSignature;
-  console.log('[Meta Webhook] Signature validation:', isValid ? '✅ VALID' : '❌ INVALID');
-  
-  return isValid;
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(appSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    
+    const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+    const hashArray = Array.from(new Uint8Array(signatureBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const expectedSignature = 'sha256=' + hashHex;
+    
+    const isValid = signature === expectedSignature;
+    console.log('[Meta Webhook] Signature validation:', isValid ? '✅ VALID' : '❌ INVALID');
+    
+    return isValid;
+  } catch (error) {
+    console.error('[Meta Webhook] Error validating signature:', error);
+    return false;
+  }
 }
 
 serve(async (req) => {
@@ -187,7 +201,7 @@ async function processMetaWebhookAsync(
 
     // Validate signature if app secret is configured
     if (metaSettings.meta_app_secret && signature) {
-      const isValid = validateMetaSignature(rawBody, signature, metaSettings.meta_app_secret);
+      const isValid = await validateMetaSignature(rawBody, signature, metaSettings.meta_app_secret);
       if (!isValid) {
         console.error('[Meta Async] ❌ Assinatura inválida - ignorando webhook');
         return;
