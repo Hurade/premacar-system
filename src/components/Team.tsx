@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2 } from 'lucide-react';
+import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, ShieldCheck, Crown } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
 import { TeamMember, type Team as TeamType, type TeamFunction } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import TeamConfigModal from './TeamConfigModal';
 import { toast } from 'sonner';
+import { useUserRole } from '@/hooks/useUserRole';
+import { RoleGate } from './RoleGate';
 
 const Team: React.FC = () => {
+  const { isAdmin, isManager, teamRole } = useUserRole();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teams, setTeams] = useState<TeamType[]>([]);
   const [functions, setFunctions] = useState<TeamFunction[]>([]);
@@ -193,18 +196,34 @@ const Team: React.FC = () => {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Equipe</h2>
-          <p className="text-sm text-slate-400 mt-1">Gerencie usuários e times da organização</p>
+          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            <ShieldCheck className="w-8 h-8 text-primary" />
+            Equipe
+          </h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Gerencie usuários e times da organização
+            {teamRole && (
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                isAdmin ? 'bg-primary/20 text-primary' : 'bg-accent/20 text-accent'
+              }`}>
+                {isAdmin ? 'Admin' : isManager ? 'Gerente' : 'Visualização'}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-3">
-          <Button onClick={() => setShowConfigModal(true)} variant="outline" className="border-slate-700">
-            <Settings className="w-4 h-4 mr-2" />
-            Configurar
-          </Button>
-          <Button onClick={() => setShowModal(true)} className="shadow-lg shadow-cyan-500/20 bg-slate-100 text-slate-900 hover:bg-white hover:text-black">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Convidar Usuário
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setShowConfigModal(true)} variant="outline" className="border-slate-700">
+              <Settings className="w-4 h-4 mr-2" />
+              Configurar
+            </Button>
+          )}
+          {isAdmin && (
+            <Button onClick={() => setShowModal(true)} className="shadow-lg shadow-cyan-500/20 bg-slate-100 text-slate-900 hover:bg-white hover:text-black">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Convidar Usuário
+            </Button>
+          )}
         </div>
       </div>
 
@@ -296,55 +315,81 @@ const Team: React.FC = () => {
 
                                 {/* Role Selector */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <select
-                                        value={member.role}
-                                        onChange={(e) => handleUpdateMember(member.id, 'role', e.target.value)}
-                                        className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
-                                    >
-                                        <option value="agent">Atendente</option>
-                                        <option value="manager">Gerente</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
+                                    {isAdmin ? (
+                                      <select
+                                          value={member.role}
+                                          onChange={(e) => handleUpdateMember(member.id, 'role', e.target.value)}
+                                          className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
+                                      >
+                                          <option value="agent">Atendente</option>
+                                          <option value="manager">Gerente</option>
+                                          <option value="admin">Admin</option>
+                                      </select>
+                                    ) : (
+                                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                        member.role === 'admin' ? 'bg-primary/20 text-primary' :
+                                        member.role === 'manager' ? 'bg-accent/20 text-accent' :
+                                        'bg-slate-800 text-slate-400'
+                                      }`}>
+                                        {member.role === 'admin' ? 'Admin' : member.role === 'manager' ? 'Gerente' : 'Atendente'}
+                                      </span>
+                                    )}
                                 </td>
 
                                 {/* Time Selector */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <select
-                                        value={member.team_id || ''}
-                                        onChange={(e) => handleUpdateMember(member.id, 'team_id', e.target.value || null)}
-                                        className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
-                                    >
-                                        <option value="">Sem time</option>
-                                        {teams.map(team => (
-                                            <option key={team.id} value={team.id}>{team.name}</option>
-                                        ))}
-                                    </select>
+                                    {isAdmin ? (
+                                      <select
+                                          value={member.team_id || ''}
+                                          onChange={(e) => handleUpdateMember(member.id, 'team_id', e.target.value || null)}
+                                          className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
+                                      >
+                                          <option value="">Sem time</option>
+                                          {teams.map(team => (
+                                              <option key={team.id} value={team.id}>{team.name}</option>
+                                          ))}
+                                      </select>
+                                    ) : (
+                                      <span className="text-sm text-slate-400">
+                                        {teams.find(t => t.id === member.team_id)?.name || 'Sem time'}
+                                      </span>
+                                    )}
                                 </td>
 
                                 {/* Function Selector */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <select
-                                        value={member.function_id || ''}
-                                        onChange={(e) => handleUpdateMember(member.id, 'function_id', e.target.value || null)}
-                                        className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
-                                    >
-                                        <option value="">Sem função</option>
-                                        {functions.map(func => (
-                                            <option key={func.id} value={func.id}>{func.name}</option>
-                                        ))}
-                                    </select>
+                                    {isAdmin ? (
+                                      <select
+                                          value={member.function_id || ''}
+                                          onChange={(e) => handleUpdateMember(member.id, 'function_id', e.target.value || null)}
+                                          className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
+                                      >
+                                          <option value="">Sem função</option>
+                                          {functions.map(func => (
+                                              <option key={func.id} value={func.id}>{func.name}</option>
+                                          ))}
+                                      </select>
+                                    ) : (
+                                      <span className="text-sm text-slate-400">
+                                        {functions.find(f => f.id === member.function_id)?.name || 'Sem função'}
+                                      </span>
+                                    )}
                                 </td>
 
                                 {/* Weight */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="10"
-                                        value={member.weight || 1}
-                                        onChange={(e) => handleUpdateMember(member.id, 'weight', parseInt(e.target.value))}
-                                        className="w-16 px-2 py-1 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 text-center"
-                                    />
+                                    {isAdmin ? (
+                                      <input
+                                          type="number"
+                                          min="1"
+                                          max="10"
+                                          value={member.weight || 1}
+                                          onChange={(e) => handleUpdateMember(member.id, 'weight', parseInt(e.target.value))}
+                                          className="w-16 px-2 py-1 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 text-center"
+                                      />
+                                    ) : (
+                                      <span className="text-sm text-slate-400 text-center block">{member.weight || 1}</span>
+                                    )}
                                 </td>
 
                                 {/* Status */}
@@ -355,20 +400,29 @@ const Team: React.FC = () => {
                                 {/* Actions */}
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                     <div className="flex items-center justify-center gap-1">
-                                        <button 
-                                            onClick={() => handleEditClick(member)}
-                                            className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
-                                            title="Editar membro"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDeleteMember(member.id, member.name)}
-                                            className="p-2 rounded-lg text-slate-500 hover:bg-red-900/50 hover:text-red-400 transition-colors"
-                                            title="Excluir membro"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {isAdmin && (
+                                          <>
+                                            <button 
+                                                onClick={() => handleEditClick(member)}
+                                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                                                title="Editar membro"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteMember(member.id, member.name)}
+                                                className="p-2 rounded-lg text-slate-500 hover:bg-red-900/50 hover:text-red-400 transition-colors"
+                                                title="Excluir membro"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                          </>
+                                        )}
+                                        {member.role === 'admin' && (
+                                          <span title="Administrador">
+                                            <Crown className="w-4 h-4 text-amber-500" />
+                                          </span>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
