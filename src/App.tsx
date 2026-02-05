@@ -12,9 +12,11 @@ import Kanban from './components/Kanban';
 import Broadcasts from './pages/Broadcasts';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
+import RoleGate from './components/RoleGate';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider } from './hooks/useAuth';
+import { UserRoleProvider } from './hooks/useUserRole';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
@@ -62,39 +64,53 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CompanySettingsProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/auth" element={<Auth />} />
-              
-              {/* Protected Routes (With Sidebar) */}
-              <Route element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/pipeline" element={<Kanban />} />
-                <Route path="/chat" element={<ChatInterface />} />
-                <Route path="/contacts" element={<Contacts />} />
-                <Route path="/broadcasts" element={<Broadcasts />} />
-                <Route path="/scheduling" element={<Scheduling />} />
-                <Route path="/team" element={<Team />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-              
-              {/* Catch all - redirect to dashboard */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </BrowserRouter>
-          <Toaster 
-            position="top-right"
-            richColors
-            theme="dark"
-          />
-        </CompanySettingsProvider>
+        <UserRoleProvider>
+          <CompanySettingsProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/auth" element={<Auth />} />
+                
+                {/* Protected Routes (With Sidebar) */}
+                <Route element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/pipeline" element={<Kanban />} />
+                  <Route path="/chat" element={<ChatInterface />} />
+                  <Route path="/contacts" element={<Contacts />} />
+                  <Route path="/broadcasts" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <Broadcasts />
+                    </RoleGate>
+                  } />
+                  <Route path="/scheduling" element={<Scheduling />} />
+                  <Route path="/team" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <Team />
+                    </RoleGate>
+                  } />
+                  <Route path="/settings" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <Settings />
+                    </RoleGate>
+                  } />
+                </Route>
+                
+                {/* Catch all - redirect to dashboard */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </BrowserRouter>
+            <Toaster 
+              position="top-right"
+              richColors
+              theme="dark"
+            />
+          </CompanySettingsProvider>
+        </UserRoleProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

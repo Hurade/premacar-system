@@ -3,6 +3,7 @@ import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole, MENU_ROLE_REQUIREMENTS, TeamRole } from '@/hooks/useUserRole';
 import { Sidebar, SidebarBody, SidebarLink, useSidebar } from '@/components/ui/sidebar';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -84,6 +85,11 @@ const SidebarContent = () => {
     user,
     signOut
   } = useAuth();
+  const {
+    teamRole,
+    isAdmin,
+    loading: roleLoading
+  } = useUserRole();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname.substring(1) || 'dashboard';
@@ -91,7 +97,16 @@ const SidebarContent = () => {
     open,
     setOpen
   } = useSidebar();
-  const links = menuItems.map(item => ({
+
+  // Filter menu items based on user role
+  const filteredMenuItems = menuItems.filter(item => {
+    const requiredRoles = MENU_ROLE_REQUIREMENTS[item.id];
+    if (!requiredRoles) return true; // No restriction
+    if (isAdmin) return true; // Admin sees everything
+    return teamRole && requiredRoles.includes(teamRole);
+  });
+
+  const links = filteredMenuItems.map(item => ({
     label: item.label,
     href: `/${item.id}`,
     icon: <item.icon className="h-5 w-5" />
@@ -156,7 +171,20 @@ const SidebarContent = () => {
         }} transition={{
           duration: 0.2
         }} className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-foreground group-hover:text-foreground whitespace-nowrap">{getDisplayName()}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-foreground group-hover:text-foreground whitespace-nowrap">{getDisplayName()}</p>
+              {teamRole && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
+                  teamRole === 'admin' 
+                    ? 'bg-primary/20 text-primary' 
+                    : teamRole === 'manager' 
+                    ? 'bg-accent/20 text-accent' 
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  {teamRole === 'admin' ? 'Admin' : teamRole === 'manager' ? 'Gerente' : 'Agente'}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground truncate">{user?.email || 'email@example.com'}</p>
           </motion.div>
           <motion.div animate={{
