@@ -34,7 +34,14 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
   scheduled: { label: 'Agendada', color: 'bg-purple-500/20 text-purple-400', icon: <Clock className="w-3 h-3" /> },
 };
 
-const POLLING_INTERVAL = 60000; // 60 seconds
+// Polling intervals options in seconds
+const POLLING_INTERVALS = [
+  { value: 10000, label: '10s' },
+  { value: 20000, label: '20s' },
+  { value: 30000, label: '30s' },
+  { value: 60000, label: '60s' },
+  { value: 120000, label: '2min' },
+];
 
 export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCampaign }) => {
   const { data: campaigns, isLoading, refetch } = useCampaigns();
@@ -42,6 +49,7 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
   const deleteCampaign = useDeleteCampaign();
   const processCampaigns = useProcessCampaigns();
   const [autoProcessing, setAutoProcessing] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(30000); // Default 30s
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if there are active campaigns
@@ -53,13 +61,13 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
       // Process immediately when enabled
       processCampaigns.mutate();
       
-      // Set up interval
+      // Set up interval with configurable time
       pollingRef.current = setInterval(() => {
         if (!processCampaigns.isPending) {
-          console.log('[CampaignsList] Auto-processing campaigns...');
+          console.log(`[CampaignsList] Auto-processing campaigns (interval: ${pollingInterval/1000}s)...`);
           processCampaigns.mutate();
         }
-      }, POLLING_INTERVAL);
+      }, pollingInterval);
 
       return () => {
         if (pollingRef.current) {
@@ -73,7 +81,7 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
         pollingRef.current = null;
       }
     }
-  }, [autoProcessing, hasActiveCampaigns]);
+  }, [autoProcessing, hasActiveCampaigns, pollingInterval]);
 
   // Stop auto-processing when no active campaigns
   useEffect(() => {
@@ -110,10 +118,17 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
         return;
       }
       setAutoProcessing(true);
-      toast.success('Processamento automático ativado (a cada 60s)');
+      toast.success(`Processamento automático ativado (a cada ${pollingInterval/1000}s)`);
     } else {
       setAutoProcessing(false);
       toast.info('Processamento automático desativado');
+    }
+  };
+
+  const handleIntervalChange = (newInterval: number) => {
+    setPollingInterval(newInterval);
+    if (autoProcessing) {
+      toast.info(`Intervalo atualizado para ${newInterval/1000}s`);
     }
   };
 
@@ -168,6 +183,19 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
             <RefreshCw className={`w-4 h-4 ${autoProcessing ? 'animate-spin' : ''}`} />
             {autoProcessing ? 'Auto: Ligado' : 'Auto: Desligado'}
           </Button>
+          
+          {/* Interval selector */}
+          <select
+            value={pollingInterval}
+            onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {POLLING_INTERVALS.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
         
         <Button onClick={onNewCampaign} className="gap-2">
@@ -177,11 +205,19 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
       </div>
 
       {autoProcessing && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 flex items-center gap-2 text-sm text-green-400">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex items-center gap-2 text-sm text-emerald-400">
           <RefreshCw className="w-4 h-4 animate-spin" />
-          Processamento automático ativo - enviando mensagens a cada 60 segundos
+          Processamento automático ativo - enviando mensagens a cada {pollingInterval/1000} segundos
         </div>
       )}
+      
+      {/* Info about automatic cron */}
+      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-sm text-cyan-400">
+        <p className="flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          <strong>Novo:</strong> O sistema agora processa campanhas automaticamente a cada 1 minuto via cron, mesmo sem a página aberta!
+        </p>
+      </div>
 
       <div className="grid gap-4">
         {campaigns.map((campaign) => {
