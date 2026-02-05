@@ -13,6 +13,43 @@ import {
 } from '@/types';
 import { toast } from 'sonner';
 
+// Sound notification utility
+const playNotificationSound = () => {
+  try {
+    // Create audio context for notification sound
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Pleasant notification tone
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+    
+    console.log('[Notification] 🔔 Sound played');
+  } catch (error) {
+    console.log('[Notification] Could not play sound:', error);
+  }
+};
+
+// Update document title with unread count
+const updateDocumentTitle = (unreadCount: number) => {
+  const baseTitle = 'VIA - Chat';
+  if (unreadCount > 0) {
+    document.title = `(${unreadCount}) ${baseTitle}`;
+  } else {
+    document.title = baseTitle;
+  }
+};
+
 export function useConversations() {
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +64,9 @@ export function useConversations() {
   
   // Polling interval ref for fallback mechanism
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track last notification time to prevent spam
+  const lastNotificationTime = useRef<number>(0);
 
   // Fetch a single conversation and add it to state
   const fetchAndAddConversation = useCallback(async (conversationId: string) => {
@@ -109,6 +149,21 @@ export function useConversations() {
       toast.error('Erro ao carregar conversas');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Update document title when unread count changes
+  useEffect(() => {
+    const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+    updateDocumentTitle(totalUnread);
+  }, [conversations]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        console.log('[Notification] Permission:', permission);
+      });
     }
   }, []);
 
@@ -201,13 +256,33 @@ export function useConversations() {
                 // Track this message as processed
                 processedMessageIds.current.add(uiMessage.id);
                 
+                // 🔔 Play notification sound for incoming messages from contacts
+                const isFromContact = newMessage.from_type === 'user';
+                if (isFromContact) {
+                  const now = Date.now();
+                  // Prevent notification spam (at least 2 seconds between sounds)
+                  if (now - lastNotificationTime.current > 2000) {
+                    lastNotificationTime.current = now;
+                    playNotificationSound();
+                    
+                    // Show browser notification if tab is not focused
+                    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+                      new Notification('Nova mensagem', {
+                        body: newMessage.content?.substring(0, 100) || 'Nova mensagem recebida',
+                        icon: '/favicon.png',
+                        tag: 'new-message'
+                      });
+                    }
+                  }
+                }
+                
                 return {
                   ...conv,
                   messages: [...conv.messages, uiMessage],
                   lastMessage: newMessage.content || '',
                   lastMessageTime: 'Agora',
                   // Increment unread if it's from user
-                  unreadCount: newMessage.from_type === 'user' 
+                  unreadCount: isFromContact 
                     ? conv.unreadCount + 1 
                     : conv.unreadCount
                 };
