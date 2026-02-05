@@ -8,8 +8,7 @@ import { Sidebar, SidebarBody, SidebarLink, useSidebar } from '@/components/ui/s
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import viaIcon from '@/assets/icon-via.png';
-import viaLogoWhite from '@/assets/logo-via-white.png';
+import premaLogo from '@/assets/logo-prema.png';
 const menuItems = [{
   id: 'dashboard',
   label: 'Dashboard',
@@ -49,11 +48,8 @@ const Logo = ({
   companyName: string;
 }) => {
   return <Link to="/dashboard" className="flex items-center space-x-3 py-1">
-      <div className="relative w-10 h-10 flex items-center justify-center flex-shrink-0">
-        <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full" />
-        <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20 p-1.5">
-          <img src={viaIcon} alt="Logo" className="w-full h-full object-contain" />
-        </div>
+      <div className="relative w-12 h-12 flex items-center justify-center flex-shrink-0">
+        <img src={premaLogo} alt="Logo" className="w-full h-full object-contain rounded-xl" />
       </div>
       <motion.div initial={{
       opacity: 0
@@ -69,11 +65,8 @@ const Logo = ({
 };
 const LogoIcon = () => {
   return <Link to="/dashboard" className="flex items-center py-1">
-      <div className="relative w-10 h-10 flex items-center justify-center flex-shrink-0">
-        <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full" />
-        <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20 p-1.5">
-          <img src={viaIcon} alt="Logo" className="w-full h-full object-contain" />
-        </div>
+      <div className="relative w-12 h-12 flex items-center justify-center flex-shrink-0">
+        <img src={premaLogo} alt="Logo" className="w-full h-full object-contain rounded-xl" />
       </div>
     </Link>;
 };
@@ -148,7 +141,7 @@ const SidebarContent = () => {
         </nav>
       </div>
 
-      {/* VIA Logo - Footer */}
+      {/* Prema Logo - Footer */}
       {open && <motion.div initial={{
       opacity: 0
     }} animate={{
@@ -156,7 +149,7 @@ const SidebarContent = () => {
     }} transition={{
       duration: 0.3
     }} className="py-4 flex justify-center">
-          <img alt="VIA" className="h-6 transition-opacity opacity-100 object-contain" src="/lovable-uploads/acd62219-d796-4d5d-994b-e33b0336c511.png" />
+          <img alt="PremaCar" className="h-8 transition-opacity opacity-100 object-contain rounded-lg" src={premaLogo} />
         </motion.div>}
 
       {/* User Footer */}
