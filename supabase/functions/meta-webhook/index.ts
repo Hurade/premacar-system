@@ -404,11 +404,13 @@ async function processMetaWebhookAsync(
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 💬 Buscando conversa...');
 
+        // Buscar conversa ativa para este contato VIA META
         let { data: conversation } = await supabase
           .from('conversations')
           .select('*')
           .eq('contact_id', contact.id)
           .eq('is_active', true)
+          .eq('api_source', 'meta')
           .maybeSingle();
 
         if (!conversation) {
