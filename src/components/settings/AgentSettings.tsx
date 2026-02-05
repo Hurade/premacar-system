@@ -601,10 +601,12 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
             <div className="space-y-3">
               <select
                 value={settings.ai_activation_delay_minutes}
-                onChange={(e) => setSettings({ ...settings, ai_activation_delay_minutes: parseInt(e.target.value) })}
+                onChange={(e) => setSettings({ ...settings, ai_activation_delay_minutes: parseFloat(e.target.value) })}
                 className="w-full h-10 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               >
                 <option value="0">Sem delay (responder imediatamente)</option>
+                <option value="0.33">20 segundos</option>
+                <option value="0.5">30 segundos</option>
                 <option value="1">1 minuto</option>
                 <option value="3">3 minutos</option>
                 <option value="5">5 minutos (recomendado)</option>
