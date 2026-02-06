@@ -157,7 +157,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           ai_activation_delay_minutes: settings.ai_activation_delay_minutes,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', settings.id);
+        .eq('id', settings.id!);
 
       if (error) throw error;
 

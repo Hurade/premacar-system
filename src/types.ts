@@ -27,7 +27,7 @@ export interface TeamMember {
   lastActive?: string;
   team_id?: string | null;
   function_id?: string | null;
-  weight?: number;
+  weight?: number | null;
   team?: Team;
   function?: TeamFunction;
 }
@@ -36,8 +36,8 @@ export interface Team {
   id: string;
   name: string;
   description: string | null;
-  color: string;
-  is_active: boolean;
+  color: string | null;
+  is_active: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,7 +46,7 @@ export interface TeamFunction {
   id: string;
   name: string;
   description: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -102,9 +102,9 @@ export interface Appointment {
   time: string;
   duration: number;
   type: 'demo' | 'meeting' | 'support' | 'followup';
-  description?: string;
+  description?: string | null;
   attendees?: string[];
-  contact_id?: string;
+  contact_id?: string | null;
   contact?: {
     id: string;
     name: string | null;
@@ -134,7 +134,7 @@ export interface Deal {
   lostAt?: string;
   lostReason?: string;
   clientMemory?: ClientMemory;
-  conversationId?: string;
+  conversationId?: string | null;
 }
 
 export interface DealActivity {
