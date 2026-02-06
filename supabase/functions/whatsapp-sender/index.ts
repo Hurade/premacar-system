@@ -159,7 +159,7 @@ serve(async (req) => {
               retry_count: newRetryCount,
               error_message: errorMessage,
               scheduled_at: shouldRetry 
-                ? new Date(Date.now() + newRetryCount * 60000).toISOString() 
+                ? new Date(Date.now() + newRetryCount * 15000).toISOString() // 15s, 30s backoff
                 : null
             })
             .eq('id', item.id);
@@ -347,7 +347,7 @@ async function sendViaMeta(settings: any, recipient: string, queueItem: any): Pr
   return responseData.messages?.[0]?.id || null;
 }
 
-// Send via Evolution API
+// Send via Evolution API with automatic retry for transient errors
 async function sendViaEvolution(settings: any, recipient: string, queueItem: any): Promise<string | null> {
   // Clean Evolution API URL (remove trailing slash)
   const baseUrl = settings.evolution_api_url.replace(/\/$/, '');
@@ -359,76 +359,91 @@ async function sendViaEvolution(settings: any, recipient: string, queueItem: any
   switch (queueItem.message_type) {
     case 'text':
       endpoint = `/message/sendText/${settings.evolution_instance_name}`;
-      payload = {
-        number: recipient,
-        text: queueItem.content
-      };
+      payload = { number: recipient, text: queueItem.content };
       break;
-    
     case 'image':
       endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
-      payload = {
-        number: recipient,
-        mediatype: 'image',
-        media: queueItem.media_url,
-        caption: queueItem.content || undefined
-      };
+      payload = { number: recipient, mediatype: 'image', media: queueItem.media_url, caption: queueItem.content || undefined };
       break;
-    
     case 'audio':
       endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
-      payload = {
-        number: recipient,
-        mediatype: 'audio',
-        media: queueItem.media_url
-      };
+      payload = { number: recipient, mediatype: 'audio', media: queueItem.media_url };
       break;
-    
     case 'document':
       endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
-      payload = {
-        number: recipient,
-        mediatype: 'document',
-        media: queueItem.media_url,
-        fileName: queueItem.content || 'document'
-      };
+      payload = { number: recipient, mediatype: 'document', media: queueItem.media_url, fileName: queueItem.content || 'document' };
       break;
-    
     default:
       endpoint = `/message/sendText/${settings.evolution_instance_name}`;
-      payload = {
-        number: recipient,
-        text: queueItem.content
-      };
+      payload = { number: recipient, text: queueItem.content };
   }
 
-  console.log('[Sender] Evolution API request:', {
-    url: `${baseUrl}${endpoint}`,
-    payload
-  });
-
-  // Clean Evolution API key (remove common prefixes like AUTHENTICATION_API_KEY=)
+  // Clean Evolution API key
   let apiKey = settings.evolution_api_key || '';
   if (apiKey.includes('=')) {
     apiKey = apiKey.split('=').slice(1).join('=');
   }
 
-  // Send via Evolution API
-  const response = await fetch(`${baseUrl}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'apikey': apiKey,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
+  const url = `${baseUrl}${endpoint}`;
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [2000, 4000, 8000]; // 2s, 4s, 8s backoff
 
-  const responseData = await response.json();
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[Sender] Evolution API request (attempt ${attempt + 1}/${MAX_RETRIES + 1}):`, { url, payload });
 
-  if (!response.ok) {
-    console.error('[Sender] Evolution API error:', responseData);
-    throw new Error(responseData.message || responseData.error || 'Evolution API error');
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'apikey': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = JSON.stringify(responseData);
+        const isConnectionClosed = errorMsg.toLowerCase().includes('connection closed') || 
+                                    errorMsg.toLowerCase().includes('connection reset') ||
+                                    errorMsg.toLowerCase().includes('econnrefused') ||
+                                    errorMsg.toLowerCase().includes('timeout') ||
+                                    response.status === 502 || 
+                                    response.status === 503;
+
+        if (isConnectionClosed && attempt < MAX_RETRIES) {
+          const delay = RETRY_DELAYS[attempt];
+          console.warn(`[Sender] Evolution transient error (attempt ${attempt + 1}), retrying in ${delay}ms:`, responseData);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        console.error('[Sender] Evolution API error (final):', responseData);
+        throw new Error(responseData.message || responseData.error || 'Evolution API error');
+      }
+
+      if (attempt > 0) {
+        console.log(`[Sender] Evolution API succeeded on retry attempt ${attempt + 1}`);
+      }
+
+      return responseData.key?.id || responseData.messageId || null;
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const isTransient = errMsg.toLowerCase().includes('connection') || 
+                          errMsg.toLowerCase().includes('timeout') ||
+                          errMsg.toLowerCase().includes('fetch failed');
+
+      if (isTransient && attempt < MAX_RETRIES) {
+        const delay = RETRY_DELAYS[attempt];
+        console.warn(`[Sender] Evolution fetch error (attempt ${attempt + 1}), retrying in ${delay}ms:`, errMsg);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-  return responseData.key?.id || responseData.messageId || null;
+  throw new Error('Evolution API: max retries exceeded');
 }
