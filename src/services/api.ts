@@ -989,11 +989,11 @@ export const api = {
       title: data.title,
       company: data.company || 'Sem empresa',
       value: Number(data.value) || 0,
-      stage: data.stage,
+      stage: data.stage || '',
       stageId: data.stage_id,
       ownerAvatar: 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
       tags: data.tags || [],
-      dueDate: data.due_date,
+      dueDate: data.due_date || undefined,
       priority: data.priority as 'low' | 'medium' | 'high',
     };
   },

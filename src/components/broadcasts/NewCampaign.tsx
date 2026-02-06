@@ -132,8 +132,10 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
 
         setFolders((foldersData || []).map(f => ({
           ...f,
+          color: f.color as string | null,
+          is_active: f.is_active as boolean | null,
           contact_count: counts[f.id] || 0
-        })));
+        })) as ContactFolder[]);
 
         // Load tag definitions
         const { data: tagsData } = await supabase
