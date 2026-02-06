@@ -190,7 +190,7 @@ export const api = {
       
       const responseTimes = avgResponseResult.data?.map(m => m.nina_response_time).filter(Boolean) || [];
       const avgResponseMs = responseTimes.length > 0 
-        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length 
+        ? responseTimes.reduce((a: number, b: number) => a + b, 0) / responseTimes.length 
         : 0;
 
       return [
