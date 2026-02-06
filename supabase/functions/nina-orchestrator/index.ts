@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech";
+// ElevenLabs removed - text-only responses
 
 // Tool definition for appointment creation
 const createAppointmentTool = {
@@ -236,7 +236,6 @@ serve(async (req) => {
           ai_model_mode: effectiveSettings.ai_model_mode,
           has_system_prompt: !!effectiveSettings.system_prompt_override,
           has_whatsapp_config: !!effectiveSettings.whatsapp_phone_number_id,
-          has_elevenlabs: !!effectiveSettings.elevenlabs_api_key,
         });
         
         await processQueueItem(supabase, lovableApiKey, item, systemPrompt, effectiveSettings);
@@ -289,50 +288,7 @@ serve(async (req) => {
   }
 });
 
-// Generate audio using ElevenLabs
-async function generateAudioElevenLabs(settings: any, text: string): Promise<ArrayBuffer | null> {
-  if (!settings.elevenlabs_api_key) {
-    console.log('[Nina] ElevenLabs API key not configured');
-    return null;
-  }
-
-  try {
-    const voiceId = settings.elevenlabs_voice_id || '33B4UnXyTNbgLmdEDh5P'; // Keren - Young Brazilian Female
-    const model = settings.elevenlabs_model || 'eleven_turbo_v2_5';
-
-    console.log('[Nina] Generating audio with ElevenLabs, voice:', voiceId);
-
-    const response = await fetch(`${ELEVENLABS_API_URL}/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': settings.elevenlabs_api_key,
-        'Content-Type': 'application/json',
-        'Accept': 'audio/mpeg'
-      },
-      body: JSON.stringify({
-        text,
-        model_id: model,
-        voice_settings: {
-          stability: settings.elevenlabs_stability || 0.75,
-          similarity_boost: settings.elevenlabs_similarity_boost || 0.80,
-          style: settings.elevenlabs_style || 0.30,
-          use_speaker_boost: settings.elevenlabs_speaker_boost !== false
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Nina] ElevenLabs error:', response.status, errorText);
-      return null;
-    }
-
-    return await response.arrayBuffer();
-  } catch (error) {
-    console.error('[Nina] Error generating audio:', error);
-    return null;
-  }
-}
+// ElevenLabs audio generation removed
 
 // Upload audio to Supabase Storage
 async function uploadAudioToStorage(
@@ -912,56 +868,8 @@ async function processQueueItem(
   const delayMax = settings?.response_delay_max || 3000;
   const delay = Math.random() * (delayMax - delayMin) + delayMin;
 
-  // Check if audio response should be sent - pure mirroring: only respond with audio if incoming was audio
-  const incomingWasAudio = message.type === 'audio';
-  const shouldSendAudio = incomingWasAudio && settings?.elevenlabs_api_key;
-
-  if (shouldSendAudio) {
-    console.log(`[Nina] Audio response enabled (incoming was audio: ${incomingWasAudio})`);
-    
-    const audioBuffer = await generateAudioElevenLabs(settings, aiContent);
-    
-    if (audioBuffer) {
-      const audioUrl = await uploadAudioToStorage(supabase, audioBuffer, conversation.id);
-      
-      if (audioUrl) {
-        const { error: sendQueueError } = await supabase
-          .from('send_queue')
-          .insert({
-            conversation_id: conversation.id,
-            contact_id: conversation.contact_id,
-            content: aiContent,
-            from_type: 'nina',
-            message_type: 'audio',
-            media_url: audioUrl,
-            priority: 1,
-            scheduled_at: new Date(Date.now() + delay).toISOString(),
-            metadata: {
-              response_to_message_id: message.id,
-              ai_model: aiSettings.model,
-              audio_generated: true,
-              text_content: aiContent,
-              appointment_created: appointmentCreated?.id || null
-            }
-          });
-
-        if (sendQueueError) {
-          console.error('[Nina] Error queuing audio response:', sendQueueError);
-          throw sendQueueError;
-        }
-
-        console.log('[Nina] Audio response queued for sending');
-      } else {
-        console.log('[Nina] Failed to upload audio, falling back to text');
-        await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay, appointmentCreated);
-      }
-    } else {
-      console.log('[Nina] Failed to generate audio, falling back to text');
-      await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay, appointmentCreated);
-    }
-  } else {
-    await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay, appointmentCreated);
-  }
+  // Always send text response (ElevenLabs audio removed)
+  await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay, appointmentCreated);
 
   // Trigger whatsapp-sender
   try {
