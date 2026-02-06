@@ -508,17 +508,56 @@ async function processMetaWebhookAsync(
           .eq('id', conversation.id);
 
         // ═══════════════════════════════════════════
-        // 5. VERIFICAR DELAY DE ATIVAÇÃO DA IA E ADICIONAR À FILA
+        // 5. DETECÇÃO DE MENSAGENS AUTOMÁTICAS (BOTS)
+        // ═══════════════════════════════════════════
+        const botPatterns = [
+          /^\u200e/,                          // Caractere invisível ‎ no início (comum em bots)
+          /agradece\s+seu\s+contato/i,        // "agradece seu contato"
+          /obrigad[oa]\s+por\s+entrar\s+em\s+contato/i,
+          /como\s+podemos\s+(te\s+)?ajudar\??$/i, // "Como podemos ajudar?"
+          /bem[- ]?vind[oa]\s+(à|a|ao)/i,     // "Bem-vindo(a) à/ao"
+          /atendimento\s+automático/i,
+          /digite\s+\d+\s+para/i,             // "Digite 1 para..."
+          /escolha\s+uma?\s+(das\s+)?opç(ão|ões)/i,
+          /horário\s+de\s+atendimento/i,
+          /fora\s+do\s+hor[aá]rio/i,
+          /no\s+momento\s+n[ãa]o\s+estamos/i,
+          /resposta\s+autom[aá]tica/i,
+          /mensagem\s+autom[aá]tica/i,
+        ];
+
+        const isLikelyBot = messageContent ? botPatterns.some(p => p.test(messageContent)) : false;
+        
+        if (isLikelyBot) {
+          console.log('[Meta Async] 🤖🚫 MENSAGEM AUTOMÁTICA DETECTADA!');
+          console.log('[Meta Async] - Conteúdo:', messageContent?.substring(0, 80));
+          console.log('[Meta Async] - Aplicando delay de proteção anti-bot');
+          
+          // Marcar dispatch_sent_at para ativar o delay mesmo em conversas inbound
+          if (!conversation.dispatch_sent_at) {
+            await supabase
+              .from('conversations')
+              .update({ dispatch_sent_at: new Date().toISOString() })
+              .eq('id', conversation.id);
+            // Atualizar referência local
+            conversation.dispatch_sent_at = new Date().toISOString();
+            console.log('[Meta Async] - dispatch_sent_at definido para proteção anti-bot');
+          }
+        }
+
+        // ═══════════════════════════════════════════
+        // 6. VERIFICAR DELAY DE ATIVAÇÃO DA IA E ADICIONAR À FILA
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 🤖 Verificando fila da IA...');
         console.log('[Meta Async] - Status da conversa:', conversation.status);
         console.log('[Meta Async] - Grouping enabled:', groupingEnabled);
         console.log('[Meta Async] - AI Activation Delay (min):', aiActivationDelayMinutes);
         console.log('[Meta Async] - dispatch_sent_at:', conversation.dispatch_sent_at);
+        console.log('[Meta Async] - Bot detectado:', isLikelyBot);
 
         if (conversation.status === 'nina') {
           // ═══════════════════════════════════════════
-          // VERIFICAR DELAY DE ATIVAÇÃO APÓS DISPARO
+          // VERIFICAR DELAY DE ATIVAÇÃO APÓS DISPARO OU BOT
           // ═══════════════════════════════════════════
           let canProcessAI = true;
           let delayRemainingMinutes = 0;
@@ -529,9 +568,9 @@ async function processMetaWebhookAsync(
             const minutesSinceDispatch = (now.getTime() - dispatchTime.getTime()) / 1000 / 60;
             
             console.log('[Meta Async] 📊 Verificando delay de ativação:');
-            console.log('[Meta Async] - Disparo enviado em:', dispatchTime.toISOString());
+            console.log('[Meta Async] - Disparo/bot detectado em:', dispatchTime.toISOString());
             console.log('[Meta Async] - Hora atual:', now.toISOString());
-            console.log('[Meta Async] - Minutos desde disparo:', minutesSinceDispatch.toFixed(2));
+            console.log('[Meta Async] - Minutos desde evento:', minutesSinceDispatch.toFixed(2));
             console.log('[Meta Async] - Delay configurado:', aiActivationDelayMinutes, 'minutos');
 
             if (minutesSinceDispatch < aiActivationDelayMinutes) {
@@ -542,14 +581,13 @@ async function processMetaWebhookAsync(
               console.log('[Meta Async] - Mensagem será armazenada mas NÃO processada pela IA');
             } else {
               console.log('[Meta Async] ✅ Delay expirado, IA pode responder');
-              // Limpar dispatch_sent_at após delay expirar (opcional: evita verificar novamente)
               await supabase
                 .from('conversations')
                 .update({ dispatch_sent_at: null })
                 .eq('id', conversation.id);
             }
           } else if (!conversation.dispatch_sent_at) {
-            console.log('[Meta Async] ℹ️ Não é conversa de disparo (inbound), processando normalmente');
+            console.log('[Meta Async] ℹ️ Não é conversa de disparo/bot (inbound humano), processando normalmente');
           } else {
             console.log('[Meta Async] ℹ️ Delay desabilitado (0 min), processando imediatamente');
           }
