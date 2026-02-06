@@ -95,27 +95,18 @@ serve(async (req) => {
               .eq('whatsapp_message_id', messageId)
               .eq('status', 'sent');
 
-            // Update campaign counter
+            // Atomic counter increment
             const { data: lead } = await supabase
               .from('campaign_leads')
               .select('campaign_id')
               .eq('whatsapp_message_id', messageId)
-              .single();
+              .maybeSingle();
 
             if (lead) {
-              // Increment delivered counter
-              const { data: campaign } = await supabase
-                .from('campaigns')
-                .select('total_delivered')
-                .eq('id', lead.campaign_id)
-                .single();
-
-              if (campaign) {
-                await supabase
-                  .from('campaigns')
-                  .update({ total_delivered: (campaign.total_delivered || 0) + 1 })
-                  .eq('id', lead.campaign_id);
-              }
+              await supabase.rpc('increment_campaign_counter', { 
+                p_campaign_id: lead.campaign_id, 
+                p_counter: 'total_delivered' 
+              });
             }
           }
           
@@ -133,21 +124,13 @@ serve(async (req) => {
               .from('campaign_leads')
               .select('campaign_id')
               .eq('whatsapp_message_id', messageId)
-              .single();
+              .maybeSingle();
 
             if (lead) {
-              const { data: campaign } = await supabase
-                .from('campaigns')
-                .select('total_read')
-                .eq('id', lead.campaign_id)
-                .single();
-
-              if (campaign) {
-                await supabase
-                  .from('campaigns')
-                  .update({ total_read: (campaign.total_read || 0) + 1 })
-                  .eq('id', lead.campaign_id);
-              }
+              await supabase.rpc('increment_campaign_counter', { 
+                p_campaign_id: lead.campaign_id, 
+                p_counter: 'total_read' 
+              });
             }
           }
         }
@@ -267,20 +250,10 @@ serve(async (req) => {
           .eq('id', campaignLead.id);
 
         // Update campaign replied counter
-        const { data: campaign } = await supabase
-          .from('campaigns')
-          .select('total_replied')
-          .eq('id', campaignLead.campaign_id)
-          .single();
-
-        if (campaign) {
-          await supabase
-            .from('campaigns')
-            .update({ 
-              total_replied: (campaign.total_replied || 0) + 1 
-            })
-            .eq('id', campaignLead.campaign_id);
-        }
+        await supabase.rpc('increment_campaign_counter', { 
+          p_campaign_id: campaignLead.campaign_id, 
+          p_counter: 'total_replied' 
+        });
       }
 
       // 1. Get or create contact
