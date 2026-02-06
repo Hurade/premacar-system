@@ -27,7 +27,7 @@ export interface TeamMember {
   lastActive?: string;
   team_id?: string | null;
   function_id?: string | null;
-  weight?: number;
+  weight?: number | null;
   team?: Team;
   function?: TeamFunction;
 }
