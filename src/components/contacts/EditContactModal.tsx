@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Loader2, UserPlus, Tag as TagIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Loader2, Pencil, Tag as TagIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -10,20 +10,30 @@ import { toast } from 'sonner';
 import { ContactFolder } from './FolderManager';
 import { TagDefinition } from './TagManager';
 
-interface AddContactModalProps {
+interface EditContactModalProps {
   isOpen: boolean;
   onClose: () => void;
   folders: ContactFolder[];
   tags: TagDefinition[];
-  onContactAdded: () => void;
+  onContactUpdated: () => void;
+  contact: {
+    id: string;
+    name: string | null;
+    phone_number: string;
+    oficina: string | null;
+    email: string | null;
+    tags: string[] | null;
+    folder_id: string | null;
+  } | null;
 }
 
-const AddContactModal: React.FC<AddContactModalProps> = ({
+const EditContactModal: React.FC<EditContactModalProps> = ({
   isOpen,
   onClose,
   folders,
   tags,
-  onContactAdded
+  onContactUpdated,
+  contact
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -33,17 +43,18 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
   const [folderId, setFolderId] = useState<string>('none');
   const [loading, setLoading] = useState(false);
 
-  const resetForm = () => {
-    setName('');
-    setPhone('');
-    setOficina('');
-    setEmail('');
-    setSelectedTags([]);
-    setFolderId('none');
-  };
+  useEffect(() => {
+    if (contact) {
+      setName(contact.name || '');
+      setPhone(contact.phone_number || '');
+      setOficina(contact.oficina || '');
+      setEmail(contact.email || '');
+      setSelectedTags(contact.tags || []);
+      setFolderId(contact.folder_id || 'none');
+    }
+  }, [contact]);
 
   const handleClose = () => {
-    resetForm();
     onClose();
   };
 
@@ -61,6 +72,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!contact) return;
     
     const cleanPhone = formatPhone(phone);
     
@@ -73,68 +85,68 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
       toast.error('Email inválido.');
       return;
     }
-      return;
-    }
 
     setLoading(true);
     try {
-      // Verificar se já existe contato com esse telefone
-      const { data: existing } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('phone_number', cleanPhone)
-        .single();
+      // Check if phone changed and already exists
+      if (cleanPhone !== contact.phone_number) {
+        const { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('phone_number', cleanPhone)
+          .neq('id', contact.id)
+          .maybeSingle();
 
-      if (existing) {
-        toast.error('Já existe um contato com esse telefone.');
-        return;
+        if (existing) {
+          toast.error('Já existe outro contato com esse telefone.');
+          setLoading(false);
+          return;
+        }
       }
 
       const { error } = await supabase
         .from('contacts')
-        .insert({
+        .update({
           name: name.trim() || null,
           phone_number: cleanPhone,
           oficina: oficina.trim() || null,
           email: email.trim() || null,
           tags: selectedTags.length > 0 ? selectedTags : null,
           folder_id: folderId === 'none' ? null : folderId
-        });
+        })
+        .eq('id', contact.id);
 
       if (error) throw error;
 
-      toast.success('Contato adicionado com sucesso!');
-      onContactAdded();
+      toast.success('Contato atualizado com sucesso!');
+      onContactUpdated();
       handleClose();
     } catch (error) {
-      console.error('Erro ao adicionar contato:', error);
-      toast.error('Erro ao adicionar contato');
+      console.error('Erro ao atualizar contato:', error);
+      toast.error('Erro ao atualizar contato');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !contact) return null;
 
   const activeTags = tags.filter(t => t.is_active);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay */}
       <div 
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={handleClose}
       />
 
-      {/* Modal */}
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-500/10 rounded-lg">
-              <UserPlus className="w-5 h-5 text-cyan-400" />
+            <div className="p-2 bg-amber-500/10 rounded-lg">
+              <Pencil className="w-5 h-5 text-amber-400" />
             </div>
-            <h2 className="text-lg font-semibold text-white">Adicionar Contato</h2>
+            <h2 className="text-lg font-semibold text-white">Editar Contato</h2>
           </div>
           <button
             onClick={handleClose}
@@ -144,13 +156,11 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Nome */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
           <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
+            <Label htmlFor="edit-name">Nome</Label>
             <Input
-              id="name"
+              id="edit-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nome do contato"
@@ -158,11 +168,10 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             />
           </div>
 
-          {/* Telefone */}
           <div className="space-y-2">
-            <Label htmlFor="phone">Telefone *</Label>
+            <Label htmlFor="edit-phone">Telefone *</Label>
             <Input
-              id="phone"
+              id="edit-phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Ex: 5511999999999"
@@ -172,23 +181,10 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             <p className="text-xs text-slate-500">Formato: código do país + DDD + número</p>
           </div>
 
-          {/* Oficina */}
           <div className="space-y-2">
-            <Label htmlFor="oficina">Oficina</Label>
+            <Label htmlFor="edit-email">Email</Label>
             <Input
-              id="oficina"
-              value={oficina}
-              onChange={(e) => setOficina(e.target.value)}
-              placeholder="Nome da oficina (opcional)"
-              className="bg-slate-950 border-slate-800"
-            />
-          </div>
-
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
+              id="edit-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -197,7 +193,17 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             />
           </div>
 
-          {/* Pasta */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-oficina">Oficina</Label>
+            <Input
+              id="edit-oficina"
+              value={oficina}
+              onChange={(e) => setOficina(e.target.value)}
+              placeholder="Nome da oficina (opcional)"
+              className="bg-slate-950 border-slate-800"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label>Pasta</Label>
             <Select value={folderId} onValueChange={setFolderId}>
@@ -221,7 +227,6 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             </Select>
           </div>
 
-          {/* Tags */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <TagIcon className="w-4 h-4" />
@@ -252,7 +257,6 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             )}
           </div>
 
-          {/* Submit */}
           <div className="flex gap-3 pt-2">
             <Button
               type="button"
@@ -275,8 +279,8 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
                 </>
               ) : (
                 <>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Adicionar
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Salvar Alterações
                 </>
               )}
             </Button>
@@ -287,4 +291,4 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
   );
 };
 
-export default AddContactModal;
+export default EditContactModal;

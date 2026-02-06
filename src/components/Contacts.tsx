@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, Tag as TagIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -10,6 +10,7 @@ import FolderManager, { ContactFolder } from './contacts/FolderManager';
 import ImportContactsModal from './contacts/ImportContactsModal';
 import BulkActionsBar from './contacts/BulkActionsBar';
 import AddContactModal from './contacts/AddContactModal';
+import EditContactModal from './contacts/EditContactModal';
 import TagManager, { TagDefinition } from './contacts/TagManager';
 
 interface ContactRow {
@@ -17,6 +18,7 @@ interface ContactRow {
   name: string | null;
   phone_number: string;
   oficina: string | null;
+  email: string | null;
   tags: string[] | null;
   folder_id: string | null;
   folder?: ContactFolder;
@@ -35,6 +37,7 @@ const Contacts: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<ContactRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(50);
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,6 +100,7 @@ const Contacts: React.FC = () => {
           name,
           phone_number,
           oficina,
+          email,
           tags,
           folder_id,
           last_activity
@@ -133,7 +137,8 @@ const Contacts: React.FC = () => {
     return (
       (c.name?.toLowerCase() || '').includes(term) ||
       (c.phone_number || '').includes(term) ||
-      (c.oficina?.toLowerCase() || '').includes(term)
+      (c.oficina?.toLowerCase() || '').includes(term) ||
+      (c.email?.toLowerCase() || '').includes(term)
     );
   });
 
@@ -362,6 +367,7 @@ const Contacts: React.FC = () => {
                     <th className="px-4 py-4">Nome</th>
                     <th className="px-4 py-4">Oficina</th>
                     <th className="px-4 py-4">Telefone</th>
+                    <th className="px-4 py-4">Email</th>
                     <th className="px-4 py-4">Tags</th>
                     <th className="px-4 py-4">Pasta</th>
                     <th className="px-4 py-4 text-right">Ações</th>
@@ -401,6 +407,16 @@ const Contacts: React.FC = () => {
                             <Phone className="w-3.5 h-3.5" />
                             <span className="font-mono text-xs">{contact.phone_number}</span>
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {contact.email ? (
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <Mail className="w-3.5 h-3.5" />
+                              <span className="text-xs truncate max-w-[160px]">{contact.email}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 text-xs">-</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -450,15 +466,26 @@ const Contacts: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity" 
-                            title="Iniciar Conversa"
-                            onClick={() => handleStartConversation(contact.id, contact.phone_number)}
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+                              title="Editar Contato"
+                              onClick={() => setEditingContact(contact)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+                              title="Iniciar Conversa"
+                              onClick={() => handleStartConversation(contact.id, contact.phone_number)}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -586,6 +613,19 @@ const Contacts: React.FC = () => {
         folders={folders}
         tags={tagDefinitions}
         onContactAdded={() => {
+          loadContacts();
+          loadFolders();
+        }}
+      />
+
+      {/* Edit contact modal */}
+      <EditContactModal
+        isOpen={!!editingContact}
+        onClose={() => setEditingContact(null)}
+        folders={folders}
+        tags={tagDefinitions}
+        contact={editingContact}
+        onContactUpdated={() => {
           loadContacts();
           loadFolders();
         }}
