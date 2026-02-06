@@ -73,8 +73,6 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
       toast.error('Email inválido.');
       return;
     }
-      return;
-    }
 
     setLoading(true);
     try {
