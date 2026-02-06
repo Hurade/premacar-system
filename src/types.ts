@@ -300,6 +300,7 @@ export interface UIMessage {
   id: string;
   content: string;
   timestamp: string;
+  sentAt: string; // ISO date string for date grouping
   direction: MessageDirection;
   type: MessageType;
   status: 'sent' | 'delivered' | 'read';
@@ -350,6 +351,7 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     id: msg.id,
     content: msg.content || '',
     timestamp: formatMessageTime(msg.sent_at),
+    sentAt: msg.sent_at,
     direction: msg.from_type === 'user' ? MessageDirection.INCOMING : MessageDirection.OUTGOING,
     type: mapDBMessageType(msg.type),
     status: mapDBMessageStatus(msg.status),
@@ -357,6 +359,29 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     mediaUrl: msg.media_url,
     whatsappMessageId: msg.whatsapp_message_id
   };
+}
+
+export function formatDateSeparator(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  ) {
+    return 'Hoje';
+  }
+  if (
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+  ) {
+    return 'Ontem';
+  }
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function mapDBMessageType(type: DBMessageType): MessageType {
