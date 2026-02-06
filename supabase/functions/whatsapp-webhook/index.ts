@@ -320,21 +320,8 @@ serve(async (req) => {
         .eq('api_source', 'evolution')
         .maybeSingle();
 
-      // If no evolution conversation exists, check for any active conversation
-      if (!conversation) {
-        const { data: anyConversation } = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('contact_id', contact.id)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        if (anyConversation) {
-          // Update existing conversation to track this api_source
-          console.log(`[Webhook] Found existing conversation ${anyConversation.id} with api_source=${anyConversation.api_source}, reusing for evolution message`);
-          conversation = anyConversation;
-        }
-      }
+      // If no evolution conversation exists, create a new one (don't reuse Meta conversations)
+      // This ensures responses go back through the correct API
 
       if (!conversation) {
         const { data: newConversation, error: convError } = await supabase
