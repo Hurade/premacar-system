@@ -407,11 +407,17 @@ async function sendViaEvolution(settings: any, recipient: string, queueItem: any
     payload
   });
 
+  // Clean Evolution API key (remove common prefixes like AUTHENTICATION_API_KEY=)
+  let apiKey = settings.evolution_api_key || '';
+  if (apiKey.includes('=')) {
+    apiKey = apiKey.split('=').slice(1).join('=');
+  }
+
   // Send via Evolution API
   const response = await fetch(`${baseUrl}${endpoint}`, {
     method: 'POST',
     headers: {
-      'apikey': settings.evolution_api_key,
+      'apikey': apiKey,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
