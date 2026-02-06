@@ -151,7 +151,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
     setEditForm({
       name: item.name,
       description: item.description || '',
-      color: type === 'team' ? (item as Team).color : '#3b82f6'
+      color: type === 'team' ? ((item as Team).color || '#3b82f6') : '#3b82f6'
     });
   };
 
