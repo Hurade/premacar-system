@@ -288,41 +288,7 @@ serve(async (req) => {
   }
 });
 
-// ElevenLabs audio generation removed
-
-// Upload audio to Supabase Storage
-async function uploadAudioToStorage(
-  supabase: any, 
-  audioBuffer: ArrayBuffer, 
-  conversationId: string
-): Promise<string | null> {
-  try {
-    const fileName = `${conversationId}/${Date.now()}.mp3`;
-    
-    const { data, error } = await supabase.storage
-      .from('audio-messages')
-      .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
-        cacheControl: '3600'
-      });
-
-    if (error) {
-      console.error('[Nina] Error uploading audio:', error);
-      return null;
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('audio-messages')
-      .getPublicUrl(fileName);
-
-    console.log('[Nina] Audio uploaded:', urlData.publicUrl);
-    return urlData.publicUrl;
-  } catch (error) {
-    console.error('[Nina] Error uploading audio to storage:', error);
-    return null;
-  }
-}
+// Audio functionality removed - text-only responses
 
 // Create appointment from AI tool call
 // Helper function to parse time string to minutes
@@ -1120,14 +1086,34 @@ async function detectarOrigemConversa(
       .limit(1)
       .maybeSingle();
     
-    // 2. Verificar histórico de conversas anteriores
+    // 2. Verificar histórico de conversas anteriores COM interação real do contato
+    // Buscar conversas anteriores que tenham pelo menos 1 mensagem do usuário
     const { data: historicoConversas } = await supabase
       .from('conversations')
       .select('id, started_at')
       .eq('contact_id', contactId)
       .neq('id', conversationId)
       .order('started_at', { ascending: false })
-      .limit(5);
+      .limit(10);
+    
+    // Filtrar apenas conversas com mensagens reais do usuário
+    let conversasComInteracao = 0;
+    if (historicoConversas && historicoConversas.length > 0) {
+      for (const conv of historicoConversas) {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', conv.id)
+          .eq('from_type', 'user');
+        
+        if (count && count > 0) {
+          conversasComInteracao++;
+          if (conversasComInteracao >= 2) break; // Já é suficiente para classificar como retorno
+        }
+      }
+    }
+    
+    console.log('[Nina] Conversas anteriores com interação real:', conversasComInteracao, '/', (historicoConversas?.length || 0));
     
     // 3. Verificar se já existem mensagens do usuário na conversa atual (além da mensagem sendo processada)
     const userMessagesInConversation = recentMessages.filter(m => m.from_type === 'user').length;
@@ -1164,12 +1150,12 @@ async function detectarOrigemConversa(
     }
     
     // CASO 2: Cliente retornando
-    // - Tem histórico de conversas anteriores
+    // - Tem conversas anteriores COM interação real do usuário (não apenas disparos sem resposta)
     // - OU tem muitas mensagens de usuário na conversa atual (conversa em andamento)
-    if ((historicoConversas && historicoConversas.length > 0) || userMessagesInConversation > 3) {
+    if (conversasComInteracao > 0 || userMessagesInConversation > 3) {
       return {
         origem: 'retorno',
-        detalhes: `Cliente já teve ${historicoConversas?.length || 0} conversa(s) anterior(es). Reconheça que já conversaram antes, sem ser excessivamente formal.`
+        detalhes: `Cliente já teve ${conversasComInteracao} conversa(s) anterior(es) com interação real. Seja amigável e natural, sem ser excessivamente formal.`
       };
     }
     
