@@ -311,13 +311,30 @@ serve(async (req) => {
           .eq('id', contact.id);
       }
 
-      // 2. Get or create conversation
+      // 2. Get or create conversation (filter by api_source to support multi-API)
       let { data: conversation } = await supabase
         .from('conversations')
         .select('*')
         .eq('contact_id', contact.id)
         .eq('is_active', true)
+        .eq('api_source', 'evolution')
         .maybeSingle();
+
+      // If no evolution conversation exists, check for any active conversation
+      if (!conversation) {
+        const { data: anyConversation } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('contact_id', contact.id)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (anyConversation) {
+          // Update existing conversation to track this api_source
+          console.log(`[Webhook] Found existing conversation ${anyConversation.id} with api_source=${anyConversation.api_source}, reusing for evolution message`);
+          conversation = anyConversation;
+        }
+      }
 
       if (!conversation) {
         const { data: newConversation, error: convError } = await supabase
