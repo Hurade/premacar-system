@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
@@ -19,21 +19,13 @@ import { AuthProvider } from './hooks/useAuth';
 import { UserRoleProvider } from './hooks/useUserRole';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { useOnboardingStatus } from './hooks/useOnboardingStatus';
+
 
 const queryClient = new QueryClient();
 
 // Componente de Layout que envolve a aplicação principal
 const AppLayout: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const { isComplete, hasSeenWizard, loading } = useOnboardingStatus();
-
-  // Show wizard automatically on first load if not complete and never seen
-  useEffect(() => {
-    if (!loading && !isComplete && !hasSeenWizard) {
-      setShowOnboarding(true);
-    }
-  }, [loading, isComplete, hasSeenWizard]);
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
