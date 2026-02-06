@@ -437,9 +437,9 @@ const Contacts: React.FC = () => {
                             <span 
                               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border"
                               style={{ 
-                                backgroundColor: `${folder.color}15`,
-                                borderColor: `${folder.color}30`,
-                                color: folder.color 
+                                backgroundColor: `${folder.color || '#3b82f6'}15`,
+                                borderColor: `${folder.color || '#3b82f6'}30`,
+                                color: folder.color || '#3b82f6' 
                               }}
                             >
                               <Folder className="w-3 h-3" />

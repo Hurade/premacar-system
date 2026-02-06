@@ -188,7 +188,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
                     <span className="flex items-center gap-2">
                       <span 
                         className="w-2.5 h-2.5 rounded-full" 
-                        style={{ backgroundColor: folder.color }}
+                        style={{ backgroundColor: folder.color || '#3b82f6' }}
                       />
                       {folder.name}
                     </span>

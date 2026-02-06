@@ -227,7 +227,7 @@ const FolderManager: React.FC<FolderManagerProps> = ({
                   onClick={() => onSelectFolder(folder.id)}
                   className="flex-1 flex items-center gap-2"
                 >
-                  <Folder className="w-4 h-4" style={{ color: folder.color }} />
+                  <Folder className="w-4 h-4" style={{ color: folder.color || '#3b82f6' }} />
                   <span className="flex-1 text-left truncate">{folder.name}</span>
                   {folder.contact_count !== undefined && (
                     <span className="text-xs text-slate-500">{folder.contact_count}</span>
