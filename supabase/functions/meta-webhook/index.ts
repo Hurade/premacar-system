@@ -564,7 +564,6 @@ async function processMetaWebhookAsync(
         // ═══════════════════════════════════════════
         // 7. VERIFICAR DELAY DE ATIVAÇÃO DA IA E ADICIONAR À FILA
         // ═══════════════════════════════════════════
-        // ═══════════════════════════════════════════
         console.log('[Meta Async] 🤖 Verificando fila da IA...');
         console.log('[Meta Async] - Status da conversa:', conversation.status);
         console.log('[Meta Async] - Grouping enabled:', groupingEnabled);
