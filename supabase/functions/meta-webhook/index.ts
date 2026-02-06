@@ -508,7 +508,23 @@ async function processMetaWebhookAsync(
           .eq('id', conversation.id);
 
         // ═══════════════════════════════════════════
-        // 5. DETECÇÃO DE MENSAGENS AUTOMÁTICAS (BOTS)
+        // 5. VERIFICAR SE MENSAGEM É MUITO ANTIGA (re-delivery da Meta)
+        // ═══════════════════════════════════════════
+        const messageAge = Date.now() - timestamp;
+        const messageAgeMinutes = messageAge / 1000 / 60;
+        const MAX_MESSAGE_AGE_MINUTES = 60; // 1 hora
+
+        if (messageAgeMinutes > MAX_MESSAGE_AGE_MINUTES) {
+          console.log('[Meta Async] ⚠️ MENSAGEM ANTIGA DETECTADA (re-delivery da Meta)');
+          console.log('[Meta Async] - Idade:', Math.round(messageAgeMinutes), 'minutos');
+          console.log('[Meta Async] - Timestamp original:', new Date(timestamp).toISOString());
+          console.log('[Meta Async] - Hora atual:', new Date().toISOString());
+          console.log('[Meta Async] - Mensagem salva no histórico mas NÃO será processada pela IA');
+          continue; // Salva a mensagem mas pula o processamento da IA
+        }
+
+        // ═══════════════════════════════════════════
+        // 6. DETECÇÃO DE MENSAGENS AUTOMÁTICAS (BOTS)
         // ═══════════════════════════════════════════
         const botPatterns = [
           /^\u200e/,                          // Caractere invisível ‎ no início (comum em bots)
@@ -546,7 +562,8 @@ async function processMetaWebhookAsync(
         }
 
         // ═══════════════════════════════════════════
-        // 6. VERIFICAR DELAY DE ATIVAÇÃO DA IA E ADICIONAR À FILA
+        // 7. VERIFICAR DELAY DE ATIVAÇÃO DA IA E ADICIONAR À FILA
+        // ═══════════════════════════════════════════
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 🤖 Verificando fila da IA...');
         console.log('[Meta Async] - Status da conversa:', conversation.status);
