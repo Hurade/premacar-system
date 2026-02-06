@@ -80,12 +80,38 @@ serve(async (req) => {
         // Get the phone_number_id from the first message
         const phoneNumberId = messages[0].phone_number_id;
 
-        // Get owner settings for this instance
-        const { data: ownerSettings } = await supabase
+        // Get owner settings for this instance (include meta tokens for audio transcription)
+        let ownerSettings = null;
+        
+        // Try by evolution instance name first
+        const { data: evoSettings } = await supabase
           .from('nina_settings')
-          .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name')
+          .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
           .eq('evolution_instance_name', phoneNumberId)
           .maybeSingle();
+        
+        if (evoSettings) {
+          ownerSettings = evoSettings;
+        } else {
+          // Fallback: try by meta_phone_number_id (for Meta API messages)
+          const { data: metaSettings } = await supabase
+            .from('nina_settings')
+            .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
+            .eq('meta_phone_number_id', phoneNumberId)
+            .maybeSingle();
+          
+          if (metaSettings) {
+            ownerSettings = metaSettings;
+          } else {
+            // Last fallback: any settings
+            const { data: anySettings } = await supabase
+              .from('nina_settings')
+              .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
+              .limit(1)
+              .maybeSingle();
+            ownerSettings = anySettings;
+          }
+        }
 
         // Get all message_ids from the queue entries
         const messageIds = messages.map(m => m.message_id).filter(Boolean);
@@ -257,9 +283,10 @@ async function combineAndTranscribeMessages(
     // Handle audio transcription
     if (messageData.type === 'audio') {
       const audioMediaId = messageData.audio?.id;
-      if (audioMediaId && settings?.whatsapp_access_token && lovableApiKey) {
+      const accessToken = settings?.meta_access_token || settings?.whatsapp_access_token;
+      if (audioMediaId && accessToken && lovableApiKey) {
         console.log('[MessageGrouper] Transcribing audio:', audioMediaId);
-        const audioBuffer = await downloadWhatsAppMedia(settings, audioMediaId);
+        const audioBuffer = await downloadWhatsAppMedia({ ...settings, whatsapp_access_token: accessToken }, audioMediaId);
         if (audioBuffer) {
           const transcription = await transcribeAudio(audioBuffer, lovableApiKey);
           if (transcription) {

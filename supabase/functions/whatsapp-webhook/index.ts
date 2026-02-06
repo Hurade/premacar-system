@@ -229,6 +229,21 @@ serve(async (req) => {
 
       console.log(`[Webhook] Processing message from ${phoneNumber} (${contactName})`);
 
+      // ═══════════════════════════════════════════
+      // PROTEÇÃO CONTRA RE-DELIVERY / MENSAGENS ANTIGAS
+      // ═══════════════════════════════════════════
+      const messageAge = Date.now() - (messageTimestamp * 1000);
+      const messageAgeMinutes = messageAge / 1000 / 60;
+      const MAX_MESSAGE_AGE_MINUTES = 60;
+
+      if (messageAgeMinutes > MAX_MESSAGE_AGE_MINUTES) {
+        console.log('[Webhook] ⚠️ MENSAGEM ANTIGA DETECTADA (re-delivery)');
+        console.log('[Webhook] - Idade:', Math.round(messageAgeMinutes), 'minutos');
+        console.log('[Webhook] - Timestamp original:', new Date(messageTimestamp * 1000).toISOString());
+        // Still save the message but skip AI processing - handled below with skipAIProcessing flag
+      }
+      const skipAIProcessing = messageAgeMinutes > MAX_MESSAGE_AGE_MINUTES;
+
       // Check if this is a reply to a campaign message
       const { data: campaignLead } = await supabase
         .from('campaign_leads')
@@ -283,7 +298,7 @@ serve(async (req) => {
             whatsapp_id: remoteJid,
             name: contactName,
             call_name: contactName?.split(' ')[0] || null,
-            user_id: null
+            user_id: ownerId
           })
           .select()
           .single();
@@ -330,8 +345,8 @@ serve(async (req) => {
             contact_id: contact.id,
             status: 'nina',
             is_active: true,
-            api_source: 'evolution', // Mark as Evolution API conversation
-            user_id: null
+            api_source: 'evolution',
+            user_id: ownerId
           })
           .select()
           .single();
@@ -430,7 +445,10 @@ serve(async (req) => {
         .eq('id', conversation.id);
 
       // 6. Queue for message grouping (or process immediately if disabled)
-      if (!groupingEnabled) {
+      // Skip AI processing for old messages (re-delivery protection)
+      if (skipAIProcessing) {
+        console.log('[Webhook] ⏭️ Skipping AI processing - old message (re-delivery)');
+      } else if (!groupingEnabled) {
         // Grouping disabled - process immediately via nina-orchestrator
         console.log('[Webhook] Grouping disabled, processing immediately');
         
@@ -452,7 +470,11 @@ serve(async (req) => {
             });
 
           if (ninaQueueError) {
-            console.error('[Webhook] Error queuing for Nina:', ninaQueueError);
+            if (ninaQueueError.code === '23505') {
+              console.log('[Webhook] Message already in Nina queue (duplicate prevented)');
+            } else {
+              console.error('[Webhook] Error queuing for Nina:', ninaQueueError);
+            }
           } else {
             EdgeRuntime.waitUntil(
               fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
@@ -466,7 +488,7 @@ serve(async (req) => {
             );
           }
         }
-      } else {
+      } else if (conversation.status === 'nina') {
         // Grouping enabled - use delay queue
         const processAfter = new Date(Date.now() + groupingDelay).toISOString();
         
