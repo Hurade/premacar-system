@@ -835,13 +835,24 @@ async function processQueueItem(
   const delay = Math.random() * (delayMax - delayMin) + delayMin;
 
   // Always send text response (ElevenLabs audio removed)
+  const totalChunks = settings?.message_breaking_enabled 
+    ? breakMessageIntoChunks(aiContent).length 
+    : 1;
   await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay, appointmentCreated);
 
-  // Trigger whatsapp-sender
+  // Trigger whatsapp-sender AFTER the last chunk's scheduled_at
+  // Wait for all chunks to become ready before triggering sender
+  const lastChunkDelay = delay + ((totalChunks - 1) * 1500);
+  const senderTriggerDelay = lastChunkDelay + 500; // 500ms buffer after last chunk
+  
   try {
     const senderUrl = `${supabaseUrl}/functions/v1/whatsapp-sender`;
-    console.log('[Nina] Triggering whatsapp-sender at:', senderUrl);
+    console.log(`[Nina] Waiting ${senderTriggerDelay}ms for all ${totalChunks} chunks to be ready before triggering sender`);
     
+    // Wait until all chunks are past their scheduled_at
+    await new Promise(resolve => setTimeout(resolve, senderTriggerDelay));
+    
+    console.log('[Nina] Triggering whatsapp-sender now');
     fetch(senderUrl, {
       method: 'POST',
       headers: {
