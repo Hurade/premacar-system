@@ -1670,6 +1670,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_campaign_counter: {
+        Args: { p_campaign_id: string; p_counter: string }
+        Returns: undefined
+      }
       reset_campaign_daily_counts: { Args: never; Returns: undefined }
       update_client_memory: {
         Args: { p_contact_id: string; p_new_memory: Json }
