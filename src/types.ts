@@ -102,9 +102,9 @@ export interface Appointment {
   time: string;
   duration: number;
   type: 'demo' | 'meeting' | 'support' | 'followup';
-  description?: string;
+  description?: string | null;
   attendees?: string[];
-  contact_id?: string;
+  contact_id?: string | null;
   contact?: {
     id: string;
     name: string | null;
