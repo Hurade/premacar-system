@@ -19,7 +19,7 @@ import { AuthProvider } from './hooks/useAuth';
 import { UserRoleProvider } from './hooks/useUserRole';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { useOnboardingStatus } from './hooks/useOnboardingStatus';
+
 
 const queryClient = new QueryClient();
 
