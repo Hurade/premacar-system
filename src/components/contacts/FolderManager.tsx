@@ -8,9 +8,9 @@ import { toast } from 'sonner';
 export interface ContactFolder {
   id: string;
   name: string;
-  color: string;
+  color: string | null;
   description: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   contact_count?: number;
 }

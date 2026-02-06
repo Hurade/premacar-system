@@ -774,7 +774,7 @@ export const api = {
     const { data: conversations } = await supabase
       .from('conversations')
       .select('id, contact_id')
-      .in('contact_id', contactIds);
+      .in('contact_id', contactIds as string[]);
 
     const convMap = new Map(conversations?.map(c => [c.contact_id, c.id]) || []);
 

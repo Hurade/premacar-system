@@ -138,7 +138,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
       const { data: teamMemberData } = await supabase
         .from('team_members')
         .select('id, role, status')
-        .eq('email', user.email)
+        .eq('email', user.email!)
         .eq('status', 'active')
         .maybeSingle();
 

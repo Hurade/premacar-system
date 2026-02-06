@@ -134,7 +134,7 @@ export interface Deal {
   lostAt?: string;
   lostReason?: string;
   clientMemory?: ClientMemory;
-  conversationId?: string;
+  conversationId?: string | null;
 }
 
 export interface DealActivity {
