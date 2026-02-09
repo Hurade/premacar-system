@@ -639,8 +639,38 @@ async function processQueueItem(
     origemConversa
   );
 
-  // Process template variables ({{ data_hora }}, {{ dia_semana }}, {{ origem_conversa }}, etc.)
-  const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact, origemConversa);
+  // Fetch deal data for this contact
+  let dealData: any = null;
+  try {
+    const { data: deal } = await supabase
+      .from('deals')
+      .select('*, stage_info:pipeline_stages(title)')
+      .eq('contact_id', conversation.contact_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    dealData = deal;
+  } catch (e) {
+    console.log('[Nina] Could not fetch deal data:', e);
+  }
+
+  // Count total messages in this conversation
+  const { count: totalMessages } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversation.id);
+
+  // Check if contact has conversation history (conversations with real user interaction)
+  const hasHistory = origemConversa?.origem === 'retorno';
+
+  // Process template variables
+  const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact, origemConversa, {
+    dealData,
+    settings: effectiveSettings,
+    conversationStatus: conversation.status,
+    totalMessages: totalMessages || 0,
+    hasHistory,
+  });
 
   console.log('[Nina] Calling Lovable AI...');
 
@@ -1186,7 +1216,18 @@ async function detectarOrigemConversa(
   }
 }
 
-function processPromptTemplate(prompt: string, contact: any, origemConversa?: { origem: string; detalhes: string }): string {
+function processPromptTemplate(
+  prompt: string, 
+  contact: any, 
+  origemConversa?: { origem: string; detalhes: string },
+  extraContext?: {
+    dealData?: any;
+    settings?: any;
+    conversationStatus?: string;
+    totalMessages?: number;
+    hasHistory?: boolean;
+  }
+): string {
   const now = new Date();
   const brOptions: Intl.DateTimeFormatOptions = { timeZone: 'America/Sao_Paulo' };
   
@@ -1207,15 +1248,48 @@ function processPromptTemplate(prompt: string, contact: any, origemConversa?: { 
     ...brOptions, 
     weekday: 'long' 
   });
+
+  // Format first contact date
+  let primeiroContato = '';
+  if (contact?.first_contact_date) {
+    try {
+      primeiroContato = new Intl.DateTimeFormat('pt-BR', { ...brOptions, day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(contact.first_contact_date));
+    } catch { primeiroContato = ''; }
+  }
+
+  // Deal info
+  const deal = extraContext?.dealData;
+  const dealEstagio = deal?.stage_info?.title || deal?.stage || '';
+  const dealValor = deal?.value ? `R$ ${Number(deal.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '';
+  const dealTitulo = deal?.title || '';
   
   const variables: Record<string, string> = {
+    // Tempo
     'data_hora': `${dateFormatter.format(now)} ${timeFormatter.format(now)}`,
     'data': dateFormatter.format(now),
     'hora': timeFormatter.format(now),
     'dia_semana': weekdayFormatter.format(now),
+    // Cliente
     'cliente_nome': contact?.name || contact?.call_name || 'Cliente',
     'cliente_telefone': contact?.phone_number || '',
+    'cliente_email': contact?.email || '',
+    'cliente_tags': (contact?.tags || []).join(', '),
+    'cliente_notas': contact?.notes || '',
+    'cliente_oficina': contact?.oficina || '',
+    'primeiro_contato': primeiroContato,
+    // Origem e histórico
     'origem_conversa': origemConversa?.origem || 'inbound',
+    'historico_conversa': extraContext?.hasHistory ? 'true' : 'false',
+    // Deal/Pipeline
+    'deal_estagio': dealEstagio,
+    'deal_valor': dealValor,
+    'deal_titulo': dealTitulo,
+    // Empresa/Agente
+    'empresa_nome': extraContext?.settings?.company_name || '',
+    'agente_nome': extraContext?.settings?.sdr_name || '',
+    // Conversa
+    'total_mensagens': String(extraContext?.totalMessages || 0),
+    'conversa_status': extraContext?.conversationStatus || '',
   };
   
   return prompt.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, varName) => {

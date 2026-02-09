@@ -253,17 +253,55 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
             rows={12}
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-y font-mono custom-scrollbar"
           />
-          <details className="mt-3">
+        <details className="mt-3">
             <summary className="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300 flex items-center gap-2">
               <span>📋</span> Variáveis dinâmicas disponíveis
             </summary>
-            <div className="mt-2 p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono space-y-1">
-              <div><span className="text-cyan-400">{"{{ data_hora }}"}</span> → Data e hora atual (ex: 29/11/2024 14:35:22)</div>
-              <div><span className="text-cyan-400">{"{{ data }}"}</span> → Apenas data (ex: 29/11/2024)</div>
-              <div><span className="text-cyan-400">{"{{ hora }}"}</span> → Apenas hora (ex: 14:35:22)</div>
-              <div><span className="text-cyan-400">{"{{ dia_semana }}"}</span> → Dia da semana por extenso (ex: sexta-feira)</div>
-              <div><span className="text-cyan-400">{"{{ cliente_nome }}"}</span> → Nome do cliente na conversa</div>
-              <div><span className="text-cyan-400">{"{{ cliente_telefone }}"}</span> → Telefone do cliente</div>
+            <div className="mt-2 p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono space-y-3">
+              {/* Tempo */}
+              <div>
+                <div className="text-violet-400 font-semibold mb-1 text-[11px]">⏰ Tempo</div>
+                <div><span className="text-cyan-400">{"{{ data_hora }}"}</span> → Data e hora atual</div>
+                <div><span className="text-cyan-400">{"{{ data }}"}</span> → Apenas data</div>
+                <div><span className="text-cyan-400">{"{{ hora }}"}</span> → Apenas hora</div>
+                <div><span className="text-cyan-400">{"{{ dia_semana }}"}</span> → Dia da semana por extenso</div>
+              </div>
+              {/* Cliente */}
+              <div>
+                <div className="text-emerald-400 font-semibold mb-1 text-[11px]">👤 Cliente</div>
+                <div><span className="text-cyan-400">{"{{ cliente_nome }}"}</span> → Nome do cliente</div>
+                <div><span className="text-cyan-400">{"{{ cliente_telefone }}"}</span> → Telefone do cliente</div>
+                <div><span className="text-cyan-400">{"{{ cliente_email }}"}</span> → Email do cliente</div>
+                <div><span className="text-cyan-400">{"{{ cliente_tags }}"}</span> → Tags separadas por vírgula</div>
+                <div><span className="text-cyan-400">{"{{ cliente_notas }}"}</span> → Observações do contato</div>
+                <div><span className="text-cyan-400">{"{{ cliente_oficina }}"}</span> → Campo oficina</div>
+                <div><span className="text-cyan-400">{"{{ primeiro_contato }}"}</span> → Data do primeiro contato</div>
+              </div>
+              {/* Origem e Histórico */}
+              <div>
+                <div className="text-amber-400 font-semibold mb-1 text-[11px]">🔀 Origem e Histórico</div>
+                <div><span className="text-cyan-400">{"{{ origem_conversa }}"}</span> → disparo | inbound | retorno</div>
+                <div><span className="text-cyan-400">{"{{ historico_conversa }}"}</span> → true se já conversou antes</div>
+              </div>
+              {/* Deal/Pipeline */}
+              <div>
+                <div className="text-pink-400 font-semibold mb-1 text-[11px]">💰 Negócio (Pipeline)</div>
+                <div><span className="text-cyan-400">{"{{ deal_estagio }}"}</span> → Nome do estágio atual</div>
+                <div><span className="text-cyan-400">{"{{ deal_valor }}"}</span> → Valor do negócio (R$)</div>
+                <div><span className="text-cyan-400">{"{{ deal_titulo }}"}</span> → Título do deal</div>
+              </div>
+              {/* Empresa/Agente */}
+              <div>
+                <div className="text-blue-400 font-semibold mb-1 text-[11px]">🏢 Empresa/Agente</div>
+                <div><span className="text-cyan-400">{"{{ empresa_nome }}"}</span> → Nome da empresa</div>
+                <div><span className="text-cyan-400">{"{{ agente_nome }}"}</span> → Nome do agente/SDR</div>
+              </div>
+              {/* Conversa */}
+              <div>
+                <div className="text-orange-400 font-semibold mb-1 text-[11px]">💬 Conversa</div>
+                <div><span className="text-cyan-400">{"{{ total_mensagens }}"}</span> → Total de mensagens trocadas</div>
+                <div><span className="text-cyan-400">{"{{ conversa_status }}"}</span> → Status (nina, human, paused)</div>
+              </div>
             </div>
           </details>
         </div>

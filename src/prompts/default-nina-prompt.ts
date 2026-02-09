@@ -5,12 +5,38 @@
  * O usuário pode personalizar completamente com informações da sua empresa.
  * 
  * Variáveis dinâmicas disponíveis:
+ * 
+ * ⏰ Tempo:
  * - {{ data_hora }} → Data e hora atual
  * - {{ data }} → Apenas data
  * - {{ hora }} → Apenas hora
  * - {{ dia_semana }} → Dia da semana por extenso
+ * 
+ * 👤 Cliente:
  * - {{ cliente_nome }} → Nome do cliente na conversa
  * - {{ cliente_telefone }} → Telefone do cliente
+ * - {{ cliente_email }} → Email do cliente
+ * - {{ cliente_tags }} → Tags separadas por vírgula
+ * - {{ cliente_notas }} → Observações do contato
+ * - {{ cliente_oficina }} → Campo oficina
+ * - {{ primeiro_contato }} → Data do primeiro contato
+ * 
+ * 🔀 Origem e Histórico:
+ * - {{ origem_conversa }} → disparo | inbound | retorno
+ * - {{ historico_conversa }} → true se já conversou antes
+ * 
+ * 💰 Negócio (Pipeline):
+ * - {{ deal_estagio }} → Nome do estágio atual no pipeline
+ * - {{ deal_valor }} → Valor do negócio (R$)
+ * - {{ deal_titulo }} → Título do deal
+ * 
+ * 🏢 Empresa/Agente:
+ * - {{ empresa_nome }} → Nome da empresa (das configurações)
+ * - {{ agente_nome }} → Nome do agente/SDR
+ * 
+ * 💬 Conversa:
+ * - {{ total_mensagens }} → Total de mensagens trocadas
+ * - {{ conversa_status }} → Status da conversa (nina, human, paused)
  */
 
 export const DEFAULT_NINA_PROMPT = `<system_instruction>
