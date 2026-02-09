@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { Input } from './ui/input';
+import InlineCreateContact from './chat/InlineCreateContact';
 
 type FilterType = 'all' | 'unread';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
@@ -78,7 +79,7 @@ const ChatInterface: React.FC = () => {
   const [selectedContactForConv, setSelectedContactForConv] = useState<ContactOption | null>(null);
   const [selectedTagsForConv, setSelectedTagsForConv] = useState<string[]>([]);
   const [selectedApiSource, setSelectedApiSource] = useState<'meta' | 'evolution'>('evolution');
-  
+  const [newContactMode, setNewContactMode] = useState(false);
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [audioDurations, setAudioDurations] = useState<Record<string, number>>({});
@@ -284,7 +285,23 @@ const ChatInterface: React.FC = () => {
     setSelectedContactForConv(null);
     setSelectedTagsForConv([]);
     setSelectedApiSource('evolution');
+    setNewContactMode(false);
     setShowNewConversationModal(true);
+  };
+
+  const handleInlineContactCreated = async (contactId: string) => {
+    setIsCreatingConversation(true);
+    try {
+      const newConvId = await createConversation(contactId, selectedApiSource);
+      setSelectedChatId(newConvId);
+      setShowNewConversationModal(false);
+      toast.success('Conversa iniciada com novo contato!');
+    } catch (err) {
+      console.error('Error starting conversation:', err);
+      toast.error('Erro ao iniciar conversa');
+    } finally {
+      setIsCreatingConversation(false);
+    }
   };
 
   const handleSelectContactForConv = (contact: ContactOption) => {
@@ -1430,15 +1447,43 @@ const ChatInterface: React.FC = () => {
               Nova Conversa
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              {selectedContactForConv 
-                ? `Configurar conversa com ${selectedContactForConv.name || selectedContactForConv.phone_number}`
-                : 'Selecione um contato para iniciar'}
+              {newContactMode
+                ? 'Crie um novo contato e inicie a conversa'
+                : selectedContactForConv 
+                  ? `Configurar conversa com ${selectedContactForConv.name || selectedContactForConv.phone_number}`
+                  : 'Selecione um contato existente ou crie um novo'}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 overflow-y-auto flex-1">
-            {!selectedContactForConv ? (
+            {newContactMode ? (
+              <InlineCreateContact
+                onContactCreated={handleInlineContactCreated}
+                onCancel={() => setNewContactMode(false)}
+              />
+            ) : !selectedContactForConv ? (
               <>
+                {/* Botão criar novo contato */}
+                <button
+                  onClick={() => setNewContactMode(true)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-dashed border-slate-700 hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all text-left group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
+                    <Plus className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-cyan-400 group-hover:text-cyan-300 transition-colors">
+                      Criar Novo Contato
+                    </p>
+                    <p className="text-xs text-slate-500">Adicionar contato e iniciar conversa</p>
+                  </div>
+                </button>
+
+                <div className="relative flex items-center gap-3">
+                  <div className="flex-1 h-px bg-slate-800" />
+                  <span className="text-[11px] text-slate-500 font-medium">ou selecione existente</span>
+                  <div className="flex-1 h-px bg-slate-800" />
+                </div>
                 {/* Busca de contatos */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
