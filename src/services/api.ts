@@ -1261,9 +1261,28 @@ export const api = {
 
     console.log(`[API] Found ${conversations.length} conversations`);
 
+    // Filter out dispatch conversations with no user reply
+    const filteredConversations = [];
+    for (const conv of conversations) {
+      if (conv.dispatch_sent_at) {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', conv.id)
+          .eq('from_type', 'user');
+        if ((count ?? 0) > 0) {
+          filteredConversations.push(conv);
+        }
+      } else {
+        filteredConversations.push(conv);
+      }
+    }
+
+    console.log(`[API] After dispatch filter: ${filteredConversations.length} conversations`);
+
     // Fetch messages for each conversation
     const conversationsWithMessages: UIConversation[] = await Promise.all(
-      conversations.map(async (conv) => {
+      filteredConversations.map(async (conv) => {
         const { data: messages, error: msgError } = await supabase
           .from('messages')
           .select('*')
