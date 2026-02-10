@@ -664,9 +664,13 @@ async function processQueueItem(
   const hasHistory = origemConversa?.origem === 'retorno';
 
   // Process template variables
+  console.log('[Nina] DEBUG cliente_tags:', (conversation.contact?.tags || []).join(', '));
+  console.log('[Nina] DEBUG origem_conversa:', origemConversa?.origem);
+  console.log('[Nina] DEBUG has template tag:', (conversation.contact?.tags || []).some((t: string) => t.startsWith('template_')));
+  
   const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact, origemConversa, {
     dealData,
-    settings: effectiveSettings,
+    settings: settings,
     conversationStatus: conversation.status,
     totalMessages: totalMessages || 0,
     hasHistory,

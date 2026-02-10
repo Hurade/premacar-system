@@ -467,23 +467,65 @@ serve(async (req) => {
         if (existingContact) {
           contactId = existingContact.id;
           
+          // Build tags to apply
+          const currentTags = (existingContact.tags as string[]) || [];
+          const newTags = [...currentTags];
+          
           // Aplicar tag de entrega se configurada
-          if (campaignData.tag_on_delivered) {
-            const currentTags = (existingContact.tags as string[]) || [];
-            if (!currentTags.includes(campaignData.tag_on_delivered)) {
-              await supabase
-                .from("contacts")
-                .update({ 
-                  tags: [...currentTags, campaignData.tag_on_delivered],
-                  last_activity: new Date().toISOString()
-                })
-                .eq("id", contactId);
-              console.log(`[campaign-processor] Tag "${campaignData.tag_on_delivered}" aplicada ao contato ${contactId}`);
+          if (campaignData.tag_on_delivered && !newTags.includes(campaignData.tag_on_delivered)) {
+            newTags.push(campaignData.tag_on_delivered);
+            console.log(`[campaign-processor] Tag "${campaignData.tag_on_delivered}" será aplicada ao contato ${contactId}`);
+          }
+          
+          // AUTO-TAG: Adicionar tag do template Meta automaticamente (ex: template_cris_posvenda)
+          if (campaignData.api_source === 'meta' && campaignData.meta_template_id) {
+            // Buscar nome do template Meta para gerar a tag
+            const { data: metaTemplateForTag } = await supabase
+              .from("meta_templates")
+              .select("name")
+              .eq("id", campaignData.meta_template_id)
+              .single();
+            
+            if (metaTemplateForTag) {
+              const templateTag = `template_${metaTemplateForTag.name}`;
+              if (!newTags.includes(templateTag)) {
+                newTags.push(templateTag);
+                console.log(`[campaign-processor] Auto-tag "${templateTag}" será aplicada ao contato ${contactId}`);
+              }
             }
           }
+          
+          // Atualizar tags se houve mudanças
+          if (newTags.length > currentTags.length) {
+            await supabase
+              .from("contacts")
+              .update({ 
+                tags: newTags,
+                last_activity: new Date().toISOString()
+              })
+              .eq("id", contactId);
+            console.log(`[campaign-processor] Tags atualizadas para contato ${contactId}:`, newTags);
+          }
         } else {
-          // Criar novo contato com tag se configurada
+          // Criar novo contato com tags
           const tagsToApply = campaignData.tag_on_delivered ? [campaignData.tag_on_delivered] : [];
+          
+          // AUTO-TAG para novo contato também
+          if (campaignData.api_source === 'meta' && campaignData.meta_template_id) {
+            const { data: metaTemplateForTag } = await supabase
+              .from("meta_templates")
+              .select("name")
+              .eq("id", campaignData.meta_template_id)
+              .single();
+            
+            if (metaTemplateForTag) {
+              const templateTag = `template_${metaTemplateForTag.name}`;
+              if (!tagsToApply.includes(templateTag)) {
+                tagsToApply.push(templateTag);
+                console.log(`[campaign-processor] Auto-tag "${templateTag}" para novo contato`);
+              }
+            }
+          }
           
           const { data: newContact } = await supabase
             .from("contacts")
