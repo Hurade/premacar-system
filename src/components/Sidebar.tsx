@@ -45,12 +45,12 @@ const menuItems = [{
 }];
 const Logo = ({
   companyName
-}: {
-  companyName: string;
-}) => {
+
+
+}: {companyName: string;}) => {
   return <Link to="/dashboard" className="flex items-center space-x-3 py-1">
       <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
-        <img src={premaLogo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+        <img alt="Logo" className="w-full h-full object-cover rounded-xl" src="/lovable-uploads/fd1738a7-c527-49a5-b40a-f34007000e81.png" />
       </div>
       <motion.div initial={{
       opacity: 0
@@ -93,14 +93,14 @@ const SidebarContent = () => {
   } = useSidebar();
 
   // Filter menu items based on user role
-  const filteredMenuItems = menuItems.filter(item => {
+  const filteredMenuItems = menuItems.filter((item) => {
     const requiredRoles = MENU_ROLE_REQUIREMENTS[item.id];
     if (!requiredRoles) return true; // No restriction
     if (isAdmin) return true; // Admin sees everything
     return teamRole && requiredRoles.includes(teamRole);
   });
 
-  const links = filteredMenuItems.map(item => ({
+  const links = filteredMenuItems.map((item) => ({
     label: item.label,
     href: `/${item.id}`,
     icon: <item.icon className="h-5 w-5" />
@@ -167,17 +167,17 @@ const SidebarContent = () => {
         }} className="flex-1 overflow-hidden">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-foreground group-hover:text-foreground whitespace-nowrap">{getDisplayName()}</p>
-              {teamRole && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
-                  teamRole === 'admin' 
-                    ? 'bg-primary/20 text-primary' 
-                    : teamRole === 'manager' 
-                    ? 'bg-accent/20 text-accent' 
-                    : 'bg-muted text-muted-foreground'
-                }`}>
+              {teamRole &&
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
+            teamRole === 'admin' ?
+            'bg-primary/20 text-primary' :
+            teamRole === 'manager' ?
+            'bg-accent/20 text-accent' :
+            'bg-muted text-muted-foreground'}`
+            }>
                   {teamRole === 'admin' ? 'Admin' : teamRole === 'manager' ? 'Gerente' : 'Agente'}
                 </span>
-              )}
+            }
             </div>
             <p className="text-xs text-muted-foreground truncate">{user?.email || 'email@example.com'}</p>
           </motion.div>
