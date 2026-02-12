@@ -49,8 +49,8 @@ const Logo = ({
   companyName: string;
 }) => {
   return <Link to="/dashboard" className="flex items-center space-x-3 py-1">
-      <div className="relative w-12 h-12 flex items-center justify-center flex-shrink-0">
-        <img src={premaLogo} alt="Logo" className="w-full h-full object-contain rounded-xl" />
+      <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
+        <img src={premaLogo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
       </div>
       <motion.div initial={{
       opacity: 0
@@ -66,8 +66,8 @@ const Logo = ({
 };
 const LogoIcon = () => {
   return <Link to="/dashboard" className="flex items-center py-1">
-      <div className="relative w-12 h-12 flex items-center justify-center flex-shrink-0">
-        <img src={premaLogo} alt="Logo" className="w-full h-full object-contain rounded-xl" />
+      <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
+        <img src={premaLogo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
       </div>
     </Link>;
 };
@@ -149,8 +149,8 @@ const SidebarContent = () => {
       opacity: 1
     }} transition={{
       duration: 0.3
-    }} className="py-4 flex justify-center">
-          <img alt="Prema" className="h-6 max-w-[140px] transition-opacity opacity-100 object-contain" src={premaLogoFull} />
+    }} className="py-4 flex justify-center px-2">
+          <img alt="Prema" className="h-8 w-full max-w-full transition-opacity opacity-100 object-contain" src={premaLogoFull} />
         </motion.div>}
 
       {/* User Footer */}
