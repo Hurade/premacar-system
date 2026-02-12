@@ -3,8 +3,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus
+  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft
 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, ApiSource, formatDateSeparator } from '../types';
 import { Badge } from './ui/badge';
 import { Button } from './Button';
@@ -47,6 +48,7 @@ interface ContactOption {
 const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -536,7 +538,7 @@ const ChatInterface: React.FC = () => {
     <div className="flex h-full bg-slate-950 rounded-tl-2xl overflow-hidden border-t border-l border-slate-800/50 shadow-2xl">
       
       {/* Left Sidebar: Chat List */}
-      <div className="w-80 lg:w-96 border-r border-slate-800 flex flex-col bg-slate-900/50 backdrop-blur-md z-20 flex-shrink-0">
+      <div className={`${isMobile ? (selectedChatId ? 'hidden' : 'w-full') : 'w-80 lg:w-96'} border-r border-slate-800 flex flex-col bg-slate-900/50 backdrop-blur-md z-20 flex-shrink-0`}>
         {/* Search Header */}
         <div className="p-4 border-b border-slate-800/50 space-y-3">
           <div className="flex items-center justify-between px-1">
@@ -928,28 +930,38 @@ const ChatInterface: React.FC = () => {
 
       {/* Right Area: Chat Window & Profile */}
       {activeChat ? (
-        <div className="flex-1 flex overflow-hidden bg-[#0B0E14]">
+        <div className={`${isMobile && !selectedChatId ? 'hidden' : ''} flex-1 flex overflow-hidden bg-[#0B0E14]`}>
           {/* Main Chat Content */}
           <div className="flex-1 flex flex-col min-w-0 relative">
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
 
             {/* Chat Header */}
-            <div className="h-16 px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
-              <div 
-                className="flex items-center cursor-pointer hover:bg-slate-800/50 p-1.5 -ml-1.5 rounded-lg transition-colors pr-3"
-                onClick={() => setShowProfileInfo(!showProfileInfo)}
-              >
-                <div className="relative">
-                  <img src={activeChat.contactAvatar} alt={activeChat.contactName} className="w-9 h-9 rounded-full ring-2 ring-slate-800" />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
-                </div>
-                <div className="ml-3">
-                  <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                    {activeChat.contactName}
-                    {renderStatusBadge(activeChat.status)}
-                    {renderApiSourceBadge(activeChat.apiSource)}
-                  </h2>
-                  <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
+            <div className="h-16 px-4 md:px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
+              <div className="flex items-center gap-2">
+                {isMobile && (
+                  <button 
+                    onClick={() => setSelectedChatId(null)} 
+                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                )}
+                <div 
+                  className="flex items-center cursor-pointer hover:bg-slate-800/50 p-1.5 rounded-lg transition-colors pr-3"
+                  onClick={() => !isMobile && setShowProfileInfo(!showProfileInfo)}
+                >
+                  <div className="relative">
+                    <img src={activeChat.contactAvatar} alt={activeChat.contactName} className="w-9 h-9 rounded-full ring-2 ring-slate-800" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+                  </div>
+                  <div className="ml-3">
+                    <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      {activeChat.contactName}
+                      {renderStatusBadge(activeChat.status)}
+                      {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
+                    </h2>
+                    <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -1160,8 +1172,7 @@ const ChatInterface: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Profile Sidebar (CRM View) */}
-          <div 
+          {!isMobile && <div 
             className={`${showProfileInfo ? 'w-80 border-l border-slate-800 opacity-100' : 'w-0 opacity-0 border-none'} transition-all duration-300 ease-in-out bg-slate-900/95 flex-shrink-0 flex flex-col overflow-hidden`}
           >
             <div className="w-80 h-full flex flex-col">
@@ -1353,10 +1364,10 @@ const ChatInterface: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div>}
 
         </div>
-      ) : (
+      ) : !isMobile ? (
         <div className="flex-1 flex flex-col items-center justify-center bg-[#0B0E14] relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/20 to-transparent"></div>
           <div className="relative z-10 flex flex-col items-center p-8 text-center max-w-md">
@@ -1380,7 +1391,7 @@ const ChatInterface: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Finalize Confirmation Dialog */}
       <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>

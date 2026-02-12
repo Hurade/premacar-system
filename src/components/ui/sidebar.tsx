@@ -141,7 +141,7 @@ export const MobileSidebar = ({
     <>
       <div
         className={cn(
-          "h-14 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-slate-950/80 backdrop-blur-xl w-full border-b border-slate-800/50"
+          "h-14 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-slate-950/80 backdrop-blur-xl w-full border-b border-slate-800/50 fixed top-0 left-0 right-0 z-50"
         )}
         {...props}
       >
@@ -194,11 +194,11 @@ export const SidebarLink = ({
   onClick?: () => void;
   props?: Omit<LinkProps, 'to'>;
 }) => {
-  const { open, animate } = useSidebar();
+  const { open, animate, setOpen } = useSidebar();
   return (
     <Link
       to={link.href}
-      onClick={onClick}
+      onClick={() => { onClick?.(); setOpen(false); }}
       className={cn(
         "flex items-center justify-start gap-3 group/sidebar py-3 px-3 rounded-xl transition-all duration-200 relative overflow-hidden",
         isActive
