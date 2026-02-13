@@ -18,11 +18,11 @@ serve(async (req) => {
 
     console.log("[campaign-daily-reset] Resetting daily counters...");
 
-    // Reset sent_today for all active/paused campaigns
+    // Reset sent_today for all campaigns (including completed)
     const { data, error } = await supabase
       .from("campaigns")
       .update({ sent_today: 0 })
-      .in("status", ["active", "paused"]);
+      .in("status", ["active", "paused", "completed"]);
 
     if (error) {
       throw error;
