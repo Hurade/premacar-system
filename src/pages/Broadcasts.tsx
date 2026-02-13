@@ -7,6 +7,7 @@ import { BroadcastTemplates } from '@/components/broadcasts/Templates';
 import { BroadcastHistory } from '@/components/broadcasts/History';
 import { MetaTemplatesManager } from '@/components/broadcasts/MetaTemplates';
 import { useCampaignStats } from '@/hooks/useCampaigns';
+import { DispatchConversations } from '@/components/broadcasts/DispatchConversations';
 
 const Broadcasts: React.FC = () => {
   const [activeTab, setActiveTab] = useState('campaigns');
@@ -93,6 +94,10 @@ const Broadcasts: React.FC = () => {
                 <History className="w-4 h-4" />
                 Histórico
               </TabsTrigger>
+              <TabsTrigger value="dispatch-conversations" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Conversas
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -111,6 +116,9 @@ const Broadcasts: React.FC = () => {
             </TabsContent>
             <TabsContent value="history" className="h-full m-0 p-6">
               <BroadcastHistory />
+            </TabsContent>
+            <TabsContent value="dispatch-conversations" className="h-full m-0 p-6">
+              <DispatchConversations />
             </TabsContent>
           </div>
         </Tabs>
