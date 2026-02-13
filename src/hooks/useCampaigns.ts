@@ -151,7 +151,10 @@ export function useCampaignStats() {
       if (error) throw error;
 
       const activeCampaigns = campaigns?.filter(c => c.status === 'active').length ?? 0;
-      const sentToday = campaigns?.reduce((acc, c) => acc + (c.sent_today ?? 0), 0) ?? 0;
+      // Only count sent_today for active/paused campaigns (not completed)
+      const sentToday = campaigns
+        ?.filter(c => c.status === 'active' || c.status === 'paused')
+        .reduce((acc, c) => acc + (c.sent_today ?? 0), 0) ?? 0;
       const totalSent = campaigns?.reduce((acc, c) => acc + (c.total_sent ?? 0), 0) ?? 0;
       const totalDelivered = campaigns?.reduce((acc, c) => acc + (c.total_delivered ?? 0), 0) ?? 0;
       const totalReplied = campaigns?.reduce((acc, c) => acc + (c.total_replied ?? 0), 0) ?? 0;
