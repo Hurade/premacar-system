@@ -198,7 +198,7 @@ export const SidebarLink = ({
   return (
     <Link
       to={link.href}
-      onClick={() => { onClick?.(); setOpen(false); }}
+      onClick={() => { onClick?.(); if (window.innerWidth < 768) setOpen(false); }}
       className={cn(
         "flex items-center justify-start gap-3 group/sidebar py-3 px-3 rounded-xl transition-all duration-200 relative overflow-hidden",
         isActive
