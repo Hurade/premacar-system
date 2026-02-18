@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Plus, Search, MoreHorizontal, DollarSign, Loader2, CalendarClock, Tag, X, 
-  Building, User, Calendar, ArrowRight, CheckCircle2, Circle, 
-  FileText, Phone, Mail, Paperclip, Send, CheckSquare, Clock, Trash2, Settings, Brain, MessageSquare, Bot
+  Building, User, Calendar, CheckCircle2, Circle, 
+  FileText, Phone, Mail, CheckSquare, Clock, Trash2, Settings, Brain, MessageSquare, Bot,
+  Edit3, Save, StickyNote, AlertCircle, LayoutList
 } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
@@ -22,7 +23,6 @@ const Kanban: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
-  const [activeTab, setActiveTab] = useState<'note' | 'activity' | 'email'>('note');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLostModalOpen, setIsLostModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -33,6 +33,13 @@ const Kanban: React.FC = () => {
   const [newActivityDescription, setNewActivityDescription] = useState('');
   const [conversationMessages, setConversationMessages] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'details' | 'activities' | 'messages'>('details');
+  const [isEditingDeal, setIsEditingDeal] = useState(false);
+  const [editDealData, setEditDealData] = useState<{
+    title: string; company: string; value: string; priority: string; dueDate: string; notes: string;
+  }>({ title: '', company: '', value: '', priority: 'medium', dueDate: '', notes: '' });
+  const [savingDeal, setSavingDeal] = useState(false);
+  const [newActivityType, setNewActivityType] = useState<'note' | 'call' | 'email' | 'meeting' | 'task'>('note');
   
   const dragItem = useRef<string | null>(null);
   
@@ -40,6 +47,57 @@ const Kanban: React.FC = () => {
     // Reload deals after creation
     const data = await api.fetchPipeline();
     setDeals(data);
+  };
+
+  const openDeal = (deal: Deal) => {
+    setSelectedDeal(deal);
+    setDrawerTab('details');
+    setIsEditingDeal(false);
+    setEditDealData({
+      title: deal.title,
+      company: deal.company || '',
+      value: String(deal.value || 0),
+      priority: deal.priority || 'medium',
+      dueDate: deal.dueDate ? deal.dueDate.split('T')[0] : '',
+      notes: '',
+    });
+  };
+
+  const handleSaveDealEdits = async () => {
+    if (!selectedDeal) return;
+    setSavingDeal(true);
+    try {
+      await api.updateDeal(selectedDeal.id, {
+        title: editDealData.title,
+        company: editDealData.company,
+        value: parseFloat(editDealData.value) || 0,
+        priority: editDealData.priority,
+        due_date: editDealData.dueDate || undefined,
+        notes: editDealData.notes || undefined,
+      });
+      setSelectedDeal({
+        ...selectedDeal,
+        title: editDealData.title,
+        company: editDealData.company,
+        value: parseFloat(editDealData.value) || 0,
+        priority: editDealData.priority as 'low' | 'medium' | 'high',
+        dueDate: editDealData.dueDate || undefined,
+      });
+      setDeals(deals.map(d => d.id === selectedDeal.id ? {
+        ...d,
+        title: editDealData.title,
+        company: editDealData.company,
+        value: parseFloat(editDealData.value) || 0,
+        priority: editDealData.priority as 'low' | 'medium' | 'high',
+        dueDate: editDealData.dueDate || undefined,
+      } : d));
+      setIsEditingDeal(false);
+      toast.success('Deal atualizado!');
+    } catch (error) {
+      toast.error('Erro ao salvar alterações');
+    } finally {
+      setSavingDeal(false);
+    }
   };
 
   useEffect(() => {
@@ -199,7 +257,7 @@ const Kanban: React.FC = () => {
     try {
       await api.createDealActivity({
         dealId: selectedDeal.id,
-        type: activeTab === 'activity' ? 'call' : activeTab === 'email' ? 'email' : 'note',
+        type: newActivityType,
         title: newActivityTitle,
         description: newActivityDescription,
       });
@@ -393,7 +451,7 @@ const Kanban: React.FC = () => {
                       draggable
                       onDragStart={(e) => onDragStart(e, deal.id)}
                       onDragEnd={onDragEnd}
-                      onClick={() => setSelectedDeal(deal)}
+                      onClick={() => openDeal(deal)}
                       className="bg-slate-900 border border-slate-800 rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-cyan-500/50 hover:shadow-cyan-500/10 transition-all group relative"
                     >
                       <div className="flex justify-between items-start mb-1.5">
@@ -458,17 +516,26 @@ const Kanban: React.FC = () => {
                 {/* 1. Header & Stage Progress */}
                 <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800">
                     {/* Top Bar */}
-                    <div className="p-6 pb-4 flex justify-between items-start">
-                        <div>
-                            <h2 className="text-2xl font-bold text-white mb-1">{selectedDeal.title}</h2>
+                    <div className="p-5 pb-4 flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                            {isEditingDeal ? (
+                              <input
+                                className="w-full text-xl font-bold bg-slate-800 text-white rounded-lg px-3 py-1.5 outline-none border border-slate-700 focus:border-cyan-500 mb-1"
+                                value={editDealData.title}
+                                onChange={e => setEditDealData({ ...editDealData, title: e.target.value })}
+                                placeholder="Título do deal"
+                              />
+                            ) : (
+                              <h2 className="text-xl font-bold text-white mb-1 truncate">{selectedDeal.title}</h2>
+                            )}
                             <div className="flex items-center gap-2 text-slate-400 text-sm flex-wrap">
                                 <span className="font-semibold text-emerald-400">{formatCurrency(selectedDeal.value)}</span>
                                 <span className="w-1 h-1 rounded-full bg-slate-600"></span>
                                 <span className="flex items-center gap-1"><Building className="w-3 h-3" /> {selectedDeal.company}</span>
                                 <span className="w-1 h-1 rounded-full bg-slate-600"></span>
                                 <Select value={selectedDeal.ownerId || ''} onValueChange={handleOwnerChange}>
-                                  <SelectTrigger className="w-[180px] h-7 text-xs bg-slate-800 border-slate-700">
-                                    <SelectValue placeholder="Selecione proprietário">
+                                  <SelectTrigger className="w-[160px] h-7 text-xs bg-slate-800 border-slate-700">
+                                    <SelectValue placeholder="Proprietário">
                                       <span className="flex items-center gap-1">
                                         <User className="w-3 h-3" /> 
                                         {selectedDeal.ownerName || 'Sem proprietário'}
@@ -485,24 +552,24 @@ const Kanban: React.FC = () => {
                                 </Select>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <Button variant="secondary" onClick={handleMarkWon} className="bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400">
+                        <div className="flex gap-2 flex-shrink-0">
+                            <Button variant="secondary" onClick={handleMarkWon} className="bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400 h-8 text-xs px-3">
                               Ganho
                             </Button>
-                            <Button variant="secondary" onClick={() => setIsLostModalOpen(true)} className="bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400">
+                            <Button variant="secondary" onClick={() => setIsLostModalOpen(true)} className="bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400 h-8 text-xs px-3">
                               Perdido
                             </Button>
                             <button 
                                 onClick={() => setSelectedDeal(null)} 
                                 className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
                             >
-                                <X className="w-6 h-6" />
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
 
                     {/* Pipeline Visual Progress */}
-                    <div className="px-6 pb-6 overflow-x-auto">
+                    <div className="px-5 pb-4 overflow-x-auto">
                         <div className="flex items-center gap-1 w-full min-w-max">
                             {stages.map((col, idx) => {
                                 const currentStageIndex = stages.findIndex(c => c.id === selectedDeal.stageId);
@@ -512,7 +579,7 @@ const Kanban: React.FC = () => {
                                 return (
                                     <div 
                                         key={col.id} 
-                                        className={`flex-1 h-8 flex items-center justify-center px-2 relative cursor-pointer group transition-all first:rounded-l-md last:rounded-r-md 
+                                        className={`flex-1 h-7 flex items-center justify-center px-2 relative cursor-pointer group transition-all first:rounded-l-md last:rounded-r-md 
                                             ${isCompleted ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 
                                               isActive ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 
                                               'bg-slate-800 text-slate-500 hover:bg-slate-700 hover:text-slate-300'}
@@ -525,21 +592,16 @@ const Kanban: React.FC = () => {
                                                 try {
                                                     await api.markDealWon(selectedDeal.id);
                                                     toast.success("Deal marcado como ganho!");
-                                                    // Update local state
                                                     setDeals(deals.map(d => d.id === selectedDeal.id ? {...d, stageId: col.id, wonAt: new Date().toISOString()} : d));
                                                     setSelectedDeal({...selectedDeal, stageId: col.id});
                                                 } catch (error) {
-                                                    console.error('Error marking deal as won:', error);
                                                     toast.error("Erro ao marcar como ganho");
                                                 }
                                             } else if (isPerdidoColumn) {
                                                 setIsLostModalOpen(true);
                                             } else {
-                                                // Optimistic update for UI feel
                                                 setDeals(deals.map(d => d.id === selectedDeal.id ? {...d, stageId: col.id} : d));
                                                 setSelectedDeal({...selectedDeal, stageId: col.id});
-                                                
-                                                // Persist to database
                                                 try {
                                                     await api.moveDealStage(selectedDeal.id, col.id);
                                                 } catch (error) {
@@ -548,8 +610,7 @@ const Kanban: React.FC = () => {
                                             }
                                         }}
                                     >
-                                        <span className="text-xs font-bold whitespace-nowrap z-10">{col.title}</span>
-                                        {/* Arrow shape via clip-path could go here, simplified with simple blocks for now */}
+                                        <span className="text-[10px] font-bold whitespace-nowrap z-10">{col.title}</span>
                                         {idx !== stages.length - 1 && (
                                             <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-slate-950/20 z-20"></div>
                                         )}
@@ -558,275 +619,479 @@ const Kanban: React.FC = () => {
                             })}
                         </div>
                     </div>
+
+                    {/* Drawer Tabs */}
+                    <div className="flex border-t border-slate-800">
+                      {[
+                        { id: 'details', label: 'Detalhes', icon: LayoutList },
+                        { id: 'activities', label: 'Atividades', icon: CheckSquare },
+                        { id: 'messages', label: 'Mensagens', icon: MessageSquare },
+                      ].map(tab => {
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setDrawerTab(tab.id as any)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors border-b-2 ${
+                              drawerTab === tab.id
+                                ? 'text-cyan-400 border-cyan-400'
+                                : 'text-slate-500 border-transparent hover:text-slate-300'
+                            }`}
+                          >
+                            <Icon className="w-3.5 h-3.5" />
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                 </div>
 
                 {/* 2. Content Area */}
                 <div className="flex-1 overflow-y-auto bg-slate-950 custom-scrollbar">
                     
-                    {/* Action Composer */}
-                    <div className="p-6 border-b border-slate-800 bg-slate-900/30">
-                        <div className="flex gap-4 mb-4">
-                            <button 
-                                onClick={() => setActiveTab('note')}
-                                className={`flex items-center gap-2 text-sm font-medium transition-colors ${activeTab === 'note' ? 'text-cyan-400' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <div className={`p-2 rounded-full ${activeTab === 'note' ? 'bg-cyan-500/10' : 'bg-slate-800'}`}>
-                                    <FileText className="w-4 h-4" />
-                                </div>
-                                Nota
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('activity')}
-                                className={`flex items-center gap-2 text-sm font-medium transition-colors ${activeTab === 'activity' ? 'text-amber-400' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <div className={`p-2 rounded-full ${activeTab === 'activity' ? 'bg-amber-500/10' : 'bg-slate-800'}`}>
-                                    <Calendar className="w-4 h-4" />
-                                </div>
-                                Atividade
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('email')}
-                                className={`flex items-center gap-2 text-sm font-medium transition-colors ${activeTab === 'email' ? 'text-violet-400' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <div className={`p-2 rounded-full ${activeTab === 'email' ? 'bg-violet-500/10' : 'bg-slate-800'}`}>
-                                    <Mail className="w-4 h-4" />
-                                </div>
-                                Email
-                            </button>
+                    {/* ===== TAB: DETALHES ===== */}
+                    {drawerTab === 'details' && (
+                      <div className="p-6 space-y-5">
+                        {/* Edit/Save bar */}
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Informações do Deal</h4>
+                          <div className="flex gap-2">
+                            {isEditingDeal ? (
+                              <>
+                                <button
+                                  onClick={() => setIsEditingDeal(false)}
+                                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg border border-slate-700 hover:border-slate-600"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  onClick={handleSaveDealEdits}
+                                  disabled={savingDeal}
+                                  className="px-3 py-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center gap-1.5 disabled:opacity-60"
+                                >
+                                  {savingDeal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                  Salvar
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setIsEditingDeal(true)}
+                                className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                Editar
+                              </button>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 transition-all shadow-inner">
-                            <input 
-                                type="text"
-                                className="w-full bg-transparent p-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none border-b border-slate-800"
-                                placeholder="Título da atividade"
-                                value={newActivityTitle}
-                                onChange={(e) => setNewActivityTitle(e.target.value)}
-                            />
-                            <textarea 
-                                className="w-full bg-transparent p-4 text-sm text-slate-200 placeholder:text-slate-600 outline-none resize-none min-h-[80px]"
-                                placeholder={
-                                    activeTab === 'note' ? "Escreva uma nota..." :
-                                    activeTab === 'activity' ? "Descreva a atividade..." :
-                                    "Escreva o corpo do email..."
-                                }
-                                value={newActivityDescription}
-                                onChange={(e) => setNewActivityDescription(e.target.value)}
-                            />
-                            <div className="px-3 py-2 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center">
-                                <div className="flex gap-2">
-                                    <button className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-400 transition-colors"><Paperclip className="w-4 h-4" /></button>
-                                </div>
-                                <Button size="sm" className="h-8" onClick={handleCreateActivity} disabled={!newActivityTitle.trim()}>
-                                    Salvar
-                                </Button>
+                        {/* Fields Grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                          {/* Valor */}
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                              <DollarSign className="w-3 h-3" /> Valor
+                            </label>
+                            {isEditingDeal ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full bg-slate-800 text-emerald-400 font-bold text-sm rounded-md px-2 py-1.5 outline-none border border-slate-700 focus:border-cyan-500"
+                                value={editDealData.value}
+                                onChange={e => setEditDealData({ ...editDealData, value: e.target.value })}
+                              />
+                            ) : (
+                              <p className="text-sm font-bold text-emerald-400">{formatCurrency(selectedDeal.value)}</p>
+                            )}
+                          </div>
+
+                          {/* Prioridade */}
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                              <AlertCircle className="w-3 h-3" /> Prioridade
+                            </label>
+                            {isEditingDeal ? (
+                              <select
+                                className="w-full bg-slate-800 text-slate-200 text-sm rounded-md px-2 py-1.5 outline-none border border-slate-700 focus:border-cyan-500"
+                                value={editDealData.priority}
+                                onChange={e => setEditDealData({ ...editDealData, priority: e.target.value })}
+                              >
+                                <option value="low">Baixa</option>
+                                <option value="medium">Média</option>
+                                <option value="high">Alta</option>
+                              </select>
+                            ) : (
+                              <span className={`text-xs px-2 py-1 rounded-md border font-medium ${getPriorityColor(selectedDeal.priority)}`}>
+                                {selectedDeal.priority === 'high' ? '🔴 Alta' : selectedDeal.priority === 'medium' ? '🟡 Média' : '🟢 Baixa'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Empresa */}
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                              <Building className="w-3 h-3" /> Empresa
+                            </label>
+                            {isEditingDeal ? (
+                              <input
+                                className="w-full bg-slate-800 text-slate-200 text-sm rounded-md px-2 py-1.5 outline-none border border-slate-700 focus:border-cyan-500"
+                                value={editDealData.company}
+                                onChange={e => setEditDealData({ ...editDealData, company: e.target.value })}
+                                placeholder="Nome da empresa"
+                              />
+                            ) : (
+                              <p className="text-sm text-slate-200">{selectedDeal.company || '—'}</p>
+                            )}
+                          </div>
+
+                          {/* Data de Previsão */}
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                              <Calendar className="w-3 h-3" /> Previsão de Fechamento
+                            </label>
+                            {isEditingDeal ? (
+                              <input
+                                type="date"
+                                className="w-full bg-slate-800 text-slate-200 text-sm rounded-md px-2 py-1.5 outline-none border border-slate-700 focus:border-cyan-500"
+                                value={editDealData.dueDate}
+                                onChange={e => setEditDealData({ ...editDealData, dueDate: e.target.value })}
+                              />
+                            ) : (
+                              <p className="text-sm text-slate-200">
+                                {selectedDeal.dueDate
+                                  ? new Date(selectedDeal.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                  : '—'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        {selectedDeal.tags && selectedDeal.tags.length > 0 && (
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                              <Tag className="w-3 h-3" /> Tags
+                            </label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedDeal.tags.map(tag => (
+                                <span key={tag} className="text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                                  {tag}
+                                </span>
+                              ))}
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Activities Timeline */}
-                    <div className="p-6">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-6 flex items-center gap-2">
-                            <Clock className="w-3.5 h-3.5" /> Atividades ({activities.length})
-                        </h4>
-                        
-                        {loadingActivities ? (
-                          <div className="flex justify-center py-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
-                          </div>
-                        ) : activities.length === 0 ? (
-                          <div className="text-center py-8 text-slate-500 text-sm">
-                            Nenhuma atividade registrada
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {activities.map(activity => {
-                              const activityIcon = activity.type === 'call' ? Phone :
-                                                   activity.type === 'email' ? Mail :
-                                                   activity.type === 'meeting' ? Calendar :
-                                                   activity.type === 'task' ? CheckSquare :
-                                                   FileText;
-                              const activityColor = activity.type === 'call' ? 'text-amber-500 bg-amber-500/10' :
-                                                    activity.type === 'email' ? 'text-violet-500 bg-violet-500/10' :
-                                                    activity.type === 'meeting' ? 'text-cyan-500 bg-cyan-500/10' :
-                                                    activity.type === 'task' ? 'text-emerald-500 bg-emerald-500/10' :
-                                                    'text-slate-500 bg-slate-500/10';
-                              const ActivityIcon = activityIcon;
-                              
-                              return (
-                                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-slate-700 transition-all group">
-                                  <button 
-                                    onClick={() => handleToggleActivityComplete(activity.id, activity.isCompleted)}
-                                    className="mt-0.5 text-slate-500 hover:text-emerald-500 transition-colors"
-                                  >
-                                    {activity.isCompleted ? (
-                                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                    ) : (
-                                      <Circle className="w-5 h-5" />
-                                    )}
-                                  </button>
-                                  <div className={`p-1.5 rounded ${activityColor}`}>
-                                    <ActivityIcon className="w-3.5 h-3.5" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className={`text-sm font-medium transition-colors ${activity.isCompleted ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
-                                      {activity.title}
-                                    </p>
-                                    {activity.description && (
-                                      <p className="text-xs text-slate-500 mt-1">{activity.description}</p>
-                                    )}
-                                    <p className="text-[10px] text-slate-600 mt-1">
-                                      {new Date(activity.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                      {activity.createdByName && ` • ${activity.createdByName}`}
-                                    </p>
-                                  </div>
-                                  <button 
-                                    onClick={() => handleDeleteActivity(activity.id)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500 transition-all"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              );
-                            })}
                           </div>
                         )}
-                    </div>
 
-                    {/* Nina Insights Section */}
-                    {selectedDeal.clientMemory && (
-                      <div className="p-6 border-t border-slate-800">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Brain className="w-4 h-4 text-violet-500" /> Insights do(a) {sdrName}
-                        </h4>
-                        
-                        <div className="space-y-3">
-                          {/* Qualification Score */}
-                          <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-slate-400">Score de Qualificação</span>
-                              <span className="text-sm font-bold text-cyan-400">
-                                {selectedDeal.clientMemory.lead_profile.qualification_score || 0}%
-                              </span>
-                            </div>
-                            <div className="w-full bg-slate-800 rounded-full h-1.5">
-                              <div 
-                                className="bg-gradient-to-r from-cyan-500 to-violet-500 h-1.5 rounded-full transition-all"
-                                style={{ width: `${selectedDeal.clientMemory.lead_profile.qualification_score || 0}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Next Best Action */}
-                          <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                            <span className="text-xs text-slate-400">Próxima Ação Sugerida</span>
-                            <p className="text-sm text-cyan-400 mt-1 font-medium">
-                              {selectedDeal.clientMemory.sales_intelligence.next_best_action === 'qualify' ? '📋 Qualificar lead' :
-                               selectedDeal.clientMemory.sales_intelligence.next_best_action === 'demo' ? '🎯 Agendar demonstração' :
-                               selectedDeal.clientMemory.sales_intelligence.next_best_action === 'follow_up' ? '📞 Fazer follow-up' :
-                               selectedDeal.clientMemory.sales_intelligence.next_best_action}
-                            </p>
-                          </div>
-
-                          {/* Interests */}
-                          {selectedDeal.clientMemory.lead_profile.interests.length > 0 && (
-                            <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                              <span className="text-xs text-slate-400">Interesses</span>
-                              <div className="flex flex-wrap gap-1.5 mt-2">
-                                {selectedDeal.clientMemory.lead_profile.interests.map((interest, idx) => (
-                                  <span key={idx} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs rounded-md border border-emerald-500/20">
-                                    {interest}
-                                  </span>
-                                ))}
+                        {/* Contato */}
+                        {selectedDeal.contactName && (
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                              <User className="w-3 h-3" /> Contato
+                            </label>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-xs font-bold">
+                                {selectedDeal.contactName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-slate-200">{selectedDeal.contactName}</p>
+                                {selectedDeal.contactPhone && <p className="text-xs text-slate-500">{selectedDeal.contactPhone}</p>}
+                                {selectedDeal.contactEmail && <p className="text-xs text-slate-500">{selectedDeal.contactEmail}</p>}
                               </div>
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {/* Pain Points */}
-                          {selectedDeal.clientMemory.sales_intelligence.pain_points.length > 0 && (
-                            <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                              <span className="text-xs text-slate-400">Dores Identificadas</span>
-                              <div className="flex flex-wrap gap-1.5 mt-2">
-                                {selectedDeal.clientMemory.sales_intelligence.pain_points.map((pain, idx) => (
-                                  <span key={idx} className="px-2 py-0.5 bg-red-500/10 text-red-400 text-xs rounded-md border border-red-500/20">
-                                    {pain}
+                        {/* Notas */}
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                          <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                            <StickyNote className="w-3 h-3" /> Nota Rápida
+                          </label>
+                          <textarea
+                            className="w-full bg-slate-800/50 text-slate-200 text-sm rounded-md px-3 py-2 outline-none border border-slate-700 focus:border-cyan-500 resize-none min-h-[80px] placeholder:text-slate-600"
+                            placeholder="Adicione uma nota sobre este lead..."
+                            value={editDealData.notes}
+                            onChange={e => { setEditDealData({ ...editDealData, notes: e.target.value }); setIsEditingDeal(true); }}
+                          />
+                          {editDealData.notes && (
+                            <button
+                              onClick={handleSaveDealEdits}
+                              disabled={savingDeal}
+                              className="mt-2 w-full py-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-60"
+                            >
+                              {savingDeal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                              Salvar nota
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Nina Insights */}
+                        {selectedDeal.clientMemory && (
+                          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                              <Brain className="w-4 h-4 text-violet-500" /> Insights do(a) {sdrName}
+                            </h4>
+                            <div className="space-y-3">
+                              {/* Score */}
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs text-slate-400">Score de Qualificação</span>
+                                  <span className="text-sm font-bold text-cyan-400">
+                                    {selectedDeal.clientMemory.lead_profile.qualification_score || 0}%
                                   </span>
-                                ))}
+                                </div>
+                                <div className="w-full bg-slate-800 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-gradient-to-r from-cyan-500 to-violet-500 h-1.5 rounded-full transition-all"
+                                    style={{ width: `${selectedDeal.clientMemory.lead_profile.qualification_score || 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                              {/* Next Action */}
+                              <div className="p-2 rounded-lg bg-slate-800/60 border border-slate-700">
+                                <span className="text-[10px] text-slate-400">Próxima Ação Sugerida</span>
+                                <p className="text-xs text-cyan-400 mt-0.5 font-medium">
+                                  {selectedDeal.clientMemory.sales_intelligence.next_best_action === 'qualify' ? '📋 Qualificar lead' :
+                                   selectedDeal.clientMemory.sales_intelligence.next_best_action === 'demo' ? '🎯 Agendar demonstração' :
+                                   selectedDeal.clientMemory.sales_intelligence.next_best_action === 'follow_up' ? '📞 Fazer follow-up' :
+                                   selectedDeal.clientMemory.sales_intelligence.next_best_action}
+                                </p>
+                              </div>
+                              {/* Interests */}
+                              {selectedDeal.clientMemory.lead_profile.interests.length > 0 && (
+                                <div>
+                                  <span className="text-[10px] text-slate-400">Interesses</span>
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {selectedDeal.clientMemory.lead_profile.interests.map((interest, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs rounded-md border border-emerald-500/20">
+                                        {interest}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {/* Pain Points */}
+                              {selectedDeal.clientMemory.sales_intelligence.pain_points.length > 0 && (
+                                <div>
+                                  <span className="text-[10px] text-slate-400">Dores Identificadas</span>
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {selectedDeal.clientMemory.sales_intelligence.pain_points.map((pain, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-red-500/10 text-red-400 text-xs rounded-md border border-red-500/20">
+                                        {pain}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="p-2 rounded-lg bg-slate-800/60">
+                                  <span className="text-[10px] text-slate-400">Orçamento</span>
+                                  <p className="text-xs text-slate-200 mt-0.5">
+                                    💰 {selectedDeal.clientMemory.sales_intelligence.budget_indication === 'unknown' ? 'Não informado' : selectedDeal.clientMemory.sales_intelligence.budget_indication}
+                                  </p>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-800/60">
+                                  <span className="text-[10px] text-slate-400">Timeline</span>
+                                  <p className="text-xs text-slate-200 mt-0.5">
+                                    ⏰ {selectedDeal.clientMemory.sales_intelligence.decision_timeline === 'unknown' ? 'Não definido' : selectedDeal.clientMemory.sales_intelligence.decision_timeline}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          )}
-
-                          {/* Budget & Timeline */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                              <span className="text-xs text-slate-400">Orçamento</span>
-                              <p className="text-sm text-slate-200 mt-1 font-medium">
-                                💰 {selectedDeal.clientMemory.sales_intelligence.budget_indication === 'unknown' ? 'Não informado' : selectedDeal.clientMemory.sales_intelligence.budget_indication}
-                              </p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                              <span className="text-xs text-slate-400">Timeline</span>
-                              <p className="text-sm text-slate-200 mt-1 font-medium">
-                                ⏰ {selectedDeal.clientMemory.sales_intelligence.decision_timeline === 'unknown' ? 'Não definido' : selectedDeal.clientMemory.sales_intelligence.decision_timeline}
-                              </p>
-                            </div>
                           </div>
+                        )}
+                      </div>
+                    )}
 
+                    {/* ===== TAB: ATIVIDADES ===== */}
+                    {drawerTab === 'activities' && (
+                      <div className="p-6 space-y-5">
+                        {/* Activity Composer */}
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+                          {/* Type selector */}
+                          <div className="flex border-b border-slate-800">
+                            {[
+                              { type: 'note', label: 'Nota', icon: FileText, color: 'text-slate-400' },
+                              { type: 'call', label: 'Ligação', icon: Phone, color: 'text-amber-400' },
+                              { type: 'email', label: 'Email', icon: Mail, color: 'text-violet-400' },
+                              { type: 'meeting', label: 'Reunião', icon: Calendar, color: 'text-cyan-400' },
+                              { type: 'task', label: 'Tarefa', icon: CheckSquare, color: 'text-emerald-400' },
+                            ].map(({ type, label, icon: Icon, color }) => (
+                              <button
+                                key={type}
+                                onClick={() => setNewActivityType(type as any)}
+                                className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all border-b-2 ${
+                                  newActivityType === type
+                                    ? `${color} border-current bg-slate-800/50`
+                                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5" />
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <input 
+                            type="text"
+                            className="w-full bg-transparent p-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none border-b border-slate-800"
+                            placeholder={
+                              newActivityType === 'note' ? "Título da nota..." :
+                              newActivityType === 'call' ? "Assunto da ligação..." :
+                              newActivityType === 'email' ? "Assunto do email..." :
+                              newActivityType === 'meeting' ? "Nome da reunião..." :
+                              "Nome da tarefa..."
+                            }
+                            value={newActivityTitle}
+                            onChange={(e) => setNewActivityTitle(e.target.value)}
+                          />
+                          <textarea 
+                            className="w-full bg-transparent p-3 text-sm text-slate-200 placeholder:text-slate-600 outline-none resize-none min-h-[70px]"
+                            placeholder="Descrição (opcional)..."
+                            value={newActivityDescription}
+                            onChange={(e) => setNewActivityDescription(e.target.value)}
+                          />
+                          <div className="px-3 py-2 bg-slate-950/30 border-t border-slate-800 flex justify-end">
+                            <button
+                              onClick={handleCreateActivity}
+                              disabled={!newActivityTitle.trim()}
+                              className="px-4 py-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              Salvar
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Activities List */}
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <Clock className="w-3.5 h-3.5" /> Atividades ({activities.length})
+                          </h4>
+                          
+                          {loadingActivities ? (
+                            <div className="flex justify-center py-8">
+                              <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
+                            </div>
+                          ) : activities.length === 0 ? (
+                            <div className="text-center py-8 text-slate-500 text-sm">
+                              Nenhuma atividade registrada
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {activities.map(activity => {
+                                const activityIcon = activity.type === 'call' ? Phone :
+                                                     activity.type === 'email' ? Mail :
+                                                     activity.type === 'meeting' ? Calendar :
+                                                     activity.type === 'task' ? CheckSquare :
+                                                     FileText;
+                                const activityColor = activity.type === 'call' ? 'text-amber-500 bg-amber-500/10' :
+                                                      activity.type === 'email' ? 'text-violet-500 bg-violet-500/10' :
+                                                      activity.type === 'meeting' ? 'text-cyan-500 bg-cyan-500/10' :
+                                                      activity.type === 'task' ? 'text-emerald-500 bg-emerald-500/10' :
+                                                      'text-slate-500 bg-slate-500/10';
+                                const ActivityIcon = activityIcon;
+                                
+                                return (
+                                  <div key={activity.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-slate-700 transition-all group">
+                                    <button 
+                                      onClick={() => handleToggleActivityComplete(activity.id, activity.isCompleted)}
+                                      className="mt-0.5 text-slate-500 hover:text-emerald-500 transition-colors"
+                                    >
+                                      {activity.isCompleted ? (
+                                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                      ) : (
+                                        <Circle className="w-5 h-5" />
+                                      )}
+                                    </button>
+                                    <div className={`p-1.5 rounded mt-0.5 ${activityColor}`}>
+                                      <ActivityIcon className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-sm font-medium transition-colors ${activity.isCompleted ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
+                                        {activity.title}
+                                      </p>
+                                      {activity.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5">{activity.description}</p>
+                                      )}
+                                      <p className="text-[10px] text-slate-600 mt-1">
+                                        {new Date(activity.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        {activity.createdByName && ` • ${activity.createdByName}`}
+                                      </p>
+                                    </div>
+                                    <button 
+                                      onClick={() => handleDeleteActivity(activity.id)}
+                                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500 transition-all"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
 
-                    {/* Histórico de Conversa */}
-                    {selectedDeal.conversationId && (
-                      <div className="p-6 border-t border-slate-800">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <MessageSquare className="w-4 h-4 text-cyan-500" /> 
-                          Últimas Mensagens ({conversationMessages.length})
-                        </h4>
-                        
-                        {loadingMessages ? (
-                          <div className="flex justify-center py-4">
-                            <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
-                          </div>
-                        ) : conversationMessages.length === 0 ? (
-                          <div className="text-center py-4 text-slate-500 text-sm">
-                            Nenhuma mensagem encontrada
-                          </div>
-                        ) : (
-                          <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                            {conversationMessages.map(msg => (
-                              <div 
-                                key={msg.id}
-                                className={`p-2 rounded-lg text-sm ${
-                                  msg.from_type === 'user' 
-                                    ? 'bg-slate-800 text-slate-200 ml-0 mr-8' 
-                                    : msg.from_type === 'nina'
-                                      ? 'bg-cyan-900/30 text-cyan-100 ml-8 mr-0'
-                                      : 'bg-emerald-900/30 text-emerald-100 ml-8 mr-0'
-                                }`}
-                              >
-                                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
-                                  <span className="font-medium">
-                                    {msg.from_type === 'user' ? '👤 Lead' : msg.from_type === 'nina' ? `🤖 ${sdrName}` : '👨‍💼 Humano'}
-                                  </span>
-                                  <span>•</span>
-                                  <span>{new Date(msg.sent_at).toLocaleString('pt-BR', { 
-                                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
-                                  })}</span>
-                                </div>
-                                <p className="leading-relaxed line-clamp-3">{msg.content || '[mídia]'}</p>
+                    {/* ===== TAB: MENSAGENS ===== */}
+                    {drawerTab === 'messages' && (
+                      <div className="p-6">
+                        {selectedDeal.conversationId ? (
+                          <>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                              <MessageSquare className="w-4 h-4 text-cyan-500" /> 
+                              Últimas Mensagens ({conversationMessages.length})
+                            </h4>
+                            
+                            {loadingMessages ? (
+                              <div className="flex justify-center py-4">
+                                <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
                               </div>
-                            ))}
+                            ) : conversationMessages.length === 0 ? (
+                              <div className="text-center py-4 text-slate-500 text-sm">
+                                Nenhuma mensagem encontrada
+                              </div>
+                            ) : (
+                              <div className="space-y-2 mb-4">
+                                {conversationMessages.map(msg => (
+                                  <div 
+                                    key={msg.id}
+                                    className={`p-2.5 rounded-lg text-sm ${
+                                      msg.from_type === 'user' 
+                                        ? 'bg-slate-800 text-slate-200 ml-0 mr-8' 
+                                        : msg.from_type === 'nina'
+                                          ? 'bg-cyan-900/30 text-cyan-100 ml-8 mr-0'
+                                          : 'bg-emerald-900/30 text-emerald-100 ml-8 mr-0'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
+                                      <span className="font-medium">
+                                        {msg.from_type === 'user' ? '👤 Lead' : msg.from_type === 'nina' ? `🤖 ${sdrName}` : '👨‍💼 Humano'}
+                                      </span>
+                                      <span>•</span>
+                                      <span>{new Date(msg.sent_at).toLocaleString('pt-BR', { 
+                                        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                                      })}</span>
+                                    </div>
+                                    <p className="leading-relaxed line-clamp-3">{msg.content || '[mídia]'}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            <Button 
+                              className="w-full bg-violet-600 hover:bg-violet-700"
+                              onClick={() => window.location.href = `/chat?conversation=${selectedDeal.conversationId}`}
+                            >
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              Ver Conversa Completa
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="text-center py-12 text-slate-500">
+                            <MessageSquare className="w-8 h-8 mx-auto mb-3 text-slate-700" />
+                            <p className="text-sm">Nenhuma conversa vinculada a este deal</p>
                           </div>
                         )}
-                        
-                        <Button 
-                          className="w-full mt-3 bg-violet-600 hover:bg-violet-700"
-                          onClick={() => window.location.href = `/chat?conversation=${selectedDeal.conversationId}`}
-                        >
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          Ver Conversa Completa
-                        </Button>
                       </div>
                     )}
                 </div>
