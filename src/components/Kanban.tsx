@@ -918,7 +918,11 @@ const Kanban: React.FC = () => {
                             ].map(({ type, label, icon: Icon, color }) => (
                               <button
                                 key={type}
-                                onClick={() => setNewActivityType(type as any)}
+                                onClick={() => {
+                                  setNewActivityType(type as any);
+                                  setNewActivityTitle('');
+                                  setNewActivityDescription('');
+                                }}
                                 className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all border-b-2 ${
                                   newActivityType === type
                                     ? `${color} border-current bg-slate-800/50`
