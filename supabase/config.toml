@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.test-meta-webhook]
 verify_jwt = false
+
+[functions.db-backup-sync]
+verify_jwt = false
