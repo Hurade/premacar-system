@@ -6,24 +6,31 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Tables to sync (no queue tables)
-const TABLES_TO_SYNC = [
-  "contacts",
-  "conversations",
-  "messages",
-  "deals",
-  "deal_activities",
-  "appointments",
-  "campaigns",
-  "campaign_leads",
-  "nina_settings",
-  "profiles",
-  "pipeline_stages",
-  "tag_definitions",
-  "teams",
-  "team_functions",
-  "team_members",
+// Tables to sync with their timestamp column for incremental sync
+const TABLES_TO_SYNC: { name: string; tsCol: string }[] = [
+  { name: "contacts", tsCol: "updated_at" },
+  { name: "conversations", tsCol: "updated_at" },
+  { name: "messages", tsCol: "created_at" },
+  { name: "deals", tsCol: "updated_at" },
+  { name: "deal_activities", tsCol: "updated_at" },
+  { name: "appointments", tsCol: "updated_at" },
+  { name: "campaigns", tsCol: "updated_at" },
+  { name: "campaign_leads", tsCol: "updated_at" },
+  { name: "nina_settings", tsCol: "updated_at" },
+  { name: "profiles", tsCol: "updated_at" },
+  { name: "pipeline_stages", tsCol: "updated_at" },
+  { name: "tag_definitions", tsCol: "updated_at" },
+  { name: "teams", tsCol: "updated_at" },
+  { name: "team_functions", tsCol: "updated_at" },
+  { name: "team_members", tsCol: "updated_at" },
 ];
+
+// Detect if a string looks like a date/timestamp
+function isDateString(s: string): boolean {
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
+  if (/^[A-Z][a-z]{2}\s/.test(s) && !isNaN(Date.parse(s))) return true;
+  return false;
+}
 
 // Build UPSERT SQL dynamically based on table data
 function buildUpsertSQL(tableName: string, rows: Record<string, unknown>[]): string[] {
@@ -43,8 +50,20 @@ function buildUpsertSQL(tableName: string, rows: Record<string, unknown>[]): str
         if (v === null || v === undefined) return "NULL";
         if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
         if (typeof v === "number") return String(v);
+        // Check Array BEFORE object (arrays are objects in JS)
+        if (Array.isArray(v)) {
+          if (v.length === 0) return "'{}'";
+          // Detect if numeric array
+          const isNumeric = v.every((x) => typeof x === "number");
+          if (isNumeric) return `ARRAY[${v.join(",")}]::integer[]`;
+          return `ARRAY[${v.map((x) => `'${String(x).replace(/'/g, "''")}'`).join(",")}]::text[]`;
+        }
         if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
-        if (Array.isArray(v)) return `ARRAY[${(v as string[]).map((x) => `'${String(x).replace(/'/g, "''")}'`).join(",")}]::text[]`;
+        // Convert date strings to ISO format for PostgreSQL compatibility
+        if (typeof v === "string" && isDateString(v)) {
+          const iso = new Date(v).toISOString();
+          return `'${iso}'`;
+        }
         return `'${String(v).replace(/'/g, "''")}'`;
       });
       return `(${vals.join(", ")})`;
@@ -71,6 +90,13 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
   const results: Record<string, { count: number; status: string; error?: string }> = {};
 
+  // Check for force_full parameter
+  let forceFull = false;
+  try {
+    const body = await req.json();
+    forceFull = body?.force_full === true;
+  } catch { /* no body or not JSON */ }
+
   try {
     // Connect to Lovable Cloud (source)
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -90,29 +116,34 @@ Deno.serve(async (req) => {
     const { default: postgres } = await import("https://deno.land/x/postgresjs@v3.4.5/mod.js");
     const sql = postgres(rdsUrl, { max: 3 });
 
-    // Get last sync time
+    // Get last sync time (skip if force_full)
     let lastSync: string | null = null;
-    try {
-      const lastSyncResult = await sql`
-        SELECT MAX(completed_at) as last_sync FROM sync_log WHERE status = 'completed'
-      `;
-      lastSync = lastSyncResult[0]?.last_sync || null;
-    } catch {
-      // sync_log table might not exist yet on first run
-      console.log("No previous sync found, doing full sync");
+    if (!forceFull) {
+      try {
+        const lastSyncResult = await sql`
+          SELECT MAX(completed_at) as last_sync FROM sync_log WHERE status = 'completed'
+        `;
+        const raw = lastSyncResult[0]?.last_sync;
+        lastSync = raw ? new Date(raw).toISOString() : null;
+      } catch {
+        console.log("No previous sync found, doing full sync");
+      }
+    } else {
+      console.log("Force full sync requested");
     }
 
     // Log sync start
     await sql`INSERT INTO sync_log (table_name, status) VALUES ('_full_sync', 'running')`;
 
-    for (const table of TABLES_TO_SYNC) {
+    for (const tableConfig of TABLES_TO_SYNC) {
+      const table = tableConfig.name;
       try {
         // Fetch data from Lovable Cloud
         let query = supabase.from(table).select("*");
 
         // Incremental sync: only get records updated since last sync
         if (lastSync) {
-          query = query.gte("updated_at", lastSync);
+          query = query.gte(tableConfig.tsCol, lastSync);
         }
 
         // Handle pagination (Supabase limit is 1000)
@@ -148,7 +179,7 @@ Deno.serve(async (req) => {
           VALUES (${table}, ${allRows.length}, now(), 'completed')
         `;
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
         results[table] = { count: 0, status: "error", error: errorMsg };
         console.error(`Error syncing ${table}:`, errorMsg);
 
@@ -163,8 +194,11 @@ Deno.serve(async (req) => {
     await sql`
       UPDATE sync_log SET completed_at = now(), status = 'completed', 
       records_synced = ${Object.values(results).reduce((s, r) => s + r.count, 0)}
-      WHERE table_name = '_full_sync' AND status = 'running'
-      ORDER BY started_at DESC LIMIT 1
+      WHERE id = (
+        SELECT id FROM sync_log 
+        WHERE table_name = '_full_sync' AND status = 'running'
+        ORDER BY started_at DESC LIMIT 1
+      )
     `;
 
     await sql.end();
