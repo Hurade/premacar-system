@@ -1261,23 +1261,42 @@ export const api = {
 
     console.log(`[API] Found ${conversations.length} conversations`);
 
-    // Filter out dispatch conversations with no user reply (batch query)
+    // Filter out dispatch conversations with no interaction yet
+    // A dispatch conv should appear if: has a user reply OR has AI response (meaning auto-reply triggered AI)
     const dispatchConvIds = conversations.filter(c => c.dispatch_sent_at).map(c => c.id);
-    const repliedDispatchIds = new Set<string>();
+    const interactedDispatchIds = new Set<string>();
     
     if (dispatchConvIds.length > 0) {
-      const { data: repliedMessages } = await supabase
+      // Count any message that is NOT the original broadcast template
+      const { data: interactionMessages } = await supabase
         .from('messages')
-        .select('conversation_id')
+        .select('conversation_id, from_type, metadata')
         .in('conversation_id', dispatchConvIds)
-        .eq('from_type', 'user');
+        .or('from_type.eq.user,from_type.eq.human');
       
-      (repliedMessages || []).forEach(m => repliedDispatchIds.add(m.conversation_id));
+      (interactionMessages || []).forEach(m => interactedDispatchIds.add(m.conversation_id));
+
+      // Also include if AI has responded (meaning client sent something - even auto-reply)
+      const { data: aiResponses } = await supabase
+        .from('messages')
+        .select('conversation_id, metadata')
+        .in('conversation_id', dispatchConvIds)
+        .eq('from_type', 'nina')
+        .not('metadata->is_broadcast', 'eq', 'true')
+        .not('metadata->is_template', 'eq', 'true');
+      
+      (aiResponses || []).forEach(m => {
+        // Only count as interaction if it's NOT the broadcast message itself
+        const meta = m.metadata as any;
+        if (!meta?.is_broadcast && !meta?.is_template) {
+          interactedDispatchIds.add(m.conversation_id);
+        }
+      });
     }
     
     const filteredConversations = conversations.filter(conv => {
       if (!conv.dispatch_sent_at) return true;
-      return repliedDispatchIds.has(conv.id);
+      return interactedDispatchIds.has(conv.id);
     });
 
     console.log(`[API] After dispatch filter: ${filteredConversations.length} conversations`);
