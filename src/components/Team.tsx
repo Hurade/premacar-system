@@ -156,6 +156,19 @@ const Team: React.FC = () => {
         weight: editFormData.weight
       });
 
+      // Sync email change to auth system if email changed
+      const emailChanged = editFormData.email !== editingMember.email;
+      if (emailChanged && editingMember.user_id) {
+        const response = await supabase.functions.invoke('admin-update-user', {
+          body: { target_user_id: editingMember.user_id, new_email: editFormData.email },
+        });
+        if (response.error || response.data?.error) {
+          toast.error('Email atualizado na equipe, mas falhou no sistema de login: ' + (response.data?.error || response.error?.message));
+        }
+      } else if (emailChanged && !editingMember.user_id) {
+        toast.warning('Email atualizado na equipe. Como o usuário ainda não fez login, ele deve usar o novo email ao criar a conta.');
+      }
+
       // Change password if filled
       if (newPassword) {
         if (newPassword !== confirmPassword) {
