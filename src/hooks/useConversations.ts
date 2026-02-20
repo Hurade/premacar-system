@@ -68,6 +68,25 @@ export function useConversations() {
   // Track last notification time to prevent spam
   const lastNotificationTime = useRef<number>(0);
 
+  // Helper: verifica se uma conversa de disparo deve aparecer no Chat
+  // Retorna true se: não é disparo OU é disparo com pelo menos 1 resposta do cliente
+  const shouldIncludeInChat = useCallback(async (conversationId: string, dispatchSentAt: string | null): Promise<boolean> => {
+    if (!dispatchSentAt) return true; // Não é disparo, sempre incluir
+
+    const { data: userMessages } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('from_type', 'user')
+      .limit(1);
+
+    if (!userMessages || userMessages.length === 0) {
+      console.log('[Realtime] 🚫 Disparo sem resposta, ignorando no Chat:', conversationId);
+      return false;
+    }
+    return true;
+  }, []);
+
   // Fetch a single conversation and add it to state
   const fetchAndAddConversation = useCallback(async (conversationId: string) => {
     // Prevent duplicate fetches
@@ -90,6 +109,10 @@ export function useConversations() {
         console.error('[Realtime] Error fetching conversation:', convError);
         return;
       }
+
+      // Filtro de disparo: só adiciona ao Chat se tiver resposta do cliente
+      const include = await shouldIncludeInChat(conversationId, convData.dispatch_sent_at);
+      if (!include) return;
       
       const { data: messages, error: msgError } = await supabase
         .from('messages')
@@ -125,7 +148,7 @@ export function useConversations() {
     } finally {
       fetchingConversationIds.current.delete(conversationId);
     }
-  }, []);
+  }, [shouldIncludeInChat]);
 
   // Initial fetch
   const fetchConversations = useCallback(async () => {
@@ -198,9 +221,14 @@ export function useConversations() {
             const conversationExists = prev.some(c => c.id === newMessage.conversation_id);
             
             if (!conversationExists) {
-              // Message from a new conversation - fetch it asynchronously
-              console.log('[Realtime] Message from unknown conversation, fetching async...');
-              fetchAndAddConversation(newMessage.conversation_id);
+              // Só busca a conversa se a mensagem for do cliente (from_type === 'user')
+              // Mensagens de disparo (nina/human) não devem trazer a conversa para o Chat
+              if (newMessage.from_type === 'user') {
+                console.log('[Realtime] Message from unknown conversation (user), fetching async...');
+                fetchAndAddConversation(newMessage.conversation_id);
+              } else {
+                console.log('[Realtime] 🚫 Mensagem de disparo em conversa desconhecida, ignorando no Chat:', newMessage.conversation_id);
+              }
               return prev; // Return prev, async fetch will update state
             }
 
