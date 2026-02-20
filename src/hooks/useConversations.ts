@@ -69,22 +69,37 @@ export function useConversations() {
   const lastNotificationTime = useRef<number>(0);
 
   // Helper: verifica se uma conversa de disparo deve aparecer no Chat
-  // Retorna true se: não é disparo OU é disparo com pelo menos 1 resposta do cliente
+  // Retorna true se: não é disparo OU tem resposta do cliente OU IA já respondeu (interação ocorreu)
   const shouldIncludeInChat = useCallback(async (conversationId: string, dispatchSentAt: string | null): Promise<boolean> => {
     if (!dispatchSentAt) return true; // Não é disparo, sempre incluir
 
+    // Verificar se há mensagem do cliente (user ou human)
     const { data: userMessages } = await supabase
       .from('messages')
       .select('id')
       .eq('conversation_id', conversationId)
-      .eq('from_type', 'user')
+      .or('from_type.eq.user,from_type.eq.human')
       .limit(1);
 
-    if (!userMessages || userMessages.length === 0) {
-      console.log('[Realtime] 🚫 Disparo sem resposta, ignorando no Chat:', conversationId);
-      return false;
+    if (userMessages && userMessages.length > 0) return true;
+
+    // Verificar se a IA respondeu a algo (indica que houve interação - ex: auto-reply detectado)
+    const { data: aiResponses } = await supabase
+      .from('messages')
+      .select('id, metadata')
+      .eq('conversation_id', conversationId)
+      .eq('from_type', 'nina')
+      .not('metadata->is_broadcast', 'eq', 'true')
+      .not('metadata->is_template', 'eq', 'true')
+      .limit(1);
+
+    if (aiResponses && aiResponses.length > 0) {
+      console.log('[Realtime] ✅ Disparo com resposta da IA (interação detectada), incluindo no Chat:', conversationId);
+      return true;
     }
-    return true;
+
+    console.log('[Realtime] 🚫 Disparo sem resposta, ignorando no Chat:', conversationId);
+    return false;
   }, []);
 
   // Fetch a single conversation and add it to state
@@ -220,11 +235,15 @@ export function useConversations() {
             // Check if conversation exists in our state
             const conversationExists = prev.some(c => c.id === newMessage.conversation_id);
             
-            if (!conversationExists) {
-              // Só busca a conversa se a mensagem for do cliente (from_type === 'user')
-              // Mensagens de disparo (nina/human) não devem trazer a conversa para o Chat
-              if (newMessage.from_type === 'user') {
-                console.log('[Realtime] Message from unknown conversation (user), fetching async...');
+              if (!conversationExists) {
+              // Busca a conversa se: cliente respondeu OU IA respondeu (interação após disparo)
+              const isUserInteraction = newMessage.from_type === 'user' || newMessage.from_type === 'human';
+              const isAiResponse = newMessage.from_type === 'nina' && 
+                !(newMessage as any).metadata?.is_broadcast && 
+                !(newMessage as any).metadata?.is_template;
+              
+              if (isUserInteraction || isAiResponse) {
+                console.log('[Realtime] Message in unknown conversation, fetching async...');
                 fetchAndAddConversation(newMessage.conversation_id);
               } else {
                 console.log('[Realtime] 🚫 Mensagem de disparo em conversa desconhecida, ignorando no Chat:', newMessage.conversation_id);

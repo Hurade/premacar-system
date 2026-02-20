@@ -347,15 +347,19 @@ export function transformDBToUIConversation(
 }
 
 export function transformDBToUIMessage(msg: DBMessage): UIMessage {
+  // Auto-replies from contacts (saved as 'nina' to prevent AI loop) should display as INCOMING
+  const isAutoReply = (msg.metadata as any)?.is_auto_reply === true;
+  const isIncoming = msg.from_type === 'user' || isAutoReply;
+  
   return {
     id: msg.id,
     content: msg.content || '',
     timestamp: formatMessageTime(msg.sent_at),
     sentAt: msg.sent_at,
-    direction: msg.from_type === 'user' ? MessageDirection.INCOMING : MessageDirection.OUTGOING,
+    direction: isIncoming ? MessageDirection.INCOMING : MessageDirection.OUTGOING,
     type: mapDBMessageType(msg.type),
     status: mapDBMessageStatus(msg.status),
-    fromType: msg.from_type,
+    fromType: isAutoReply ? 'user' : msg.from_type,
     mediaUrl: msg.media_url,
     whatsappMessageId: msg.whatsapp_message_id
   };
