@@ -66,8 +66,8 @@ const Logo = ({
 };
 const LogoIcon = () => {
   return <Link to="/dashboard" className="flex items-center py-1">
-      <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
-        <img src={premaLogo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+      <div className="relative w-10 h-10 flex items-center justify-center flex-shrink-0">
+        <img alt="Logo" className="w-full h-full object-cover rounded-xl" src="/lovable-uploads/fd1738a7-c527-49a5-b40a-f34007000e81.png" />
       </div>
     </Link>;
 };
