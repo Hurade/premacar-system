@@ -1238,68 +1238,66 @@ export const api = {
   fetchConversations: async (): Promise<UIConversation[]> => {
     console.log('[API] Fetching conversations from Supabase...');
     
-    // Fetch active conversations with contact data
-    const { data: conversations, error: convError } = await supabase
+    // Buscar conversas SEM dispatch_sent_at (conversas normais) - sempre mostrar
+    const { data: normalConversations, error: normalError } = await supabase
       .from('conversations')
-      .select(`
-        *,
-        contact:contacts(*)
-      `)
+      .select(`*, contact:contacts(*)`)
       .eq('is_active', true)
+      .is('dispatch_sent_at', null)
       .order('last_message_at', { ascending: false })
       .limit(50);
 
-    if (convError) {
-      console.error('[API] Error fetching conversations:', convError);
-      throw convError;
+    if (normalError) {
+      console.error('[API] Error fetching normal conversations:', normalError);
+      throw normalError;
     }
 
-    if (!conversations || conversations.length === 0) {
+    // Buscar IDs de conversas de disparo que têm resposta do cliente
+    const { data: interactedConvIds } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .in('from_type', ['user', 'human'])
+      .not('conversation_id', 'is', null);
+
+    const interactedIds = new Set((interactedConvIds || []).map(m => m.conversation_id));
+
+    // Buscar conversas de disparo que tiveram interação
+    let dispatchConversations: any[] = [];
+    if (interactedIds.size > 0) {
+      const { data: dispatchData } = await supabase
+        .from('conversations')
+        .select(`*, contact:contacts(*)`)
+        .eq('is_active', true)
+        .not('dispatch_sent_at', 'is', null)
+        .in('id', Array.from(interactedIds))
+        .order('last_message_at', { ascending: false })
+        .limit(50);
+      
+      dispatchConversations = dispatchData || [];
+    }
+
+    // Combinar e ordenar por last_message_at
+    const allConversations = [...(normalConversations || []), ...dispatchConversations];
+    allConversations.sort((a, b) => 
+      new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+    );
+
+    // Remover duplicatas (pela união)
+    const seen = new Set<string>();
+    const conversations = allConversations.filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    }).slice(0, 100);
+
+    if (conversations.length === 0) {
       console.log('[API] No conversations found');
       return [];
     }
 
-    console.log(`[API] Found ${conversations.length} conversations`);
+    console.log(`[API] Found ${(normalConversations || []).length} normal + ${dispatchConversations.length} dispatch conversations = ${conversations.length} total`);
 
-    // Filter out dispatch conversations with no interaction yet
-    // A dispatch conv should appear if: has a user reply OR has AI response (meaning auto-reply triggered AI)
-    const dispatchConvIds = conversations.filter(c => c.dispatch_sent_at).map(c => c.id);
-    const interactedDispatchIds = new Set<string>();
-    
-    if (dispatchConvIds.length > 0) {
-      // Count any message that is NOT the original broadcast template
-      const { data: interactionMessages } = await supabase
-        .from('messages')
-        .select('conversation_id, from_type, metadata')
-        .in('conversation_id', dispatchConvIds)
-        .or('from_type.eq.user,from_type.eq.human');
-      
-      (interactionMessages || []).forEach(m => interactedDispatchIds.add(m.conversation_id));
-
-      // Also include if AI has responded (meaning client sent something - even auto-reply)
-      const { data: aiResponses } = await supabase
-        .from('messages')
-        .select('conversation_id, metadata')
-        .in('conversation_id', dispatchConvIds)
-        .eq('from_type', 'nina')
-        .not('metadata->is_broadcast', 'eq', 'true')
-        .not('metadata->is_template', 'eq', 'true');
-      
-      (aiResponses || []).forEach(m => {
-        // Only count as interaction if it's NOT the broadcast message itself
-        const meta = m.metadata as any;
-        if (!meta?.is_broadcast && !meta?.is_template) {
-          interactedDispatchIds.add(m.conversation_id);
-        }
-      });
-    }
-    
-    const filteredConversations = conversations.filter(conv => {
-      if (!conv.dispatch_sent_at) return true;
-      return interactedDispatchIds.has(conv.id);
-    });
-
-    console.log(`[API] After dispatch filter: ${filteredConversations.length} conversations`);
+    const filteredConversations = conversations;
 
     // Fetch messages for each conversation
     const conversationsWithMessages: UIConversation[] = await Promise.all(
