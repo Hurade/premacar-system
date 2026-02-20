@@ -71,7 +71,6 @@ const ROLE_PERMISSIONS: Record<TeamRole | 'user', Permission[]> = {
     'view_scheduling',
     'manage_scheduling',
     'view_team',
-    'view_settings',
   ],
   agent: [
     'view_dashboard',
@@ -99,7 +98,7 @@ export const MENU_ROLE_REQUIREMENTS: Record<string, TeamRole[]> = {
   broadcasts: ['admin', 'manager'],
   scheduling: ['admin', 'manager', 'agent'],
   team: ['admin', 'manager'],
-  settings: ['admin', 'manager'],
+  settings: ['admin'],
 };
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);
