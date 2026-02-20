@@ -458,11 +458,28 @@ serve(async (req) => {
 
         // ===== Criar/atualizar contato e criar mensagem no chat =====
         let contactId: string | null = null;
-        const { data: existingContact } = await supabase
+        
+        // Normalizar número para busca: tentar com e sem dígito 9 extra (Brasil)
+        const cleanLeadPhone = lead.phone.replace(/\D/g, '');
+        let phoneVariants = [cleanLeadPhone];
+        // Se número tem 13 dígitos (55 + DDD + 9 + número), tentar sem o 9
+        if (cleanLeadPhone.length === 13 && cleanLeadPhone.startsWith('55')) {
+          const withoutNinth = cleanLeadPhone.slice(0, 4) + cleanLeadPhone.slice(5);
+          phoneVariants.push(withoutNinth);
+        }
+        // Se número tem 12 dígitos (55 + DDD + número), tentar com o 9
+        if (cleanLeadPhone.length === 12 && cleanLeadPhone.startsWith('55')) {
+          const withNinth = cleanLeadPhone.slice(0, 4) + '9' + cleanLeadPhone.slice(4);
+          phoneVariants.push(withNinth);
+        }
+        console.log(`[campaign-processor] Buscando contato para variantes de telefone:`, phoneVariants);
+        
+        const { data: existingContacts } = await supabase
           .from("contacts")
-          .select("id, tags")
-          .eq("phone_number", lead.phone)
-          .maybeSingle();
+          .select("id, tags, phone_number")
+          .in("phone_number", phoneVariants);
+        
+        const existingContact = existingContacts && existingContacts.length > 0 ? existingContacts[0] : null;
 
         if (existingContact) {
           contactId = existingContact.id;
