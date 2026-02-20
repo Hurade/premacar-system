@@ -150,7 +150,7 @@ const SidebarContent = () => {
     }} transition={{
       duration: 0.3
     }} className="py-4 flex justify-center px-2">
-          <img alt="Prema" className="h-8 w-full max-w-full transition-opacity opacity-100 object-contain" src={premaLogoFull} />
+          
         </motion.div>}
 
       {/* User Footer */}
