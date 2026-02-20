@@ -381,15 +381,29 @@ async function processMetaWebhookAsync(
         }
 
         // ═══════════════════════════════════════════
-        // 1. BUSCAR OU CRIAR CONTATO
+        // 1. BUSCAR OU CRIAR CONTATO (com normalização de número BR)
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 📞 Buscando contato...');
 
-        let { data: contact } = await supabase
+        // Normalizar número: gerar variantes com/sem dígito 9 extra (Brasil)
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        const phoneVariants = [cleanPhone];
+        // 13 dígitos (55 + DDD + 9 + 8 dígitos) → tentar sem o 9
+        if (cleanPhone.length === 13 && cleanPhone.startsWith('55')) {
+          phoneVariants.push(cleanPhone.slice(0, 4) + cleanPhone.slice(5));
+        }
+        // 12 dígitos (55 + DDD + 8 dígitos) → tentar com o 9
+        if (cleanPhone.length === 12 && cleanPhone.startsWith('55')) {
+          phoneVariants.push(cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4));
+        }
+        console.log('[Meta Async] 🔍 Variantes de telefone:', phoneVariants);
+
+        const { data: existingContacts } = await supabase
           .from('contacts')
           .select('*')
-          .eq('phone_number', phoneNumber)
-          .maybeSingle();
+          .in('phone_number', phoneVariants);
+
+        let contact = existingContacts && existingContacts.length > 0 ? existingContacts[0] : null;
 
         if (!contact) {
           console.log('[Meta Async] ➕ Criando novo contato');
@@ -413,7 +427,7 @@ async function processMetaWebhookAsync(
           contact = newContact;
           console.log('[Meta Async] ✅ Contato criado:', contact.id);
         } else {
-          console.log('[Meta Async] ✅ Contato encontrado:', contact.id);
+          console.log('[Meta Async] ✅ Contato encontrado:', contact.id, '(phone:', contact.phone_number, ')');
 
           // Update contact activity
           const updates: any = { last_activity: new Date().toISOString() };
