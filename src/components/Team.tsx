@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, ShieldCheck, Crown } from 'lucide-react';
+import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, ShieldCheck, Crown, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
 import { TeamMember, type Team as TeamType, type TeamFunction } from '../types';
@@ -37,6 +37,11 @@ const Team: React.FC = () => {
     function_id: '',
     weight: 1
   });
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+
 
   useEffect(() => {
     loadAllData();
@@ -131,6 +136,8 @@ const Team: React.FC = () => {
       function_id: member.function_id || '',
       weight: member.weight || 1
     });
+    setNewPassword('');
+    setConfirmPassword('');
     setShowEditModal(true);
   };
 
@@ -148,6 +155,24 @@ const Team: React.FC = () => {
         function_id: editFormData.function_id || null,
         weight: editFormData.weight
       });
+
+      // Change password if filled
+      if (newPassword) {
+        if (newPassword !== confirmPassword) {
+          toast.error('As senhas não coincidem');
+          return;
+        }
+        if (newPassword.length < 6) {
+          toast.error('A senha deve ter no mínimo 6 caracteres');
+          return;
+        }
+        if (!editingMember.user_id) {
+          toast.error('Este usuário ainda não acessou o sistema — senha não pode ser alterada');
+          return;
+        }
+        await handleChangePassword(editingMember.user_id);
+      }
+
       toast.success('Membro atualizado com sucesso!');
       setShowEditModal(false);
       setEditingMember(null);
@@ -155,6 +180,27 @@ const Team: React.FC = () => {
     } catch (error) {
       console.error('Erro ao editar membro:', error);
       toast.error('Erro ao editar membro');
+    }
+  };
+
+  const handleChangePassword = async (targetUserId: string) => {
+    setChangingPassword(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('No session token');
+
+      const response = await supabase.functions.invoke('admin-update-user', {
+        body: { target_user_id: targetUserId, new_password: newPassword },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+    } catch (err: any) {
+      console.error('Erro ao alterar senha:', err);
+      throw err;
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -648,9 +694,57 @@ const Team: React.FC = () => {
                         />
                     </div>
 
+                    {/* Password Change Section - Admin only */}
+                    {isAdmin && (
+                      <div className="pt-2 border-t border-slate-800">
+                        <div className="flex items-center gap-2 mb-3">
+                          <KeyRound className="w-4 h-4 text-amber-500" />
+                          <label className="text-sm font-semibold text-slate-300">Alterar Senha</label>
+                          {!editingMember?.user_id && (
+                            <span className="text-xs text-slate-500 italic">(usuário ainda não acessou o sistema)</span>
+                          )}
+                        </div>
+                        {editingMember?.user_id ? (
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <input 
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder="Nova senha (mín. 6 caracteres)"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-amber-600/50 outline-none pr-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                            <input 
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="Confirmar nova senha"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-amber-600/50 outline-none"
+                            />
+                            <p className="text-xs text-slate-500">Deixe em branco para não alterar a senha.</p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 bg-slate-800/50 rounded-lg p-3">
+                            A senha só pode ser alterada após o usuário realizar o primeiro acesso ao sistema.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="pt-4 flex gap-3">
                         <Button type="button" variant="ghost" onClick={() => { setShowEditModal(false); setEditingMember(null); }} className="flex-1 border border-slate-700 hover:bg-slate-800">Cancelar</Button>
-                        <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200">Salvar Alterações</Button>
+                        <Button type="submit" disabled={changingPassword} className="flex-1 bg-white text-black hover:bg-slate-200">
+                          {changingPassword ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Salvar Alterações
+                        </Button>
                     </div>
                 </form>
             </div>

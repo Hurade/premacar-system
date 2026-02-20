@@ -383,6 +383,7 @@ export const api = {
       team_id: m.team_id,
       function_id: m.function_id,
       weight: m.weight,
+      user_id: m.user_id || null,
       team: m.team as any,
       function: m.function as any
     }));
