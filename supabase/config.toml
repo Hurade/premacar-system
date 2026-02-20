@@ -1,5 +1,11 @@
 project_id = "tkwwpcgmpemkrsubilhi"
 
+[functions.validate-setup]
+verify_jwt = false
+
+[functions.admin-update-user]
+verify_jwt = false
+
 [functions.meta-webhook]
 verify_jwt = false
 
