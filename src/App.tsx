@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -22,6 +22,26 @@ import { OnboardingWizard } from './components/OnboardingWizard';
 
 
 const queryClient = new QueryClient();
+
+const PAGE_TITLES: Record<string, string> = {
+  '/dashboard': 'PremaCar - Dashboard',
+  '/chat': 'PremaCar - Chat',
+  '/contacts': 'PremaCar - Contatos',
+  '/pipeline': 'PremaCar - Pipeline',
+  '/broadcasts': 'PremaCar - Disparos',
+  '/scheduling': 'PremaCar - Agendamentos',
+  '/team': 'PremaCar - Equipe',
+  '/settings': 'PremaCar - Configurações',
+  '/auth': 'PremaCar - Login',
+};
+
+const PageTitle: React.FC = () => {
+  const location = useLocation();
+  useEffect(() => {
+    document.title = PAGE_TITLES[location.pathname] ?? 'PremaCar';
+  }, [location.pathname]);
+  return null;
+};
 
 // Componente de Layout que envolve a aplicação principal
 const AppLayout: React.FC = () => {
@@ -59,6 +79,7 @@ const App: React.FC = () => {
         <UserRoleProvider>
           <CompanySettingsProvider>
             <BrowserRouter>
+              <PageTitle />
               <Routes>
                 {/* Public Routes */}
                 <Route path="/auth" element={<Auth />} />
