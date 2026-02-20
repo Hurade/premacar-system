@@ -50,31 +50,40 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { target_user_id, new_password } = await req.json();
+    const { target_user_id, new_password, new_email } = await req.json();
 
-    if (!target_user_id || !new_password) {
-      return new Response(JSON.stringify({ error: 'target_user_id and new_password are required' }), {
+    if (!target_user_id) {
+      return new Response(JSON.stringify({ error: 'target_user_id is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    if (new_password.length < 6) {
+    if (!new_password && !new_email) {
+      return new Response(JSON.stringify({ error: 'new_password or new_email is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (new_password && new_password.length < 6) {
       return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Use service role to update the target user's password
+    // Use service role to update the target user
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data, error } = await adminClient.auth.admin.updateUserById(target_user_id, {
-      password: new_password,
-    });
+    const updatePayload: { password?: string; email?: string } = {};
+    if (new_password) updatePayload.password = new_password;
+    if (new_email) updatePayload.email = new_email;
+
+    const { data, error } = await adminClient.auth.admin.updateUserById(target_user_id, updatePayload);
 
     if (error) {
       console.error('[admin-update-user] Error updating password:', error);
@@ -84,9 +93,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[admin-update-user] Password updated for user: ${target_user_id} by admin: ${user.id}`);
+    console.log(`[admin-update-user] User updated (email/password) for user: ${target_user_id} by admin: ${user.id}`);
 
-    return new Response(JSON.stringify({ success: true, message: 'Senha alterada com sucesso' }), {
+    return new Response(JSON.stringify({ success: true, message: 'Usuário atualizado com sucesso' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
