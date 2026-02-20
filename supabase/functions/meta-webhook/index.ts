@@ -360,6 +360,21 @@ async function processMetaWebhookAsync(
             dbMessageType = 'text';
             console.log('[Meta Async] 📋 Resposta interativa');
             break;
+          case 'contacts': {
+            // Cartão de contato vCard enviado pelo cliente
+            const contactCards = message.contacts || [];
+            const names = contactCards.map((c: any) => {
+              const formatted = c.name?.formatted_name || c.name?.first_name || '';
+              const phones = (c.phones || []).map((p: any) => p.phone || p.wa_id || '').filter(Boolean).join(', ');
+              return phones ? `${formatted} (${phones})` : formatted;
+            }).filter(Boolean);
+            messageContent = names.length > 0
+              ? `📇 Contato compartilhado: ${names.join(', ')}`
+              : '[contato compartilhado]';
+            dbMessageType = 'text';
+            console.log('[Meta Async] 📇 Contato compartilhado:', messageContent);
+            break;
+          }
           default:
             messageContent = `[mensagem do tipo: ${messageType}]`;
             console.log('[Meta Async] ❓ Tipo desconhecido:', messageType);

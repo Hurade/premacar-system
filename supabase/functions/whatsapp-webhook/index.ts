@@ -368,6 +368,25 @@ serve(async (req) => {
         messageType = 'document';
         mediaType = 'document';
         mediaId = msg.documentMessage.mediaKey;
+      } else if (msg?.contactMessage) {
+        // Cartão de contato vCard enviado pelo cliente
+        const displayName = msg.contactMessage.displayName || '';
+        const vcard = msg.contactMessage.vcard || '';
+        // Extrair telefone do vCard (linha TEL:...)
+        const telMatch = vcard.match(/TEL[^:]*:([^\r\n]+)/);
+        const phone = telMatch ? telMatch[1].trim() : '';
+        messageContent = phone
+          ? `📇 Contato compartilhado: ${displayName} (${phone})`
+          : `📇 Contato compartilhado: ${displayName || '[sem nome]'}`;
+        messageType = 'text';
+        console.log('[Webhook] 📇 Contato compartilhado:', messageContent);
+      } else if (msg?.contactsArrayMessage) {
+        // Múltiplos contatos
+        const contacts = msg.contactsArrayMessage.contacts || [];
+        const names = contacts.map((c: any) => c.displayName || '').filter(Boolean).join(', ');
+        messageContent = `📇 Contatos compartilhados: ${names || '[sem nomes]'}`;
+        messageType = 'text';
+        console.log('[Webhook] 📇 Múltiplos contatos:', messageContent);
       } else {
         messageContent = '[mensagem não suportada]';
       }
