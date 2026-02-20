@@ -477,9 +477,49 @@ async function processMetaWebhookAsync(
         }
 
         // ═══════════════════════════════════════════
-        // 3. SALVAR MENSAGEM
+        // 3. DETECÇÃO ANTECIPADA DE MENSAGENS AUTOMÁTICAS (BOTS)
+        // ═══════════════════════════════════════════
+        const botPatterns = [
+          /^\u200e/,                          // Caractere invisível ‎ no início (comum em bots)
+          /agradece\s+seu\s+contato/i,        // "agradece seu contato"
+          /obrigad[oa]\s+por\s+entrar\s+em\s+contato/i,
+          /como\s+podemos\s+(te\s+)?ajudar\??$/i, // "Como podemos ajudar?"
+          /bem[- ]?vind[oa]\s+(à|a|ao)/i,     // "Bem-vindo(a) à/ao"
+          /atendimento\s+autom[aá]tico/i,
+          /digite\s+\d+\s+para/i,             // "Digite 1 para..."
+          /escolha\s+uma?\s+(das\s+)?opç(ão|ões)/i,
+          /hor[aá]rio\s+de\s+atendimento/i,
+          /fora\s+do\s+hor[aá]rio/i,
+          /no\s+momento\s+n[ãa]o\s+estamos/i,
+          /resposta\s+autom[aá]tica/i,
+          /mensagem\s+autom[aá]tica/i,
+        ];
+
+        const isLikelyBot = messageContent ? botPatterns.some(p => p.test(messageContent)) : false;
+
+        if (isLikelyBot) {
+          console.log('[Meta Async] 🤖🚫 MENSAGEM AUTOMÁTICA DETECTADA ANTES DE SALVAR!');
+          console.log('[Meta Async] - Conteúdo:', messageContent?.substring(0, 80));
+          console.log('[Meta Async] - Será salva como from_type=nina para não afetar contexto da IA');
+          
+          // Marcar dispatch_sent_at para ativar o delay mesmo em conversas inbound
+          if (!conversation.dispatch_sent_at) {
+            await supabase
+              .from('conversations')
+              .update({ dispatch_sent_at: new Date().toISOString() })
+              .eq('id', conversation.id);
+            conversation.dispatch_sent_at = new Date().toISOString();
+            console.log('[Meta Async] - dispatch_sent_at definido para proteção anti-bot');
+          }
+        }
+
+        // ═══════════════════════════════════════════
+        // 4. SALVAR MENSAGEM
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 💾 Salvando mensagem...');
+
+        // Se for bot, salvar como 'nina' para não contaminar contexto da IA
+        const fromType = isLikelyBot ? 'nina' : 'user';
 
         const { data: dbMessage, error: msgError } = await supabase
           .from('messages')
@@ -488,7 +528,7 @@ async function processMetaWebhookAsync(
             whatsapp_message_id: messageId,
             content: messageContent,
             type: dbMessageType,
-            from_type: 'user',
+            from_type: fromType,
             status: 'sent',
             media_type: mediaType,
             media_url: mediaUrl,
@@ -497,7 +537,8 @@ async function processMetaWebhookAsync(
             metadata: { 
               original_type: messageType,
               meta_phone_number_id: metaSettings.meta_phone_number_id,
-              contact_name: contactName
+              contact_name: contactName,
+              is_auto_reply: isLikelyBot
             }
           })
           .select()
@@ -512,10 +553,10 @@ async function processMetaWebhookAsync(
           continue;
         }
 
-        console.log('[Meta Async] ✅ Mensagem salva:', dbMessage.id);
+        console.log('[Meta Async] ✅ Mensagem salva:', dbMessage.id, '| from_type:', fromType);
 
         // ═══════════════════════════════════════════
-        // 4. ATUALIZAR CONVERSA
+        // 5. ATUALIZAR CONVERSA
         // ═══════════════════════════════════════════
         await supabase
           .from('conversations')
@@ -523,7 +564,15 @@ async function processMetaWebhookAsync(
           .eq('id', conversation.id);
 
         // ═══════════════════════════════════════════
-        // 5. VERIFICAR SE MENSAGEM É MUITO ANTIGA (re-delivery da Meta)
+        // 6. SE FOR BOT, NÃO PROCESSAR NA IA
+        // ═══════════════════════════════════════════
+        if (isLikelyBot) {
+          console.log('[Meta Async] 🤖 Bot detectado - pulando processamento da IA');
+          continue;
+        }
+
+        // ═══════════════════════════════════════════
+        // 7. VERIFICAR SE MENSAGEM É MUITO ANTIGA (re-delivery da Meta)
         // ═══════════════════════════════════════════
         const messageAge = Date.now() - timestamp;
         const messageAgeMinutes = messageAge / 1000 / 60;
@@ -536,44 +585,6 @@ async function processMetaWebhookAsync(
           console.log('[Meta Async] - Hora atual:', new Date().toISOString());
           console.log('[Meta Async] - Mensagem salva no histórico mas NÃO será processada pela IA');
           continue; // Salva a mensagem mas pula o processamento da IA
-        }
-
-        // ═══════════════════════════════════════════
-        // 6. DETECÇÃO DE MENSAGENS AUTOMÁTICAS (BOTS)
-        // ═══════════════════════════════════════════
-        const botPatterns = [
-          /^\u200e/,                          // Caractere invisível ‎ no início (comum em bots)
-          /agradece\s+seu\s+contato/i,        // "agradece seu contato"
-          /obrigad[oa]\s+por\s+entrar\s+em\s+contato/i,
-          /como\s+podemos\s+(te\s+)?ajudar\??$/i, // "Como podemos ajudar?"
-          /bem[- ]?vind[oa]\s+(à|a|ao)/i,     // "Bem-vindo(a) à/ao"
-          /atendimento\s+automático/i,
-          /digite\s+\d+\s+para/i,             // "Digite 1 para..."
-          /escolha\s+uma?\s+(das\s+)?opç(ão|ões)/i,
-          /horário\s+de\s+atendimento/i,
-          /fora\s+do\s+hor[aá]rio/i,
-          /no\s+momento\s+n[ãa]o\s+estamos/i,
-          /resposta\s+autom[aá]tica/i,
-          /mensagem\s+autom[aá]tica/i,
-        ];
-
-        const isLikelyBot = messageContent ? botPatterns.some(p => p.test(messageContent)) : false;
-        
-        if (isLikelyBot) {
-          console.log('[Meta Async] 🤖🚫 MENSAGEM AUTOMÁTICA DETECTADA!');
-          console.log('[Meta Async] - Conteúdo:', messageContent?.substring(0, 80));
-          console.log('[Meta Async] - Aplicando delay de proteção anti-bot');
-          
-          // Marcar dispatch_sent_at para ativar o delay mesmo em conversas inbound
-          if (!conversation.dispatch_sent_at) {
-            await supabase
-              .from('conversations')
-              .update({ dispatch_sent_at: new Date().toISOString() })
-              .eq('id', conversation.id);
-            // Atualizar referência local
-            conversation.dispatch_sent_at = new Date().toISOString();
-            console.log('[Meta Async] - dispatch_sent_at definido para proteção anti-bot');
-          }
         }
 
         // ═══════════════════════════════════════════
