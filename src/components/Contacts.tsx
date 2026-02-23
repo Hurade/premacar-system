@@ -68,18 +68,19 @@ const Contacts: React.FC = () => {
 
       if (error) throw error;
       
-      // Get contact count per folder
-      const { data: countData } = await supabase
-        .from('contacts')
-        .select('folder_id')
-        .not('folder_id', 'is', null);
-      
+      // Get contact count per folder using HEAD requests (no row limit)
       const counts: Record<string, number> = {};
-      countData?.forEach(c => {
-        if (c.folder_id) {
-          counts[c.folder_id] = (counts[c.folder_id] || 0) + 1;
-        }
-      });
+      const folderIds = (data || []).map(f => f.id);
+      
+      await Promise.all(
+        folderIds.map(async (folderId) => {
+          const { count } = await supabase
+            .from('contacts')
+            .select('id', { count: 'exact', head: true })
+            .eq('folder_id', folderId);
+          counts[folderId] = count || 0;
+        })
+      );
 
       setFolders((data || []).map(f => ({
         ...f,

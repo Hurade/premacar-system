@@ -120,15 +120,19 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
           .eq('is_active', true)
           .order('name');
         
-        const { data: contactsData } = await supabase
-          .from('contacts')
-          .select('folder_id');
-        
+        // Count contacts per folder using exact count (no row limit)
         const counts: Record<string, number> = {};
-        contactsData?.forEach(c => {
-          const key = c.folder_id || 'no_folder';
-          counts[key] = (counts[key] || 0) + 1;
-        });
+        const folderIds = (foldersData || []).map(f => f.id);
+        
+        await Promise.all(
+          folderIds.map(async (folderId) => {
+            const { count } = await supabase
+              .from('contacts')
+              .select('id', { count: 'exact', head: true })
+              .eq('folder_id', folderId);
+            counts[folderId] = count || 0;
+          })
+        );
 
         setFolders((foldersData || []).map(f => ({
           ...f,
