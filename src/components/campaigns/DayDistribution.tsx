@@ -69,7 +69,7 @@ export function DayDistribution({ campaign }: Props) {
               {dayConfig?.successConditions?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {dayConfig.successConditions.map((c: any, i: number) => (
-                    <span key={i} className="text-[10px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded">
+                    <span key={i} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                       {c.tag}
                     </span>
                   ))}

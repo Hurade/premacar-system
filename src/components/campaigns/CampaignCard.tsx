@@ -85,10 +85,10 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCar
 
       {/* Stats */}
       <div className="flex items-center gap-4 text-xs">
-        <span className="text-green-400">
+        <span className="text-primary">
           ✅ Sucesso: {campaign.success_count} ({successRate}%)
         </span>
-        <span className="text-red-400">
+        <span className="text-destructive">
           ❌ Falha: {campaign.failed_count}
         </span>
         <span className="text-muted-foreground">
