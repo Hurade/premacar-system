@@ -50,8 +50,10 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
   const deleteCampaign = useDeleteCampaign();
   const processCampaigns = useProcessCampaigns();
   const [autoProcessing, setAutoProcessing] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState(30000); // Default 30s
+  const [pollingInterval, setPollingInterval] = useState(30000);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const { data: selectedLeads } = useCampaignLeads(selectedCampaignId);
 
   // Check if there are active campaigns
   const hasActiveCampaigns = campaigns?.some(c => c.status === 'active') ?? false;
