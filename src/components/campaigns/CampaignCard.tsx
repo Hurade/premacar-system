@@ -20,6 +20,7 @@ const STATUS_CONFIG: Record<string, { icon: string; label: string; variant: 'def
 };
 
 export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCardProps) {
+  const navigate = useNavigate();
   const config = STATUS_CONFIG[campaign.status] || STATUS_CONFIG.draft;
   const total = campaign.total_contacts || 1;
   const completed = campaign.success_count + campaign.failed_count;
