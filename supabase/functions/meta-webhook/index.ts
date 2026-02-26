@@ -265,19 +265,64 @@ async function processMetaWebhookAsync(
         }
         
         if (Object.keys(updateData).length > 0) {
+          // Update messages table
           const { error } = await supabase
             .from('messages')
             .update(updateData)
             .eq('whatsapp_message_id', messageId);
           
           if (error) {
-            console.error('[Meta Async] Erro ao atualizar status:', error);
+            console.error('[Meta Async] Erro ao atualizar status na messages:', error);
           } else {
-            console.log('[Meta Async] ✅ Status atualizado');
+            console.log('[Meta Async] ✅ Status atualizado na messages');
+          }
+
+          // Update campaign_leads table and campaign counters
+          const leadUpdateData: any = {};
+          let counterField = '';
+          if (statusType === 'delivered') {
+            leadUpdateData.status = 'delivered';
+            leadUpdateData.delivered_at = updateData.delivered_at;
+            counterField = 'total_delivered';
+          } else if (statusType === 'read') {
+            leadUpdateData.status = 'read';
+            leadUpdateData.read_at = updateData.read_at;
+            counterField = 'total_read';
+          } else if (statusType === 'failed') {
+            leadUpdateData.status = 'error';
+            leadUpdateData.error_message = status.errors?.[0]?.title || 'Message failed';
+            counterField = 'total_errors';
+          }
+
+          // Find and update campaign_lead by whatsapp_message_id
+          const { data: updatedLeads, error: leadError } = await supabase
+            .from('campaign_leads')
+            .update(leadUpdateData)
+            .eq('whatsapp_message_id', messageId)
+            .select('campaign_id, status');
+          
+          if (leadError) {
+            console.error('[Meta Async] Erro ao atualizar campaign_lead:', leadError);
+          } else if (updatedLeads && updatedLeads.length > 0 && counterField) {
+            // Increment the campaign counter
+            const campaignId = updatedLeads[0].campaign_id;
+            console.log(`[Meta Async] 📈 Incrementando ${counterField} da campanha ${campaignId}`);
+            
+            const { error: counterError } = await supabase.rpc('increment_campaign_counter', {
+              p_campaign_id: campaignId,
+              p_counter: counterField
+            });
+            
+            if (counterError) {
+              console.error('[Meta Async] Erro ao incrementar contador:', counterError);
+            } else {
+              console.log(`[Meta Async] ✅ ${counterField} incrementado`);
+            }
           }
         }
       }
-      
+
+      // Also check for replied status from incoming messages linked to campaigns
       console.log('[Meta Async] ✅ Status updates processados');
       return;
     }
@@ -576,6 +621,56 @@ async function processMetaWebhookAsync(
           .from('conversations')
           .update({ last_message_at: new Date().toISOString() })
           .eq('id', conversation.id);
+
+        // ═══════════════════════════════════════════
+        // 5b. DETECTAR RESPOSTA A CAMPANHA DE DISPARO
+        // ═══════════════════════════════════════════
+        if (conversation.dispatch_sent_at && fromType === 'user') {
+          console.log('[Meta Async] 📩 Detectada resposta a conversa de disparo!');
+          
+          // Find campaign_lead by contact phone number that hasn't been marked as replied yet
+          const contactPhone = contact.phone_number;
+          const leadPhoneVariants = [contactPhone];
+          if (contactPhone.length === 13 && contactPhone.startsWith('55')) {
+            leadPhoneVariants.push(contactPhone.slice(0, 4) + contactPhone.slice(5));
+          }
+          if (contactPhone.length === 12 && contactPhone.startsWith('55')) {
+            leadPhoneVariants.push(contactPhone.slice(0, 4) + '9' + contactPhone.slice(4));
+          }
+
+          const { data: repliedLeads } = await supabase
+            .from('campaign_leads')
+            .select('id, campaign_id, status')
+            .in('phone', leadPhoneVariants)
+            .in('status', ['sent', 'delivered', 'read'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (repliedLeads && repliedLeads.length > 0) {
+            const repliedLead = repliedLeads[0];
+            console.log(`[Meta Async] 📈 Marcando lead ${repliedLead.id} como replied`);
+            
+            await supabase
+              .from('campaign_leads')
+              .update({ 
+                status: 'replied', 
+                replied_at: new Date().toISOString() 
+              })
+              .eq('id', repliedLead.id);
+
+            // Increment total_replied counter on campaign
+            const { error: counterError } = await supabase.rpc('increment_campaign_counter', {
+              p_campaign_id: repliedLead.campaign_id,
+              p_counter: 'total_replied'
+            });
+            
+            if (counterError) {
+              console.error('[Meta Async] Erro ao incrementar total_replied:', counterError);
+            } else {
+              console.log('[Meta Async] ✅ total_replied incrementado');
+            }
+          }
+        }
 
         // ═══════════════════════════════════════════
         // 6. SE FOR BOT, NÃO PROCESSAR NA IA

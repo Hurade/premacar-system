@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useCampaigns, useUpdateCampaign, useDeleteCampaign, useProcessCampaigns, Campaign } from '@/hooks/useCampaigns';
+import { useCampaigns, useUpdateCampaign, useDeleteCampaign, useProcessCampaigns, useCampaignLeads, Campaign } from '@/hooks/useCampaigns';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -49,8 +50,10 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
   const deleteCampaign = useDeleteCampaign();
   const processCampaigns = useProcessCampaigns();
   const [autoProcessing, setAutoProcessing] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState(30000); // Default 30s
+  const [pollingInterval, setPollingInterval] = useState(30000);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const { data: selectedLeads } = useCampaignLeads(selectedCampaignId);
 
   // Check if there are active campaigns
   const hasActiveCampaigns = campaigns?.some(c => c.status === 'active') ?? false;
@@ -271,7 +274,7 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
                       <Play className="w-4 h-4" /> Iniciar
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                  <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setSelectedCampaignId(campaign.id)}>
                     <BarChart3 className="w-4 h-4" />
                   </Button>
                   <AlertDialog>
@@ -369,6 +372,136 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
           );
         })}
       </div>
+
+      {/* Campaign Stats Dialog */}
+      <Dialog open={!!selectedCampaignId} onOpenChange={(open) => !open && setSelectedCampaignId(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              Estatísticas - {campaigns?.find(c => c.id === selectedCampaignId)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {(() => {
+            const campaign = campaigns?.find(c => c.id === selectedCampaignId);
+            if (!campaign) return null;
+            
+            const totalLeads = campaign.total_leads || 0;
+            const deliveryRate = campaign.total_sent > 0 ? Math.round((campaign.total_delivered / campaign.total_sent) * 100) : 0;
+            const readRate = campaign.total_delivered > 0 ? Math.round((campaign.total_read / campaign.total_delivered) * 100) : 0;
+            const replyRate = campaign.total_sent > 0 ? Math.round((campaign.total_replied / campaign.total_sent) * 100) : 0;
+            
+            // Count lead statuses from actual leads data
+            const leadStatusCounts = {
+              pending: selectedLeads?.filter(l => l.status === 'pending').length ?? 0,
+              sent: selectedLeads?.filter(l => l.status === 'sent').length ?? 0,
+              delivered: selectedLeads?.filter(l => l.status === 'delivered').length ?? 0,
+              read: selectedLeads?.filter(l => l.status === 'read').length ?? 0,
+              replied: selectedLeads?.filter(l => l.status === 'replied').length ?? 0,
+              error: selectedLeads?.filter(l => l.status === 'error' || l.status === 'blacklisted').length ?? 0,
+            };
+            
+            return (
+              <div className="space-y-6">
+                {/* Summary cards */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-card border border-border rounded-lg p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Taxa de Entrega</p>
+                    <p className="text-3xl font-bold text-foreground">{deliveryRate}%</p>
+                    <p className="text-xs text-muted-foreground">{campaign.total_delivered}/{campaign.total_sent}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-lg p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Taxa de Leitura</p>
+                    <p className="text-3xl font-bold text-foreground">{readRate}%</p>
+                    <p className="text-xs text-muted-foreground">{campaign.total_read}/{campaign.total_delivered}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-lg p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Taxa de Resposta</p>
+                    <p className="text-3xl font-bold text-foreground">{replyRate}%</p>
+                    <p className="text-xs text-muted-foreground">{campaign.total_replied}/{campaign.total_sent}</p>
+                  </div>
+                </div>
+
+                {/* Detailed counters */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-foreground">Contadores da Campanha</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2"><Send className="w-4 h-4" /> Total de Leads</span>
+                      <span className="font-semibold text-foreground">{totalLeads}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2"><Send className="w-4 h-4" /> Enviadas</span>
+                      <span className="font-semibold text-foreground">{campaign.total_sent}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Entregues</span>
+                      <span className="font-semibold text-foreground">{campaign.total_delivered}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2"><Eye className="w-4 h-4" /> Lidas</span>
+                      <span className="font-semibold text-foreground">{campaign.total_read}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Respondidas</span>
+                      <span className="font-semibold text-foreground">{campaign.total_replied}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Erros</span>
+                      <span className="font-semibold text-destructive">{campaign.total_errors}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lead status breakdown from actual data */}
+                {selectedLeads && selectedLeads.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-foreground">Status dos Leads (dados em tempo real)</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-foreground">{leadStatusCounts.pending}</p>
+                        <p className="text-xs text-muted-foreground">Pendentes</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-foreground">{leadStatusCounts.sent}</p>
+                        <p className="text-xs text-muted-foreground">Enviados</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-foreground">{leadStatusCounts.delivered}</p>
+                        <p className="text-xs text-muted-foreground">Entregues</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-foreground">{leadStatusCounts.read}</p>
+                        <p className="text-xs text-muted-foreground">Lidos</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-foreground">{leadStatusCounts.replied}</p>
+                        <p className="text-xs text-muted-foreground">Responderam</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-destructive">{leadStatusCounts.error}</p>
+                        <p className="text-xs text-muted-foreground">Erros</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Campaign info */}
+                <div className="space-y-2 text-sm text-muted-foreground border-t border-border pt-4">
+                  <p><strong>API:</strong> {campaign.api_source === 'meta' ? 'Meta (WhatsApp Business)' : 'Evolution API'}</p>
+                  <p><strong>Limite diário:</strong> {campaign.daily_limit} msgs/dia</p>
+                  <p><strong>Enviadas hoje:</strong> {campaign.sent_today}</p>
+                  {campaign.last_sent_at && (
+                    <p><strong>Último envio:</strong> {format(new Date(campaign.last_sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                  )}
+                  <p><strong>Criada em:</strong> {format(new Date(campaign.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
