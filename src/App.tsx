@@ -10,6 +10,7 @@ import Team from './components/Team';
 import Scheduling from './components/Scheduling';
 import Kanban from './components/Kanban';
 import Broadcasts from './pages/Broadcasts';
+import Campanhas from './pages/Campanhas';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
