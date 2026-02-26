@@ -12,6 +12,7 @@ import Kanban from './components/Kanban';
 import Broadcasts from './pages/Broadcasts';
 import Campanhas from './pages/Campanhas';
 import CreateCampaign from './pages/CreateCampaign';
+import CampaignDetails from './pages/CampaignDetails';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
