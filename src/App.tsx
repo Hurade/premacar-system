@@ -102,6 +102,11 @@ const App: React.FC = () => {
                       <Broadcasts />
                     </RoleGate>
                   } />
+                  <Route path="/campanhas" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <Campanhas />
+                    </RoleGate>
+                  } />
                   <Route path="/scheduling" element={<Scheduling />} />
                   <Route path="/team" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>

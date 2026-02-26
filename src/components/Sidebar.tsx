@@ -31,6 +31,10 @@ const menuItems = [{
   label: 'Disparos',
   icon: Send
 }, {
+  id: 'campanhas',
+  label: 'Campanhas',
+  icon: BarChart3
+}, {
   id: 'scheduling',
   label: 'Agendamentos',
   icon: Calendar
