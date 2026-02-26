@@ -108,6 +108,11 @@ const App: React.FC = () => {
                       <Campanhas />
                     </RoleGate>
                   } />
+                  <Route path="/campanhas/create" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <CreateCampaign />
+                    </RoleGate>
+                  } />
                   <Route path="/scheduling" element={<Scheduling />} />
                   <Route path="/team" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
