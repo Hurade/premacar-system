@@ -107,6 +107,76 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_contacts: {
+        Row: {
+          campaign_id: string
+          completed_at: string | null
+          contact_id: string
+          created_at: string | null
+          current_day: number | null
+          day_statuses: Json | null
+          failed_reason: string | null
+          id: string
+          individual_cost: number | null
+          metadata: Json | null
+          status: string | null
+          success_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          completed_at?: string | null
+          contact_id: string
+          created_at?: string | null
+          current_day?: number | null
+          day_statuses?: Json | null
+          failed_reason?: string | null
+          id?: string
+          individual_cost?: number | null
+          metadata?: Json | null
+          status?: string | null
+          success_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          completed_at?: string | null
+          contact_id?: string
+          created_at?: string | null
+          current_day?: number | null
+          day_statuses?: Json | null
+          failed_reason?: string | null
+          id?: string
+          individual_cost?: number | null
+          metadata?: Json | null
+          status?: string | null
+          success_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_contacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_leads: {
         Row: {
           attempts: number | null
@@ -1262,6 +1332,69 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_campaigns: {
+        Row: {
+          actual_cost: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          ended_at: string | null
+          estimated_cost: number | null
+          failed_count: number | null
+          flow_config: Json
+          id: string
+          in_progress_count: number | null
+          name: string
+          objective: string | null
+          started_at: string | null
+          status: string | null
+          success_count: number | null
+          total_contacts: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          actual_cost?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          ended_at?: string | null
+          estimated_cost?: number | null
+          failed_count?: number | null
+          flow_config?: Json
+          id?: string
+          in_progress_count?: number | null
+          name: string
+          objective?: string | null
+          started_at?: string | null
+          status?: string | null
+          success_count?: number | null
+          total_contacts?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          actual_cost?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          ended_at?: string | null
+          estimated_cost?: number | null
+          failed_count?: number | null
+          flow_config?: Json
+          id?: string
+          in_progress_count?: number | null
+          name?: string
+          objective?: string | null
+          started_at?: string | null
+          status?: string | null
+          success_count?: number | null
+          total_contacts?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       send_queue: {
         Row: {
           contact_id: string
@@ -1663,6 +1796,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_recurring_campaign_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
