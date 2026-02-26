@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Settings, BarChart3, Pause, Play, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ const STATUS_CONFIG: Record<string, { icon: string; label: string; variant: 'def
 };
 
 export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCardProps) {
+  const navigate = useNavigate();
   const config = STATUS_CONFIG[campaign.status] || STATUS_CONFIG.draft;
   const total = campaign.total_contacts || 1;
   const completed = campaign.success_count + campaign.failed_count;
@@ -47,7 +49,7 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCar
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Settings className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/campanhas/${campaign.id}`)}>
             <BarChart3 className="w-4 h-4" />
           </Button>
           {campaign.status === 'active' ? (
@@ -83,10 +85,10 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCar
 
       {/* Stats */}
       <div className="flex items-center gap-4 text-xs">
-        <span className="text-green-400">
+        <span className="text-primary">
           ✅ Sucesso: {campaign.success_count} ({successRate}%)
         </span>
-        <span className="text-red-400">
+        <span className="text-destructive">
           ❌ Falha: {campaign.failed_count}
         </span>
         <span className="text-muted-foreground">

@@ -1777,6 +1777,7 @@ export type Database = {
       cleanup_processed_message_queue: { Args: never; Returns: undefined }
       cleanup_processed_queues: { Args: never; Returns: undefined }
       get_auth_user_id: { Args: never; Returns: string }
+      get_campaign_funnel: { Args: { p_campaign_id: string }; Returns: Json }
       get_or_create_conversation_state: {
         Args: { p_conversation_id: string }
         Returns: {
