@@ -265,19 +265,64 @@ async function processMetaWebhookAsync(
         }
         
         if (Object.keys(updateData).length > 0) {
+          // Update messages table
           const { error } = await supabase
             .from('messages')
             .update(updateData)
             .eq('whatsapp_message_id', messageId);
           
           if (error) {
-            console.error('[Meta Async] Erro ao atualizar status:', error);
+            console.error('[Meta Async] Erro ao atualizar status na messages:', error);
           } else {
-            console.log('[Meta Async] ✅ Status atualizado');
+            console.log('[Meta Async] ✅ Status atualizado na messages');
+          }
+
+          // Update campaign_leads table and campaign counters
+          const leadUpdateData: any = {};
+          let counterField = '';
+          if (statusType === 'delivered') {
+            leadUpdateData.status = 'delivered';
+            leadUpdateData.delivered_at = updateData.delivered_at;
+            counterField = 'total_delivered';
+          } else if (statusType === 'read') {
+            leadUpdateData.status = 'read';
+            leadUpdateData.read_at = updateData.read_at;
+            counterField = 'total_read';
+          } else if (statusType === 'failed') {
+            leadUpdateData.status = 'error';
+            leadUpdateData.error_message = status.errors?.[0]?.title || 'Message failed';
+            counterField = 'total_errors';
+          }
+
+          // Find and update campaign_lead by whatsapp_message_id
+          const { data: updatedLeads, error: leadError } = await supabase
+            .from('campaign_leads')
+            .update(leadUpdateData)
+            .eq('whatsapp_message_id', messageId)
+            .select('campaign_id, status');
+          
+          if (leadError) {
+            console.error('[Meta Async] Erro ao atualizar campaign_lead:', leadError);
+          } else if (updatedLeads && updatedLeads.length > 0 && counterField) {
+            // Increment the campaign counter
+            const campaignId = updatedLeads[0].campaign_id;
+            console.log(`[Meta Async] 📈 Incrementando ${counterField} da campanha ${campaignId}`);
+            
+            const { error: counterError } = await supabase.rpc('increment_campaign_counter', {
+              p_campaign_id: campaignId,
+              p_counter: counterField
+            });
+            
+            if (counterError) {
+              console.error('[Meta Async] Erro ao incrementar contador:', counterError);
+            } else {
+              console.log(`[Meta Async] ✅ ${counterField} incrementado`);
+            }
           }
         }
       }
-      
+
+      // Also check for replied status from incoming messages linked to campaigns
       console.log('[Meta Async] ✅ Status updates processados');
       return;
     }
