@@ -30,6 +30,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/contacts': 'PremaCar - Contatos',
   '/pipeline': 'PremaCar - Pipeline',
   '/broadcasts': 'PremaCar - Disparos',
+  '/campanhas': 'PremaCar - Campanhas',
   '/scheduling': 'PremaCar - Agendamentos',
   '/team': 'PremaCar - Equipe',
   '/settings': 'PremaCar - Configurações',
