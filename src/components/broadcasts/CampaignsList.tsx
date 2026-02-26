@@ -274,7 +274,7 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
                       <Play className="w-4 h-4" /> Iniciar
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                  <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setSelectedCampaignId(campaign.id)}>
                     <BarChart3 className="w-4 h-4" />
                   </Button>
                   <AlertDialog>
