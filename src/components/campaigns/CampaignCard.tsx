@@ -49,7 +49,7 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCar
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Settings className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/campanhas/${campaign.id}`)}>
             <BarChart3 className="w-4 h-4" />
           </Button>
           {campaign.status === 'active' ? (
