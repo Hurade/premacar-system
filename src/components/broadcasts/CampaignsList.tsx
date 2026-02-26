@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useCampaigns, useUpdateCampaign, useDeleteCampaign, useProcessCampaigns, Campaign } from '@/hooks/useCampaigns';
+import { useCampaigns, useUpdateCampaign, useDeleteCampaign, useProcessCampaigns, useCampaignLeads, Campaign } from '@/hooks/useCampaigns';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 

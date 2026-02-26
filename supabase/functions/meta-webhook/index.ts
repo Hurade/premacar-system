@@ -623,6 +623,56 @@ async function processMetaWebhookAsync(
           .eq('id', conversation.id);
 
         // ═══════════════════════════════════════════
+        // 5b. DETECTAR RESPOSTA A CAMPANHA DE DISPARO
+        // ═══════════════════════════════════════════
+        if (conversation.dispatch_sent_at && fromType === 'user') {
+          console.log('[Meta Async] 📩 Detectada resposta a conversa de disparo!');
+          
+          // Find campaign_lead by contact phone number that hasn't been marked as replied yet
+          const contactPhone = contact.phone_number;
+          const leadPhoneVariants = [contactPhone];
+          if (contactPhone.length === 13 && contactPhone.startsWith('55')) {
+            leadPhoneVariants.push(contactPhone.slice(0, 4) + contactPhone.slice(5));
+          }
+          if (contactPhone.length === 12 && contactPhone.startsWith('55')) {
+            leadPhoneVariants.push(contactPhone.slice(0, 4) + '9' + contactPhone.slice(4));
+          }
+
+          const { data: repliedLeads } = await supabase
+            .from('campaign_leads')
+            .select('id, campaign_id, status')
+            .in('phone', leadPhoneVariants)
+            .in('status', ['sent', 'delivered', 'read'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (repliedLeads && repliedLeads.length > 0) {
+            const repliedLead = repliedLeads[0];
+            console.log(`[Meta Async] 📈 Marcando lead ${repliedLead.id} como replied`);
+            
+            await supabase
+              .from('campaign_leads')
+              .update({ 
+                status: 'replied', 
+                replied_at: new Date().toISOString() 
+              })
+              .eq('id', repliedLead.id);
+
+            // Increment total_replied counter on campaign
+            const { error: counterError } = await supabase.rpc('increment_campaign_counter', {
+              p_campaign_id: repliedLead.campaign_id,
+              p_counter: 'total_replied'
+            });
+            
+            if (counterError) {
+              console.error('[Meta Async] Erro ao incrementar total_replied:', counterError);
+            } else {
+              console.log('[Meta Async] ✅ total_replied incrementado');
+            }
+          }
+        }
+
+        // ═══════════════════════════════════════════
         // 6. SE FOR BOT, NÃO PROCESSAR NA IA
         // ═══════════════════════════════════════════
         if (isLikelyBot) {
