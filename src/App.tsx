@@ -10,6 +10,7 @@ import Team from './components/Team';
 import Scheduling from './components/Scheduling';
 import Kanban from './components/Kanban';
 import Broadcasts from './pages/Broadcasts';
+import Campanhas from './pages/Campanhas';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
@@ -29,6 +30,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/contacts': 'PremaCar - Contatos',
   '/pipeline': 'PremaCar - Pipeline',
   '/broadcasts': 'PremaCar - Disparos',
+  '/campanhas': 'PremaCar - Campanhas',
   '/scheduling': 'PremaCar - Agendamentos',
   '/team': 'PremaCar - Equipe',
   '/settings': 'PremaCar - Configurações',
@@ -98,6 +100,11 @@ const App: React.FC = () => {
                   <Route path="/broadcasts" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
                       <Broadcasts />
+                    </RoleGate>
+                  } />
+                  <Route path="/campanhas" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <Campanhas />
                     </RoleGate>
                   } />
                   <Route path="/scheduling" element={<Scheduling />} />

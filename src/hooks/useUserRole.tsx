@@ -96,6 +96,7 @@ export const MENU_ROLE_REQUIREMENTS: Record<string, TeamRole[]> = {
   chat: ['admin', 'manager', 'agent'],
   contacts: ['admin', 'manager', 'agent'],
   broadcasts: ['admin', 'manager'],
+  campanhas: ['admin', 'manager'],
   scheduling: ['admin', 'manager', 'agent'],
   team: ['admin', 'manager'],
   settings: ['admin'],
