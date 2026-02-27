@@ -92,7 +92,7 @@ serve(async (req) => {
     console.log(`[test-meta-template] Payload:`, JSON.stringify(payload, null, 2));
 
     // Enviar via Meta API
-    const url = `https://graph.facebook.com/v18.0/${settings.meta_phone_number_id}/messages`;
+    const url = `https://graph.facebook.com/v21.0/${settings.meta_phone_number_id}/messages`;
     
     const response = await fetch(url, {
       method: 'POST',

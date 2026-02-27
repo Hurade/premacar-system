@@ -83,7 +83,7 @@ async function sendTemplateViaMeta(
   lead: Lead,
   settings: NinaSettings
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  const url = `https://graph.facebook.com/v18.0/${settings.meta_phone_number_id}/messages`;
+  const url = `https://graph.facebook.com/v21.0/${settings.meta_phone_number_id}/messages`;
   
   // Formatar número: remover caracteres especiais e adicionar código do país
   const cleanPhone = phoneNumber.replace(/\D/g, '');
@@ -270,6 +270,9 @@ serve(async (req) => {
     console.log(`[campaign-processor] Found ${campaigns?.length || 0} active campaigns`);
 
     const results: { campaignId: string; sent: boolean; reason?: string }[] = [];
+
+    // Circuit breaker: track consecutive errors per campaign
+    const consecutiveErrors: Record<string, number> = {};
 
     for (const campaign of campaigns || []) {
       const campaignData = campaign as Campaign;
@@ -661,12 +664,24 @@ serve(async (req) => {
       } else {
         console.error(`[campaign-processor] Error sending message: ${sendResult.error}`);
 
-        // Verificar se o erro indica que não é um número WhatsApp válido
-        const isNotWhatsAppError = sendResult.error?.toLowerCase().includes('not a valid whatsapp') ||
-          sendResult.error?.toLowerCase().includes('invalid') ||
-          sendResult.error?.toLowerCase().includes('not registered') ||
-          sendResult.error?.toLowerCase().includes('número inválido') ||
-          sendResult.error?.toLowerCase().includes('recipient');
+        const errorLower = sendResult.error?.toLowerCase() || '';
+
+        // Classify error as definitive (no retry) vs retryable
+        const isDefinitiveError = 
+          errorLower.includes('ecosystem engagement') ||
+          errorLower.includes('131049') ||
+          errorLower.includes('undeliverable') ||
+          errorLower.includes('not a valid whatsapp') ||
+          errorLower.includes('not registered') ||
+          errorLower.includes('número inválido') ||
+          errorLower.includes('recipient') ||
+          errorLower.includes('invalid');
+
+        const isNotWhatsAppError = errorLower.includes('not a valid whatsapp') ||
+          errorLower.includes('invalid') ||
+          errorLower.includes('not registered') ||
+          errorLower.includes('número inválido') ||
+          errorLower.includes('recipient');
 
         // Aplicar tag de "sem WhatsApp" se configurada e aplicável
         if (isNotWhatsAppError && campaignData.tag_on_no_whatsapp) {
@@ -690,22 +705,43 @@ serve(async (req) => {
           }
         }
 
-        // Update lead with error
+        // Update lead: definitive errors go straight to 'error', retryable can retry up to 2x
         const attempts = (lead as Lead & { attempts?: number }).attempts || 0;
+        const newStatus = isDefinitiveError ? 'error' : (attempts >= 2 ? 'error' : 'pending');
+        
         await supabase
           .from("campaign_leads")
           .update({
-            status: attempts >= 2 ? "error" : "pending",
+            status: newStatus,
             error_message: sendResult.error,
             attempts: attempts + 1,
           })
           .eq("id", lead.id);
 
+        if (isDefinitiveError) {
+          console.log(`[campaign-processor] Definitive error - lead marked as error immediately (no retry)`);
+        }
+
         // Update campaign error count
-        await supabase
-          .from("campaigns")
-          .update({ total_errors: campaignData.total_sent + 1 })
-          .eq("id", campaignData.id);
+        await supabase.rpc('increment_campaign_counter', { 
+          p_campaign_id: campaignData.id, 
+          p_counter: 'total_errors' 
+        });
+
+        // Circuit breaker: track consecutive errors
+        consecutiveErrors[campaignData.id] = (consecutiveErrors[campaignData.id] || 0) + 1;
+        console.log(`[campaign-processor] Consecutive errors for ${campaignData.name}: ${consecutiveErrors[campaignData.id]}`);
+
+        if (consecutiveErrors[campaignData.id] >= 5) {
+          console.error(`[campaign-processor] CIRCUIT BREAKER: 5+ consecutive errors for "${campaignData.name}" - auto-pausing campaign`);
+          await supabase
+            .from("campaigns")
+            .update({ 
+              status: 'paused',
+              description: `${campaignData.description || ''}\n[Auto-pausada em ${new Date().toISOString()}: ${consecutiveErrors[campaignData.id]} erros consecutivos - "${sendResult.error}"]`.trim()
+            })
+            .eq("id", campaignData.id);
+        }
 
         results.push({ campaignId: campaignData.id, sent: false, reason: sendResult.error });
       }
