@@ -1,55 +1,68 @@
 
-# Atualização de Favicon e Títulos das Páginas
 
-## O que será feito
+## Corrigir Erros de Envio da Campanha
 
-### 1. Favicons — 3 tamanhos fornecidos
-- `favicon-96x96.png` → favicon principal do navegador
-- `web-app-manifest-192x192.png` → ícone para dispositivos móveis (PWA)
-- `web-app-manifest-512x512.png` → ícone maior para instalação em tela inicial
+### Diagnostico
 
-Todos os arquivos serão copiados para a pasta `public/` e referenciados corretamente no `index.html`.
+Campanha "disp 10": 49 leads processados, todos com erro:
+- 37x "This message was not delivered to maintain healthy ecosystem engagement"
+- 12x "Message undeliverable"
+- 0 enviados com sucesso
 
-### 2. Título das páginas
-Atualmente o `index.html` tem o título fixo `Dashboard | Sistema SDR`. O sistema não usa `document.title` dinamicamente nas rotas — o título fixo é o único existente.
+### Causa Raiz
 
-Será atualizado para: **`PremaCar`** como título base, com o padrão `PremaCar - [Nome da Página]` aplicado dinamicamente conforme a rota ativa, usando um hook simples de título no `App.tsx`.
+1. **Versao da API Meta desatualizada**: O sistema usa `v18.0` (lancada em 2023). A Meta deprecia versoes antigas e isso pode causar comportamento erratico. Atualizar para `v21.0`.
+2. **Sem circuit breaker**: O processador continua tentando enviar mesmo apos falhas consecutivas, desperdicando cota e piorando a reputacao.
+3. **Retry agressivo**: Leads com erro 131049 sao re-tentados ate 3x, o que pode agravar o bloqueio.
 
----
+### Plano de Correcao
 
-## Arquivos a alterar
+#### 1. Atualizar versao da API Meta (campaign-processor)
 
-| Arquivo | Mudança |
-|---|---|
-| `public/favicon-96x96.png` | Copiar arquivo enviado |
-| `public/web-app-manifest-192x192.png` | Copiar arquivo enviado |
-| `public/web-app-manifest-512x512.png` | Copiar arquivo enviado |
-| `index.html` | Atualizar `<link rel="icon">` e `<title>` + adicionar tags de manifest |
-| `src/App.tsx` | Adicionar lógica de título dinâmico por rota |
+Alterar a URL da API em `supabase/functions/campaign-processor/index.ts`:
+- De: `https://graph.facebook.com/v18.0/`
+- Para: `https://graph.facebook.com/v21.0/`
 
----
+Fazer o mesmo em `supabase/functions/test-meta-template/index.ts`.
 
-## Detalhes técnicos
+#### 2. Adicionar Circuit Breaker no campaign-processor
 
-### index.html — Novas tags de favicon
+Quando houver 5+ erros consecutivos na mesma campanha durante uma execucao, pausar automaticamente a campanha e registrar o motivo. Isso evita desperdicar cota e piorar metricas.
 
-```html
-<title>PremaCar</title>
-<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
-<link rel="apple-touch-icon" sizes="192x192" href="/web-app-manifest-192x192.png" />
+Logica:
+- Contador de erros consecutivos por campanha
+- Ao atingir 5, marcar campanha como `paused` com motivo no campo de observacoes
+- Continuar processando outras campanhas
+
+#### 3. Diferenciar erros retentaveis vs definitivos
+
+- Erro "Message undeliverable" = numero invalido/sem WhatsApp -> marcar como `error` imediatamente (sem retry)
+- Erro "ecosystem engagement" (131049) = marcar como `error` imediatamente (retry piora a situacao)
+- Erros de rede/timeout = permitir retry
+
+#### 4. Re-processar leads pendentes
+
+Apos corrigir a versao da API, os 51 leads ainda com status `pending` na campanha "disp 10" poderao ser processados normalmente na proxima execucao.
+
+### Detalhes Tecnicos
+
+**Arquivos a modificar:**
+- `supabase/functions/campaign-processor/index.ts` - versao API, circuit breaker, classificacao de erros
+- `supabase/functions/test-meta-template/index.ts` - versao API
+
+**Mudancas no campaign-processor:**
+
+```text
+Linha 86:  v18.0 -> v21.0
+Linha 661-711: Refatorar tratamento de erros:
+  - Classificar erro como "definitivo" vs "retentavel"
+  - Erros definitivos: status = 'error' imediatamente (sem retry)
+  - Adicionar contador de erros consecutivos
+  - Se >= 5 erros consecutivos: pausar campanha automaticamente
 ```
 
-### App.tsx — Títulos dinâmicos por rota
+**Impacto esperado:**
+- Versao atualizada da API pode resolver os erros 131049
+- Circuit breaker protege contra perda de cota em cascata
+- 51 leads pendentes serao re-processados automaticamente
 
-Será adicionado um componente `PageTitle` que usa `useLocation` e `useEffect` para atualizar `document.title` conforme a página:
-
-- `/dashboard` → `PremaCar - Dashboard`
-- `/chat` → `PremaCar - Chat`
-- `/contacts` → `PremaCar - Contatos`
-- `/pipeline` → `PremaCar - Pipeline`
-- `/broadcasts` → `PremaCar - Disparos`
-- `/scheduling` → `PremaCar - Agendamentos`
-- `/team` → `PremaCar - Equipe`
-- `/settings` → `PremaCar - Configurações`
-- `/auth` → `PremaCar - Login`
-- Padrão → `PremaCar`
