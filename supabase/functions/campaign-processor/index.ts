@@ -681,7 +681,8 @@ serve(async (req) => {
           errorLower.includes('invalid') ||
           errorLower.includes('not registered') ||
           errorLower.includes('número inválido') ||
-          errorLower.includes('recipient');
+          errorLower.includes('recipient') ||
+          errorLower.includes('undeliverable');
 
         // Aplicar tag de "sem WhatsApp" se configurada e aplicável
         if (isNotWhatsAppError && campaignData.tag_on_no_whatsapp) {
