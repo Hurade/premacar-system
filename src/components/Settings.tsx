@@ -107,7 +107,7 @@ const Settings: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          {activeTab !== 'docs' && isAdmin && (
+          {activeTab !== 'docs' && activeTab !== 'integrations' && isAdmin && (
             <div className="flex gap-3">
               <Button
                 variant="ghost"
