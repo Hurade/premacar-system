@@ -271,6 +271,9 @@ serve(async (req) => {
 
     const results: { campaignId: string; sent: boolean; reason?: string }[] = [];
 
+    // Circuit breaker: track consecutive errors per campaign
+    const consecutiveErrors: Record<string, number> = {};
+
     for (const campaign of campaigns || []) {
       const campaignData = campaign as Campaign;
       console.log(`[campaign-processor] Processing campaign: ${campaignData.name} (API: ${campaignData.api_source})`);
