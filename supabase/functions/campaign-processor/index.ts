@@ -83,7 +83,7 @@ async function sendTemplateViaMeta(
   lead: Lead,
   settings: NinaSettings
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  const url = `https://graph.facebook.com/v18.0/${settings.meta_phone_number_id}/messages`;
+  const url = `https://graph.facebook.com/v21.0/${settings.meta_phone_number_id}/messages`;
   
   // Formatar número: remover caracteres especiais e adicionar código do país
   const cleanPhone = phoneNumber.replace(/\D/g, '');
