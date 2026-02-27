@@ -748,20 +748,21 @@ serve(async (req) => {
       }
     }
 
-    // Auto-complete campaigns with no remaining pending leads
-    for (const campaignData of activeCampaigns) {
+    // Safety net: auto-complete any campaigns that somehow still have 'active' status but 0 pending leads
+    for (const campaign of campaigns || []) {
+      const campaignData = campaign as Campaign;
       const { count } = await supabase
         .from("campaign_leads")
         .select("id", { count: 'exact', head: true })
         .eq("campaign_id", campaignData.id)
         .eq("status", "pending");
 
-      if (count === 0) {
+      if (count === 0 && campaignData.status === 'active') {
         await supabase
           .from("campaigns")
           .update({ status: 'completed' })
           .eq("id", campaignData.id);
-        console.log(`[campaign-processor] Campaign "${campaignData.name}" auto-completed (no pending leads)`);
+        console.log(`[campaign-processor] Campaign "${campaignData.name}" auto-completed (safety net - no pending leads)`);
       }
     }
 
