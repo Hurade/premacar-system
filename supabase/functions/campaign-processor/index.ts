@@ -681,7 +681,8 @@ serve(async (req) => {
           errorLower.includes('invalid') ||
           errorLower.includes('not registered') ||
           errorLower.includes('número inválido') ||
-          errorLower.includes('recipient');
+          errorLower.includes('recipient') ||
+          errorLower.includes('undeliverable');
 
         // Aplicar tag de "sem WhatsApp" se configurada e aplicável
         if (isNotWhatsAppError && campaignData.tag_on_no_whatsapp) {
@@ -744,6 +745,24 @@ serve(async (req) => {
         }
 
         results.push({ campaignId: campaignData.id, sent: false, reason: sendResult.error });
+      }
+    }
+
+    // Safety net: auto-complete any campaigns that somehow still have 'active' status but 0 pending leads
+    for (const campaign of campaigns || []) {
+      const campaignData = campaign as Campaign;
+      const { count } = await supabase
+        .from("campaign_leads")
+        .select("id", { count: 'exact', head: true })
+        .eq("campaign_id", campaignData.id)
+        .eq("status", "pending");
+
+      if (count === 0 && campaignData.status === 'active') {
+        await supabase
+          .from("campaigns")
+          .update({ status: 'completed' })
+          .eq("id", campaignData.id);
+        console.log(`[campaign-processor] Campaign "${campaignData.name}" auto-completed (safety net - no pending leads)`);
       }
     }
 
