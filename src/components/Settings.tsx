@@ -153,6 +153,10 @@ const Settings: React.FC = () => {
           <ApiSettings ref={apiRef} />
         </TabsContent>
 
+        <TabsContent value="integrations">
+          <IntegrationSettings />
+        </TabsContent>
+
         <TabsContent value="docs">
           <SystemRoadmap />
         </TabsContent>
