@@ -748,6 +748,23 @@ serve(async (req) => {
       }
     }
 
+    // Auto-complete campaigns with no remaining pending leads
+    for (const campaignData of activeCampaigns) {
+      const { count } = await supabase
+        .from("campaign_leads")
+        .select("id", { count: 'exact', head: true })
+        .eq("campaign_id", campaignData.id)
+        .eq("status", "pending");
+
+      if (count === 0) {
+        await supabase
+          .from("campaigns")
+          .update({ status: 'completed' })
+          .eq("id", campaignData.id);
+        console.log(`[campaign-processor] Campaign "${campaignData.name}" auto-completed (no pending leads)`);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
