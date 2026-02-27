@@ -758,6 +758,132 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          html_body: string
+          id: string
+          is_active: boolean | null
+          name: string
+          subject: string
+          text_body: string | null
+          updated_at: string | null
+          user_id: string | null
+          variables: Json | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          html_body: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          subject: string
+          text_body?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          html_body?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          subject?: string
+          text_body?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
+      integration_settings: {
+        Row: {
+          aws_access_key_id: string | null
+          aws_region: string | null
+          aws_secret_access_key: string | null
+          aws_ses_email_from: string | null
+          aws_ses_email_from_name: string | null
+          aws_ses_enabled: boolean | null
+          aws_ses_webhook_url: string | null
+          call_hours_end: string | null
+          call_hours_start: string | null
+          call_max_duration: number | null
+          call_script_prompt: string | null
+          created_at: string | null
+          elevenlabs_api_key_integration: string | null
+          elevenlabs_enabled: boolean | null
+          elevenlabs_voice_id_integration: string | null
+          id: string
+          twilio_account_sid: string | null
+          twilio_auth_token: string | null
+          twilio_enabled: boolean | null
+          twilio_phone_number: string | null
+          twilio_webhook_url: string | null
+          updated_at: string | null
+          user_id: string
+          whatsapp_enabled: boolean | null
+        }
+        Insert: {
+          aws_access_key_id?: string | null
+          aws_region?: string | null
+          aws_secret_access_key?: string | null
+          aws_ses_email_from?: string | null
+          aws_ses_email_from_name?: string | null
+          aws_ses_enabled?: boolean | null
+          aws_ses_webhook_url?: string | null
+          call_hours_end?: string | null
+          call_hours_start?: string | null
+          call_max_duration?: number | null
+          call_script_prompt?: string | null
+          created_at?: string | null
+          elevenlabs_api_key_integration?: string | null
+          elevenlabs_enabled?: boolean | null
+          elevenlabs_voice_id_integration?: string | null
+          id?: string
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          twilio_enabled?: boolean | null
+          twilio_phone_number?: string | null
+          twilio_webhook_url?: string | null
+          updated_at?: string | null
+          user_id: string
+          whatsapp_enabled?: boolean | null
+        }
+        Update: {
+          aws_access_key_id?: string | null
+          aws_region?: string | null
+          aws_secret_access_key?: string | null
+          aws_ses_email_from?: string | null
+          aws_ses_email_from_name?: string | null
+          aws_ses_enabled?: boolean | null
+          aws_ses_webhook_url?: string | null
+          call_hours_end?: string | null
+          call_hours_start?: string | null
+          call_max_duration?: number | null
+          call_script_prompt?: string | null
+          created_at?: string | null
+          elevenlabs_api_key_integration?: string | null
+          elevenlabs_enabled?: boolean | null
+          elevenlabs_voice_id_integration?: string | null
+          id?: string
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          twilio_enabled?: boolean | null
+          twilio_phone_number?: string | null
+          twilio_webhook_url?: string | null
+          updated_at?: string | null
+          user_id?: string
+          whatsapp_enabled?: boolean | null
+        }
+        Relationships: []
+      }
       message_grouping_queue: {
         Row: {
           contacts_data: Json | null
