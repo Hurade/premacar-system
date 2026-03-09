@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_message_control: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          hour_window_start: string
+          is_waiting_response: boolean
+          last_ai_content: string | null
+          last_ai_message_at: string
+          message_count_last_hour: number
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          hour_window_start?: string
+          is_waiting_response?: boolean
+          last_ai_content?: string | null
+          last_ai_message_at?: string
+          message_count_last_hour?: number
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          hour_window_start?: string
+          is_waiting_response?: boolean
+          last_ai_content?: string | null
+          last_ai_message_at?: string
+          message_count_last_hour?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_control_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           attendees: string[] | null
@@ -1825,6 +1866,10 @@ export type Database = {
       }
     }
     Functions: {
+      can_send_ai_message: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       claim_message_processing_batch: {
         Args: { p_limit?: number }
         Returns: {
@@ -1933,6 +1978,14 @@ export type Database = {
       }
       increment_campaign_counter: {
         Args: { p_campaign_id: string; p_counter: string }
+        Returns: undefined
+      }
+      mark_ai_message_sent: {
+        Args: { p_content: string; p_conversation_id: string }
+        Returns: undefined
+      }
+      mark_user_responded: {
+        Args: { p_conversation_id: string }
         Returns: undefined
       }
       reset_campaign_daily_counts: { Args: never; Returns: undefined }
