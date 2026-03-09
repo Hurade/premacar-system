@@ -614,6 +614,12 @@ async function processMetaWebhookAsync(
 
         console.log('[Meta Async] ✅ Mensagem salva:', dbMessage.id, '| from_type:', fromType);
 
+        // 4b. Mark user responded (unlock AI anti-spam guard) - only for real user messages
+        if (fromType === 'user') {
+          await supabase.rpc('mark_user_responded', { p_conversation_id: conversation.id });
+          console.log('[Meta Async] ✅ mark_user_responded called for conversation:', conversation.id);
+        }
+
         // ═══════════════════════════════════════════
         // 5. ATUALIZAR CONVERSA
         // ═══════════════════════════════════════════
