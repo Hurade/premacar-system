@@ -430,6 +430,10 @@ serve(async (req) => {
 
       console.log('[Webhook] Created message:', dbMessage.id);
 
+      // 4b. Mark user responded (unlock AI anti-spam guard)
+      await supabase.rpc('mark_user_responded', { p_conversation_id: conversation.id });
+      console.log('[Webhook] ✅ mark_user_responded called for conversation:', conversation.id);
+
       // 5. Update conversation last_message_at
       await supabase
         .from('conversations')
