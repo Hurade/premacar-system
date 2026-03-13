@@ -361,7 +361,7 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     type: mapDBMessageType(msg.type),
     status: mapDBMessageStatus(msg.status),
     fromType: isAutoReply ? 'user' : msg.from_type,
-    mediaUrl: msg.media_url,
+    mediaUrl: resolveMediaUrl(msg.media_url, msg.api_source),
     whatsappMessageId: msg.whatsapp_message_id
   };
 }
