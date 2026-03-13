@@ -272,6 +272,20 @@ export interface DBMessage {
   delivered_at: string | null;
   read_at: string | null;
   created_at: string;
+  api_source?: string | null;
+}
+
+// Resolve media URL: Meta media IDs need to go through our proxy
+function resolveMediaUrl(mediaUrl: string | null, apiSource?: string | null): string | null {
+  if (!mediaUrl) return null;
+  // If it's already a full URL, return as-is
+  if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) return mediaUrl;
+  // If it's a Meta media ID, use the proxy edge function
+  if (apiSource === 'meta') {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/functions/v1/media-proxy?id=${encodeURIComponent(mediaUrl)}`;
+  }
+  return mediaUrl;
 }
 
 // ============= Transformed Types for UI =============
