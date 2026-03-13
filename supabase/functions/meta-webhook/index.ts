@@ -12,6 +12,27 @@ const corsHeaders = {
 
 const DEFAULT_GROUPING_DELAY_MS = 20000;
 
+// Resolve Meta media ID to a downloadable URL
+async function resolveMetaMediaUrl(mediaId: string, accessToken: string): Promise<string | null> {
+  if (!mediaId || !accessToken) return null;
+  try {
+    // Step 1: Get media info (contains the actual URL)
+    const mediaInfoRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (!mediaInfoRes.ok) {
+      console.error('[Meta Media] ❌ Erro ao buscar info da mídia:', mediaInfoRes.status, await mediaInfoRes.text());
+      return null;
+    }
+    const mediaInfo = await mediaInfoRes.json();
+    console.log('[Meta Media] ✅ URL da mídia obtida:', mediaInfo.url ? 'SIM' : 'NÃO');
+    return mediaInfo.url || null;
+  } catch (error) {
+    console.error('[Meta Media] ❌ Erro ao resolver mídia:', error);
+    return null;
+  }
+}
+
 // Validate Meta webhook signature using Web Crypto API
 async function validateMetaSignature(body: string, signature: string | null, appSecret: string): Promise<boolean> {
   if (!signature || !appSecret) {
