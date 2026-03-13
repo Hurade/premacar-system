@@ -446,7 +446,18 @@ async function processMetaWebhookAsync(
             console.log('[Meta Async] ❓ Tipo desconhecido:', messageType);
         }
 
-        // ═══════════════════════════════════════════
+        // Resolve media URL from Meta API if we have a media ID
+        if (mediaUrl && metaSettings.meta_access_token) {
+          console.log('[Meta Async] 🔗 Resolvendo URL da mídia, ID:', mediaUrl);
+          const resolvedUrl = await resolveMetaMediaUrl(mediaUrl, metaSettings.meta_access_token);
+          if (resolvedUrl) {
+            mediaUrl = resolvedUrl;
+            console.log('[Meta Async] ✅ URL da mídia resolvida com sucesso');
+          } else {
+            console.warn('[Meta Async] ⚠️ Não foi possível resolver URL da mídia, mantendo ID');
+          }
+        }
+
         // 1. BUSCAR OU CRIAR CONTATO (com normalização de número BR)
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 📞 Buscando contato...');
