@@ -425,7 +425,7 @@ async function processMetaWebhookAsync(
             console.log('[Meta Async] ❓ Tipo desconhecido:', messageType);
         }
 
-        // ═══════════════════════════════════════════
+
         // 1. BUSCAR OU CRIAR CONTATO (com normalização de número BR)
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 📞 Buscando contato...');
