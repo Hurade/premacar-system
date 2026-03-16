@@ -7,7 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Pencil, Check } from 'lucide-react';
+import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import type { CampaignFormData } from '@/pages/CreateCampaign';
 
 interface Step2Props {
@@ -26,6 +29,23 @@ const CHANNEL_CONFIG: Record<string, { icon: string; label: string }> = {
 export function Step2FlowConfig({ data, onChange }: Step2Props) {
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editConfig, setEditConfig] = useState<any>(null);
+
+  // Fetch approved Meta templates
+  const { data: metaTemplates = [], isLoading: loadingMeta } = useApprovedMetaTemplates();
+
+  // Fetch email templates
+  const { data: emailTemplates = [], isLoading: loadingEmail } = useQuery({
+    queryKey: ['email-templates-active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const flowConfig = data.flow_config;
   const dayKeys = Object.keys(flowConfig).sort();
@@ -52,7 +72,6 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
   const removeDay = (key: string) => {
     const updated = { ...flowConfig };
     delete updated[key];
-    // Re-number keys
     const reNumbered: Record<string, any> = {};
     Object.values(updated).forEach((v, i) => {
       reNumbered[`day${i + 1}`] = v;
@@ -82,6 +101,27 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
     setEditingDay(null);
     setEditConfig(null);
   };
+
+  // Get display info for a day config
+  const getDayDescription = (cfg: any) => {
+    if (cfg.type === 'whatsapp' && cfg.config?.meta_template_id) {
+      const t = metaTemplates.find((t: any) => t.id === cfg.config.meta_template_id);
+      return t ? `Template: ${t.display_name}` : 'Template selecionado';
+    }
+    if (cfg.type === 'email' && cfg.config?.email_template_id) {
+      const t = emailTemplates.find((t: any) => t.id === cfg.config.email_template_id);
+      return t ? `Template: ${t.name}` : 'Template selecionado';
+    }
+    if (cfg.config?.message) {
+      return cfg.config.message.substring(0, 60) + (cfg.config.message.length > 60 ? '...' : '');
+    }
+    return 'Clique em Editar para configurar';
+  };
+
+  // Selected meta template for preview in modal
+  const selectedMetaTemplate = editConfig?.type === 'whatsapp' && editConfig?.config?.meta_template_id
+    ? metaTemplates.find((t: any) => t.id === editConfig.config.meta_template_id)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -119,6 +159,8 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
                         : cfg.timing?.type === 'delay'
                         ? `${cfg.timing.hours}h após dia anterior`
                         : 'Automático'}
+                      {' · '}
+                      {getDayDescription(cfg)}
                     </p>
                   </div>
                 </div>
@@ -137,7 +179,6 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
                 </div>
               </div>
 
-              {/* Tags preview */}
               {cfg.enabled && cfg.successConditions?.length > 0 && (
                 <div className="flex gap-1.5 mt-3 flex-wrap">
                   {cfg.successConditions.map((c: any, i: number) => (
@@ -171,7 +212,14 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
               {/* Channel type */}
               <div className="space-y-2">
                 <Label>Canal</Label>
-                <Select value={editConfig.type} onValueChange={(v) => setEditConfig({ ...editConfig, type: v })}>
+                <Select
+                  value={editConfig.type}
+                  onValueChange={(v) => setEditConfig({
+                    ...editConfig,
+                    type: v,
+                    config: { message: '' }, // reset config on channel change
+                  })}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
@@ -208,17 +256,201 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
                 )}
               </div>
 
-              {/* Message */}
-              <div className="space-y-2">
-                <Label>Mensagem</Label>
-                <Textarea
-                  value={editConfig.config?.message || ''}
-                  onChange={(e) => setEditConfig({ ...editConfig, config: { ...editConfig.config, message: e.target.value } })}
-                  placeholder="Use {{nome}}, {{empresa}} para variáveis..."
-                  rows={4}
-                />
-                <p className="text-xs text-muted-foreground">Variáveis: {'{{nome}}'}, {'{{empresa}}'}, {'{{telefone}}'}</p>
-              </div>
+              {/* === WHATSAPP: Meta Template Selector === */}
+              {editConfig.type === 'whatsapp' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Template WhatsApp (Meta)</Label>
+                    <Select
+                      value={editConfig.config?.meta_template_id || 'custom'}
+                      onValueChange={(v) => {
+                        if (v === 'custom') {
+                          setEditConfig({
+                            ...editConfig,
+                            config: { ...editConfig.config, meta_template_id: null },
+                          });
+                        } else {
+                          const template = metaTemplates.find((t: any) => t.id === v);
+                          setEditConfig({
+                            ...editConfig,
+                            config: {
+                              ...editConfig.config,
+                              meta_template_id: v,
+                              message: template?.body_text || editConfig.config?.message || '',
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecionar template..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="custom">✏️ Mensagem Personalizada</SelectItem>
+                        {loadingMeta ? (
+                          <SelectItem value="_loading" disabled>Carregando...</SelectItem>
+                        ) : metaTemplates.length === 0 ? (
+                          <SelectItem value="_empty" disabled>Nenhum template aprovado</SelectItem>
+                        ) : (
+                          metaTemplates.map((t: any) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.display_name} ({t.language_code})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Templates aprovados da Meta (mesmos usados em Disparos)
+                    </p>
+                  </div>
+
+                  {/* Preview of selected Meta template */}
+                  {selectedMetaTemplate && (
+                    <div className="bg-secondary/30 border border-border/50 rounded-lg p-3 space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Preview do Template</p>
+                      {selectedMetaTemplate.header_text && (
+                        <p className="text-sm font-semibold text-foreground">{selectedMetaTemplate.header_text}</p>
+                      )}
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{selectedMetaTemplate.body_text}</p>
+                      {selectedMetaTemplate.footer_text && (
+                        <p className="text-xs text-muted-foreground italic">{selectedMetaTemplate.footer_text}</p>
+                      )}
+                      {selectedMetaTemplate.parameters_count > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          📌 {selectedMetaTemplate.parameters_count} parâmetro(s) dinâmico(s)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Custom message if no template selected */}
+                  {!editConfig.config?.meta_template_id && (
+                    <div className="space-y-2">
+                      <Label>Mensagem Personalizada</Label>
+                      <Textarea
+                        value={editConfig.config?.message || ''}
+                        onChange={(e) => setEditConfig({ ...editConfig, config: { ...editConfig.config, message: e.target.value } })}
+                        placeholder="Use {{nome}}, {{empresa}} para variáveis..."
+                        rows={4}
+                      />
+                      <p className="text-xs text-muted-foreground">Variáveis: {'{{nome}}'}, {'{{empresa}}'}, {'{{telefone}}'}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* === EMAIL: Template + Custom Editor === */}
+              {editConfig.type === 'email' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Template de Email</Label>
+                    <Select
+                      value={editConfig.config?.email_template_id || 'custom'}
+                      onValueChange={(v) => {
+                        if (v === 'custom') {
+                          setEditConfig({
+                            ...editConfig,
+                            config: { ...editConfig.config, email_template_id: null },
+                          });
+                        } else {
+                          const template = emailTemplates.find((t: any) => t.id === v);
+                          setEditConfig({
+                            ...editConfig,
+                            config: {
+                              ...editConfig.config,
+                              email_template_id: v,
+                              subject: template?.subject || '',
+                              message: template?.text_body || template?.html_body || '',
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecionar template..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="custom">✏️ Mensagem Personalizada</SelectItem>
+                        {loadingEmail ? (
+                          <SelectItem value="_loading" disabled>Carregando...</SelectItem>
+                        ) : emailTemplates.length === 0 ? (
+                          <SelectItem value="_empty" disabled>Nenhum template encontrado</SelectItem>
+                        ) : (
+                          emailTemplates.map((t: any) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              📧 {t.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assunto *</Label>
+                    <Input
+                      value={editConfig.config?.subject || ''}
+                      onChange={(e) => setEditConfig({
+                        ...editConfig,
+                        config: { ...editConfig.config, subject: e.target.value },
+                      })}
+                      placeholder="Ex: Acompanhamento da sua solicitação"
+                    />
+                    <p className="text-xs text-muted-foreground">Variáveis: {'{{nome}}'}, {'{{empresa}}'}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Mensagem do Email *</Label>
+                    <Textarea
+                      value={editConfig.config?.message || ''}
+                      onChange={(e) => setEditConfig({
+                        ...editConfig,
+                        config: { ...editConfig.config, message: e.target.value },
+                      })}
+                      placeholder="Digite a mensagem do email aqui... Aceita HTML."
+                      rows={6}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Aceita HTML. Variáveis: {'{{nome}}'}, {'{{empresa}}'}, {'{{telefone}}'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* === CALL config === */}
+              {editConfig.type === 'call' && (
+                <div className="space-y-2">
+                  <Label>Tipo de Voz</Label>
+                  <Select
+                    value={editConfig.config?.voiceType || 'ai'}
+                    onValueChange={(v) => setEditConfig({
+                      ...editConfig,
+                      config: { ...editConfig.config, voiceType: v },
+                    })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ai">🎙️ Voz AI (ElevenLabs)</SelectItem>
+                      <SelectItem value="tts">🔊 TTS Padrão (Twilio)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    ℹ️ O script usará automaticamente o prompt configurado no sistema
+                  </p>
+                </div>
+              )}
+
+              {/* === SMS: simple message === */}
+              {editConfig.type === 'sms' && (
+                <div className="space-y-2">
+                  <Label>Mensagem SMS</Label>
+                  <Textarea
+                    value={editConfig.config?.message || ''}
+                    onChange={(e) => setEditConfig({ ...editConfig, config: { ...editConfig.config, message: e.target.value } })}
+                    placeholder="Use {{nome}} para variáveis..."
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">Máximo 160 caracteres recomendado</p>
+                </div>
+              )}
 
               {/* Success tag */}
               <div className="space-y-2">
