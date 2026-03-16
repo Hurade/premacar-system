@@ -35,6 +35,9 @@ import {
 } from './ui/dialog';
 import { Input } from './ui/input';
 import InlineCreateContact from './chat/InlineCreateContact';
+import { useConversationWindow } from '@/hooks/useConversationWindow';
+import { WindowStatusBadge } from './chat/WindowStatusBadge';
+import { WindowExpiredAlert } from './chat/WindowExpiredAlert';
 
 type FilterType = 'all' | 'unread';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
