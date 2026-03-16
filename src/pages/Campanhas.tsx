@@ -11,7 +11,7 @@ const CampanhasPage: React.FC = () => {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const { campaigns, loading, toggleStatus, deleteCampaign } = useRecurringCampaigns({ filter, search });
+  const { campaigns, loading, toggleStatus, deleteCampaign, refetch } = useRecurringCampaigns({ filter, search });
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -54,6 +54,7 @@ const CampanhasPage: React.FC = () => {
               campaign={campaign}
               onToggleStatus={toggleStatus}
               onDelete={deleteCampaign}
+              onRefresh={refetch}
             />
           ))
         )}
