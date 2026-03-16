@@ -102,6 +102,10 @@ const Settings: React.FC = () => {
               <Cable className="w-4 h-4" />
               Integrações
             </TabsTrigger>
+            <TabsTrigger value="connections" className="gap-2">
+              <Smartphone className="w-4 h-4" />
+              Conexões
+            </TabsTrigger>
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
