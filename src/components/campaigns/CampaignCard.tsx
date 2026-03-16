@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, BarChart3, Pause, Play, Trash2 } from 'lucide-react';
+import { Settings, BarChart3, Pause, Play, Trash2, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
