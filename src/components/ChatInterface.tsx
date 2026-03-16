@@ -236,6 +236,12 @@ const ChatInterface: React.FC = () => {
     e?.preventDefault();
     if (!inputText.trim() || !activeChat) return;
 
+    // Block free messages if Meta 24h window is expired
+    if (activeChat.apiSource === 'meta' && !canSendFreeMessage) {
+      toast.error('Janela de 24h expirada. Use um template para retomar a conversa.');
+      return;
+    }
+
     const content = inputText.trim();
     setInputText('');
     
