@@ -94,6 +94,17 @@ const ChatInterface: React.FC = () => {
   const activeChat = conversations.find(c => c.id === selectedChatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // 24h Window hook for Meta API
+  const {
+    windowStatus,
+    canSendFreeMessage,
+    hoursRemaining,
+    hoursSinceExpired,
+    expiredAt,
+    loading: windowLoading,
+    refetch: refetchWindow,
+  } = useConversationWindow(selectedChatId, activeChat?.apiSource);
+  
   // Format audio time helper
   const formatAudioTime = (seconds: number): string => {
     if (!seconds || isNaN(seconds)) return '0:00';
