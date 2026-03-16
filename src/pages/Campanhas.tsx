@@ -54,6 +54,7 @@ const CampanhasPage: React.FC = () => {
               campaign={campaign}
               onToggleStatus={toggleStatus}
               onDelete={deleteCampaign}
+              onRefresh={refetch}
             />
           ))
         )}
