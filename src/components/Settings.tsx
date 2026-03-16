@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
 import SystemRoadmap from './SystemRoadmap';
 import IntegrationSettings from './integrations/IntegrationSettings';
+import { ConnectionsManager } from './connections/ConnectionsManager';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
 import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
@@ -101,13 +102,17 @@ const Settings: React.FC = () => {
               <Cable className="w-4 h-4" />
               Integrações
             </TabsTrigger>
+            <TabsTrigger value="connections" className="gap-2">
+              <Smartphone className="w-4 h-4" />
+              Conexões
+            </TabsTrigger>
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
             </TabsTrigger>
           </TabsList>
 
-          {activeTab !== 'docs' && activeTab !== 'integrations' && isAdmin && (
+          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && isAdmin && (
             <div className="flex gap-3">
               <Button
                 variant="ghost"
@@ -137,7 +142,7 @@ const Settings: React.FC = () => {
             </div>
           )}
           
-          {activeTab !== 'docs' && activeTab !== 'integrations' && !isAdmin && (
+          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && !isAdmin && (
             <div className="flex items-center gap-2 text-sm text-amber-400">
               <Lock className="w-4 h-4" />
               Apenas administradores podem editar
@@ -157,6 +162,9 @@ const Settings: React.FC = () => {
           <IntegrationSettings />
         </TabsContent>
 
+        <TabsContent value="connections">
+          <ConnectionsManager />
+        </TabsContent>
         <TabsContent value="docs">
           <SystemRoadmap />
         </TabsContent>

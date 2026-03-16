@@ -35,6 +35,9 @@ import {
 } from './ui/dialog';
 import { Input } from './ui/input';
 import InlineCreateContact from './chat/InlineCreateContact';
+import { useConversationWindow } from '@/hooks/useConversationWindow';
+import { WindowStatusBadge } from './chat/WindowStatusBadge';
+import { WindowExpiredAlert } from './chat/WindowExpiredAlert';
 
 type FilterType = 'all' | 'unread';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
@@ -90,6 +93,17 @@ const ChatInterface: React.FC = () => {
   
   const activeChat = conversations.find(c => c.id === selectedChatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // 24h Window hook for Meta API
+  const {
+    windowStatus,
+    canSendFreeMessage,
+    hoursRemaining,
+    hoursSinceExpired,
+    expiredAt,
+    loading: windowLoading,
+    refetch: refetchWindow,
+  } = useConversationWindow(selectedChatId, activeChat?.apiSource);
   
   // Format audio time helper
   const formatAudioTime = (seconds: number): string => {
@@ -221,6 +235,12 @@ const ChatInterface: React.FC = () => {
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputText.trim() || !activeChat) return;
+
+    // Block free messages if Meta 24h window is expired
+    if (activeChat.apiSource === 'meta' && !canSendFreeMessage) {
+      toast.error('Janela de 24h expirada. Use um template para retomar a conversa.');
+      return;
+    }
 
     const content = inputText.trim();
     setInputText('');
@@ -959,6 +979,13 @@ const ChatInterface: React.FC = () => {
                       {activeChat.contactName}
                       {renderStatusBadge(activeChat.status)}
                       {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
+                      {activeChat.apiSource === 'meta' && !windowLoading && (
+                        <WindowStatusBadge 
+                          status={windowStatus} 
+                          hoursRemaining={hoursRemaining}
+                          apiSource={activeChat.apiSource}
+                        />
+                      )}
                     </h2>
                     <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
                   </div>
@@ -1115,61 +1142,79 @@ const ChatInterface: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
-            <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
-              <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto">
-                <div className="flex items-center gap-1">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon" 
-                    disabled
-                    title="Em breve: Emoji picker"
-                    className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
-                  >
-                    <Smile className="w-5 h-5" />
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    disabled
-                    title="Em breve: Enviar anexos"
-                    className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </Button>
-                </div>
-                
-                <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
-                  <textarea
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite sua mensagem...'}
-                    className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
-                    rows={1}
-                  />
-                </div>
+            {/* Input Area OR Window Expired Alert */}
+            {activeChat.apiSource === 'meta' && !canSendFreeMessage ? (
+              <WindowExpiredAlert
+                conversationId={activeChat.id}
+                contactId={activeChat.contactId}
+                expiredAt={expiredAt}
+                hoursSinceExpired={hoursSinceExpired}
+                onTemplateSent={refetchWindow}
+              />
+            ) : (
+              <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
+                {/* Warning when window is about to expire */}
+                {activeChat.apiSource === 'meta' && windowStatus === 'open' && hoursRemaining < 2 && (
+                  <div className="mb-2 text-center">
+                    <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+                      ⏰ Janela expira em {Math.floor(hoursRemaining * 60)} minutos
+                    </span>
+                  </div>
+                )}
+                <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto">
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      disabled
+                      title="Em breve: Emoji picker"
+                      className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon"
+                      disabled
+                      title="Em breve: Enviar anexos"
+                      className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
+                    >
+                      <Paperclip className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  
+                  <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                    <textarea
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite sua mensagem...'}
+                      className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
+                      rows={1}
+                    />
+                  </div>
 
-                <Button 
-                  type="submit" 
-                  disabled={!inputText.trim()}
-                  className={`rounded-full w-12 h-12 p-0 transition-all ${
-                    inputText.trim() 
-                      ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95' 
-                      : 'opacity-50 cursor-not-allowed'
-                  }`}
-                >
-                  <Send className="w-5 h-5 ml-0.5" />
-                </Button>
-              </form>
-            </div>
+                  <Button 
+                    type="submit" 
+                    disabled={!inputText.trim()}
+                    className={`rounded-full w-12 h-12 p-0 transition-all ${
+                      inputText.trim() 
+                        ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95' 
+                        : 'opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <Send className="w-5 h-5 ml-0.5" />
+                  </Button>
+                </form>
+              </div>
+            )}
           </div>
 
           {!isMobile && <div 
