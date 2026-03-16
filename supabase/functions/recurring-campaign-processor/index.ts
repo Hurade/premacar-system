@@ -122,7 +122,7 @@ serve(async (req) => {
           if (dayConfig.type === "email") {
             sendResult = await sendEmail(contact, dayConfig, integrationSettings);
           } else if (dayConfig.type === "whatsapp") {
-            sendResult = await sendWhatsApp(contact, dayConfig, ninaSettings);
+            sendResult = await sendWhatsApp(contact, dayConfig, ninaSettings, supabase);
           } else if (dayConfig.type === "sms") {
             // SMS not implemented yet
             sendResult = { success: false, error: "SMS não implementado ainda" };
