@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, BarChart3, Pause, Play, Trash2, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { RecurringCampaign } from '@/hooks/useRecurringCampaigns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface CampaignCardProps {
   campaign: RecurringCampaign;
   onToggleStatus: (id: string, status: string) => void;
   onDelete: (id: string) => void;
+  onRefresh?: () => void;
 }
 
 const STATUS_CONFIG: Record<string, { icon: string; label: string; variant: 'default' | 'secondary' | 'outline' }> = {
@@ -19,8 +22,9 @@ const STATUS_CONFIG: Record<string, { icon: string; label: string; variant: 'def
   draft: { icon: '📝', label: 'Rascunho', variant: 'outline' },
 };
 
-export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCardProps) {
+export function CampaignCard({ campaign, onToggleStatus, onDelete, onRefresh }: CampaignCardProps) {
   const navigate = useNavigate();
+  const [processing, setProcessing] = useState(false);
   const config = STATUS_CONFIG[campaign.status] || STATUS_CONFIG.draft;
   const total = campaign.total_contacts || 1;
   const completed = campaign.success_count + campaign.failed_count;
@@ -30,6 +34,29 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCar
   const flowDays = campaign.flow_config && typeof campaign.flow_config === 'object'
     ? Object.keys(campaign.flow_config).length
     : 0;
+
+  const handleProcessNow = async () => {
+    try {
+      setProcessing(true);
+      const { data, error } = await supabase.functions.invoke('recurring-campaign-processor', {
+        body: { campaign_id: campaign.id },
+      });
+      if (error) throw error;
+      
+      const results = data?.results?.[0];
+      if (results) {
+        toast.success(`Processado: ${results.sent} enviados, ${results.failed} falhas`);
+      } else {
+        toast.success('Campanha processada!');
+      }
+      onRefresh?.();
+    } catch (err: any) {
+      console.error('Erro ao processar campanha:', err);
+      toast.error('Erro ao processar campanha');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   return (
     <div className="bg-card/50 border border-border/50 rounded-xl p-5 hover:border-primary/30 transition-colors">
@@ -46,6 +73,18 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete }: CampaignCar
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {campaign.status === 'active' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-primary"
+              onClick={handleProcessNow}
+              disabled={processing}
+              title="Enviar agora"
+            >
+              {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Settings className="w-4 h-4" />
           </Button>
