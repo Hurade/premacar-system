@@ -162,6 +162,9 @@ const Settings: React.FC = () => {
           <IntegrationSettings />
         </TabsContent>
 
+        <TabsContent value="connections">
+          <ConnectionsManager />
+        </TabsContent>
         <TabsContent value="docs">
           <SystemRoadmap />
         </TabsContent>
