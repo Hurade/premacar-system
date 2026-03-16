@@ -583,11 +583,13 @@ export type Database = {
           api_source: string | null
           assigned_team: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id: string | null
+          connection_id: string | null
           contact_id: string
           created_at: string
           dispatch_sent_at: string | null
           id: string
           is_active: boolean
+          last_customer_message_at: string | null
           last_message_at: string
           metadata: Json | null
           nina_context: Json | null
@@ -596,16 +598,20 @@ export type Database = {
           tags: string[] | null
           updated_at: string
           user_id: string | null
+          window_expires_at: string | null
+          window_status: string | null
         }
         Insert: {
           api_source?: string | null
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
+          connection_id?: string | null
           contact_id: string
           created_at?: string
           dispatch_sent_at?: string | null
           id?: string
           is_active?: boolean
+          last_customer_message_at?: string | null
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
@@ -614,16 +620,20 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string
           user_id?: string | null
+          window_expires_at?: string | null
+          window_status?: string | null
         }
         Update: {
           api_source?: string | null
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
+          connection_id?: string | null
           contact_id?: string
           created_at?: string
           dispatch_sent_at?: string | null
           id?: string
           is_active?: boolean
+          last_customer_message_at?: string | null
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
@@ -632,8 +642,17 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string
           user_id?: string | null
+          window_expires_at?: string | null
+          window_status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_contact_id_fkey"
             columns: ["contact_id"]
@@ -1834,6 +1853,69 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_connections: {
+        Row: {
+          api_type: string
+          created_at: string | null
+          evolution_api_key: string | null
+          evolution_base_url: string | null
+          evolution_instance_name: string | null
+          id: string
+          is_active: boolean | null
+          is_connected: boolean | null
+          last_connected_at: string | null
+          meta_access_token: string | null
+          meta_business_account_id: string | null
+          meta_phone_number_id: string | null
+          name: string
+          phone_number: string
+          qr_code: string | null
+          qr_code_expires_at: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          api_type?: string
+          created_at?: string | null
+          evolution_api_key?: string | null
+          evolution_base_url?: string | null
+          evolution_instance_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_connected?: boolean | null
+          last_connected_at?: string | null
+          meta_access_token?: string | null
+          meta_business_account_id?: string | null
+          meta_phone_number_id?: string | null
+          name: string
+          phone_number: string
+          qr_code?: string | null
+          qr_code_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          api_type?: string
+          created_at?: string | null
+          evolution_api_key?: string | null
+          evolution_base_url?: string | null
+          evolution_instance_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_connected?: boolean | null
+          last_connected_at?: string | null
+          meta_access_token?: string | null
+          meta_business_account_id?: string | null
+          meta_phone_number_id?: string | null
+          name?: string
+          phone_number?: string
+          qr_code?: string | null
+          qr_code_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       contacts_with_stats: {
@@ -1869,6 +1951,10 @@ export type Database = {
       can_send_ai_message: {
         Args: { p_conversation_id: string }
         Returns: boolean
+      }
+      check_conversation_window: {
+        Args: { p_conversation_id: string }
+        Returns: Json
       }
       claim_message_processing_batch: {
         Args: { p_limit?: number }
