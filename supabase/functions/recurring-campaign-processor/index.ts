@@ -122,7 +122,7 @@ serve(async (req) => {
           if (dayConfig.type === "email") {
             sendResult = await sendEmail(contact, dayConfig, integrationSettings);
           } else if (dayConfig.type === "whatsapp") {
-            sendResult = await sendWhatsApp(contact, dayConfig, ninaSettings);
+            sendResult = await sendWhatsApp(contact, dayConfig, ninaSettings, supabase);
           } else if (dayConfig.type === "sms") {
             // SMS not implemented yet
             sendResult = { success: false, error: "SMS não implementado ainda" };
@@ -354,16 +354,14 @@ async function sendEmail(
 async function sendWhatsApp(
   contact: any,
   dayConfig: any,
-  settings: any
+  settings: any,
+  supabase: any
 ): Promise<{ success: boolean; error?: string }> {
   const config = dayConfig.config || {};
+  const contactName = contact.name || contact.call_name || "Cliente";
   const message = (config.message || "")
-    .replace(/\{\{nome\}\}/g, contact.name || contact.call_name || "Cliente")
+    .replace(/\{\{nome\}\}/g, contactName)
     .replace(/\{\{empresa\}\}/g, contact.oficina || "");
-
-  if (!message && !config.template_id) {
-    return { success: false, error: "Mensagem vazia e sem template" };
-  }
 
   const cleanPhone = contact.phone_number.replace(/\D/g, "");
   const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
@@ -372,13 +370,72 @@ async function sendWhatsApp(
   if (settings?.meta_access_token && settings?.meta_phone_number_id) {
     try {
       const url = `https://graph.facebook.com/v21.0/${settings.meta_phone_number_id}/messages`;
-      const payload: any = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: formattedPhone,
-        type: "text",
-        text: { body: message },
-      };
+      let payload: any;
+
+      // If template_id is set, send as template (required outside 24h window)
+      if (config.template_id) {
+        // Fetch template details from meta_templates
+        const { data: template } = await supabase
+          .from("meta_templates")
+          .select("name, language_code, parameters_count, parameters_mapping")
+          .eq("id", config.template_id)
+          .single();
+
+        if (!template) {
+          return { success: false, error: `Template ${config.template_id} não encontrado` };
+        }
+
+        console.log(`[recurring-processor] Sending template "${template.name}" (${template.language_code}) to ${formattedPhone}`);
+
+        // Build template parameters
+        const components: any[] = [];
+        if (template.parameters_count > 0) {
+          const params: any[] = [];
+          const mapping = (template.parameters_mapping as Record<string, string>) || {};
+          
+          for (let i = 1; i <= template.parameters_count; i++) {
+            const paramKey = mapping[`${i}`] || mapping[String(i)] || "";
+            let value = contactName; // default
+            
+            if (paramKey === "nome" || paramKey === "name" || paramKey === "1") {
+              value = contactName;
+            } else if (paramKey === "empresa" || paramKey === "company") {
+              value = contact.oficina || "sua empresa";
+            } else if (paramKey === "telefone" || paramKey === "phone") {
+              value = contact.phone_number;
+            }
+            
+            params.push({ type: "text", text: value });
+          }
+          
+          components.push({ type: "body", parameters: params });
+        }
+
+        payload = {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: formattedPhone,
+          type: "template",
+          template: {
+            name: template.name,
+            language: { code: template.language_code },
+            ...(components.length > 0 ? { components } : {}),
+          },
+        };
+      } else if (message) {
+        // Send as plain text (only works within 24h window)
+        payload = {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: formattedPhone,
+          type: "text",
+          text: { body: message },
+        };
+      } else {
+        return { success: false, error: "Mensagem vazia e sem template selecionado" };
+      }
+
+      console.log(`[recurring-processor] Meta payload:`, JSON.stringify(payload).substring(0, 500));
 
       const response = await fetch(url, {
         method: "POST",
@@ -391,8 +448,12 @@ async function sendWhatsApp(
 
       const data = await response.json();
       if (!response.ok) {
-        return { success: false, error: data.error?.message || "Meta API error" };
+        const errMsg = data.error?.message || JSON.stringify(data.error) || "Meta API error";
+        console.error(`[recurring-processor] Meta API error:`, JSON.stringify(data));
+        return { success: false, error: errMsg };
       }
+
+      console.log(`[recurring-processor] Meta API success, message ID:`, data.messages?.[0]?.id);
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -401,6 +462,9 @@ async function sendWhatsApp(
 
   // Fallback to Evolution API
   if (settings?.evolution_api_url && settings?.evolution_api_key && settings?.evolution_instance_name) {
+    if (!message) {
+      return { success: false, error: "Evolution API requer mensagem de texto" };
+    }
     try {
       const evolutionUrl = `${settings.evolution_api_url}/message/sendText/${settings.evolution_instance_name}`;
       const response = await fetch(evolutionUrl, {
