@@ -979,6 +979,13 @@ const ChatInterface: React.FC = () => {
                       {activeChat.contactName}
                       {renderStatusBadge(activeChat.status)}
                       {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
+                      {activeChat.apiSource === 'meta' && !windowLoading && (
+                        <WindowStatusBadge 
+                          status={windowStatus} 
+                          hoursRemaining={hoursRemaining}
+                          apiSource={activeChat.apiSource}
+                        />
+                      )}
                     </h2>
                     <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
                   </div>
