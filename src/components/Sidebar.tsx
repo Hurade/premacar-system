@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, ScrollText } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, ScrollText, MessageSquarePlus } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,6 +50,10 @@ const menuItems = [{
   id: 'logs',
   label: 'Logs',
   icon: ScrollText
+}, {
+  id: 'followup',
+  label: 'Follow-up',
+  icon: MessageSquarePlus
 }];
 const Logo = ({
   companyName
