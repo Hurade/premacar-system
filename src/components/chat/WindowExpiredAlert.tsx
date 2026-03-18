@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Clock, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
 
 interface WindowExpiredAlertProps {
   conversationId: string;
@@ -11,15 +12,6 @@ interface WindowExpiredAlertProps {
   expiredAt: Date | null;
   hoursSinceExpired: number;
   onTemplateSent: () => void;
-}
-
-interface MetaTemplate {
-  id: string;
-  name: string;
-  display_name: string;
-  category: string;
-  status: string;
-  body_text: string;
 }
 
 export function WindowExpiredAlert({
@@ -31,18 +23,7 @@ export function WindowExpiredAlert({
 }: WindowExpiredAlertProps) {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [sending, setSending] = useState(false);
-  const [templates, setTemplates] = useState<MetaTemplate[]>([]);
-
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      const { data } = await supabase
-        .from('meta_templates')
-        .select('id, name, display_name, category, status, body_text')
-        .eq('status', 'APPROVED');
-      setTemplates((data || []) as MetaTemplate[]);
-    };
-    fetchTemplates();
-  }, []);
+  const { data: templates = [] } = useApprovedMetaTemplates();
 
   const handleSendTemplate = async () => {
     if (!selectedTemplate) return;
