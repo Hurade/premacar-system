@@ -50,8 +50,51 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { target_user_id, new_password, new_email } = await req.json();
+    const { action, target_user_id, new_password, new_email, email, password } = await req.json();
 
+    // Use service role client for all admin operations
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // ── CREATE user ──────────────────────────────────────────────────────────
+    if (action === 'create') {
+      if (!email || !password) {
+        return new Response(JSON.stringify({ error: 'email and password are required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (password.length < 6) {
+        return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data, error } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+
+      if (error) {
+        console.error('[admin-update-user] Error creating user:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`[admin-update-user] User created: ${data.user.id} by admin: ${user.id}`);
+      return new Response(JSON.stringify({ success: true, user: data.user }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── UPDATE user ──────────────────────────────────────────────────────────
     if (!target_user_id) {
       return new Response(JSON.stringify({ error: 'target_user_id is required' }), {
         status: 400,
@@ -73,12 +116,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role to update the target user
-    const adminClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
     const updatePayload: { password?: string; email?: string } = {};
     if (new_password) updatePayload.password = new_password;
     if (new_email) updatePayload.email = new_email;
@@ -86,7 +123,7 @@ Deno.serve(async (req) => {
     const { data, error } = await adminClient.auth.admin.updateUserById(target_user_id, updatePayload);
 
     if (error) {
-      console.error('[admin-update-user] Error updating password:', error);
+      console.error('[admin-update-user] Error updating user:', error);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

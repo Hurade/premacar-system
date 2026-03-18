@@ -82,24 +82,51 @@ const Team: React.FC = () => {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+
     try {
-      await api.createTeamMember({
-        name: formData.name,
-        email: formData.email,
-        role: formData.role as 'agent' | 'admin' | 'manager',
-        team_id: formData.team_id || undefined,
-        function_id: formData.function_id || undefined,
-        weight: formData.weight
+      const { data, error } = await supabase.functions.invoke('admin-update-user', {
+        body: {
+          action: 'create',
+          email: formData.email,
+          password: newPassword,
+        },
       });
 
-      toast.success('Membro convidado com sucesso!');
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const userId = data?.user?.id;
+      if (userId) {
+        await supabase.from('team_members').insert({
+          user_id: userId,
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          team_id: formData.team_id || null,
+          function_id: formData.function_id || null,
+          weight: formData.weight || 1,
+          status: 'active',
+        });
+      }
+
+      toast.success('Usuário criado com sucesso!');
       setShowModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
       setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1 });
       await loadAllData();
     } catch (error) {
-      console.error('Erro ao convidar membro:', error);
-      toast.error('Erro ao convidar membro. Verifique se o email já não está cadastrado.');
+      console.error('Erro ao criar usuário:', error);
+      toast.error('Erro ao criar usuário. Verifique se o email já não está cadastrado.');
     }
   };
 
@@ -280,7 +307,7 @@ const Team: React.FC = () => {
           {isAdmin && (
             <Button onClick={() => setShowModal(true)} className="shadow-lg shadow-cyan-500/20 bg-slate-100 text-slate-900 hover:bg-white hover:text-black">
               <UserPlus className="w-4 h-4 mr-2" />
-              Convidar Usuário
+              Criar Usuário
             </Button>
           )}
         </div>
@@ -336,7 +363,7 @@ const Team: React.FC = () => {
                 <p className="text-slate-400 mb-4">Nenhum membro cadastrado ainda.</p>
                 <Button onClick={() => setShowModal(true)} className="bg-slate-100 text-slate-900 hover:bg-white">
                     <UserPlus className="w-4 h-4 mr-2" />
-                    Convidar Primeiro Membro
+                    Criar Primeiro Membro
                 </Button>
             </div>
         ) : (
@@ -497,8 +524,8 @@ const Team: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-white">Convidar para a Equipe</h3>
-                    <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white transition-colors">
+                    <h3 className="text-lg font-bold text-white">Criar Novo Usuário</h3>
+                    <button onClick={() => { setShowModal(false); setNewPassword(''); setConfirmPassword(''); }} className="text-slate-400 hover:text-white transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -517,13 +544,44 @@ const Team: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-300">Email Corporativo</label>
-                        <input 
+                        <input
                             required
-                            type="email" 
+                            type="email"
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                             placeholder="colaborador@empresa.com"
                             value={formData.email}
                             onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Senha</label>
+                        <div className="relative">
+                            <input
+                                required
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder="Mínimo 6 caracteres"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                            >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Confirmar Senha</label>
+                        <input
+                            required
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Repita a senha"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none"
                         />
                     </div>
                     <div className="space-y-2">
@@ -587,8 +645,8 @@ const Team: React.FC = () => {
                     </div>
 
                     <div className="pt-4 flex gap-3">
-                        <Button type="button" variant="ghost" onClick={() => setShowModal(false)} className="flex-1 border border-slate-700 hover:bg-slate-800">Cancelar</Button>
-                        <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200">Enviar Convite</Button>
+                        <Button type="button" variant="ghost" onClick={() => { setShowModal(false); setNewPassword(''); setConfirmPassword(''); }} className="flex-1 border border-slate-700 hover:bg-slate-800">Cancelar</Button>
+                        <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200">Criar Usuário</Button>
                     </div>
                 </form>
             </div>
