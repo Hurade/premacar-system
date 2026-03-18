@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { MessageSquarePlus, Clock, Tag, Info, CheckCircle2, XCircle } from 'lucide-react';
+import { MessageSquarePlus, Clock, Tag, Info, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
 const schema = z.object({
@@ -97,6 +97,7 @@ export default function Followup() {
       return data as FollowupSettings | null;
     },
     enabled: !!user?.id,
+    staleTime: 60_000,
   });
 
   // Populate form when settings load
@@ -132,7 +133,7 @@ export default function Followup() {
   });
 
   // ── Recent logs ─────────────────────────────────────────────────────────────
-  const { data: logs = [] } = useQuery({
+  const { data: logs = [], refetch: refetchLogs, dataUpdatedAt } = useQuery({
     queryKey: ['followup-logs'],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,7 +146,7 @@ export default function Followup() {
       if (error) throw error;
       return (data || []) as SystemLog[];
     },
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
 
   if (isLoading) {
@@ -271,7 +272,21 @@ export default function Followup() {
 
       {/* Recent logs */}
       <div className="space-y-3">
-        <h2 className="text-base font-semibold text-foreground">Últimos follow-ups enviados</h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Últimos follow-ups enviados</h2>
+            {dataUpdatedAt > 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Atualizado às{' '}
+                {new Date(dataUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetchLogs()} className="gap-2 h-8">
+            <RefreshCw className="w-3.5 h-3.5" />
+            Atualizar
+          </Button>
+        </div>
 
         {logs.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum follow-up enviado ainda.</p>

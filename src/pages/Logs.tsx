@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -29,32 +29,62 @@ export default function Logs() {
   const [source, setSource] = useState('all');
   const [level, setLevel] = useState('all');
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
+  // Debounce search input — reset page when debounced value updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchDebounced(search);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // ── Count query (separate, no rows fetched) ──────────────────────────────────
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ['system-logs-count', source, level, searchDebounced],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = (supabase as any)
+        .from('system_logs')
+        .select('*', { count: 'exact', head: true });
+      if (source !== 'all') query = query.eq('source', source);
+      if (level !== 'all') query = query.eq('level', level);
+      if (searchDebounced) query = query.ilike('message', `%${searchDebounced}%`);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count as number || 0;
+    },
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // ── Data query (current page only) ──────────────────────────────────────────
   const { data: logs = [], isFetching, refetch } = useQuery({
-    queryKey: ['system-logs', source, level, search],
+    queryKey: ['system-logs', source, level, searchDebounced, page],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = (supabase as any)
         .from('system_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(200);
-
-      if (source && source !== 'all') query = query.eq('source', source);
-      if (level && level !== 'all') query = query.eq('level', level);
-      if (search) query = query.ilike('message', `%${search}%`);
-
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      if (source !== 'all') query = query.eq('source', source);
+      if (level !== 'all') query = query.eq('level', level);
+      if (searchDebounced) query = query.ilike('message', `%${searchDebounced}%`);
       const { data, error } = await query;
       if (error) throw error;
       return (data || []) as SystemLog[];
     },
+    staleTime: 10_000,
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
   });
 
-  const totalPages = Math.ceil(logs.length / PAGE_SIZE);
-  const pageLogs = logs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
@@ -108,12 +138,12 @@ export default function Logs() {
         <Input
           placeholder="Buscar na mensagem..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          onChange={(e) => setSearch(e.target.value)}
           className="w-72 bg-card border-border"
         />
 
         <span className="self-center text-sm text-muted-foreground ml-auto">
-          {logs.length} registros encontrados
+          {totalCount} registros encontrados
         </span>
       </div>
 
@@ -129,14 +159,14 @@ export default function Logs() {
             </tr>
           </thead>
           <tbody>
-            {pageLogs.length === 0 ? (
+            {logs.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhum log encontrado
                 </td>
               </tr>
             ) : (
-              pageLogs.map((log) => (
+              logs.map((log) => (
                 <>
                   <tr
                     key={log.id}
