@@ -156,12 +156,17 @@ export function useDeleteMetaTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error, count } = await supabase
         .from('meta_templates')
-        .delete()
-        .eq('id', id);
+        .delete({ count: 'exact' })
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
+      if (count === 0) throw new Error('Template não encontrado ou sem permissão');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['meta-templates'] });
