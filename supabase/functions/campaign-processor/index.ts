@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { saveLog } from "../_shared/logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -351,6 +352,13 @@ serve(async (req) => {
           .update({ status: "completed" })
           .eq("id", campaignData.id);
 
+        console.log(`[campaign-processor] Campaign "${campaignData.name}" concluída — sem leads pendentes`);
+        await saveLog(supabase, {
+          source: 'campaign-processor',
+          level: 'info',
+          message: `Campanha concluída: ${campaignData.name}`,
+          metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, reason: 'no_pending_leads' },
+        });
         results.push({ campaignId: campaignData.id, sent: false, reason: "no_pending_leads" });
         continue;
       }
@@ -377,6 +385,12 @@ serve(async (req) => {
 
         if (metaTemplateError || !metaTemplate) {
           console.error(`[campaign-processor] Meta template not found: ${campaignData.meta_template_id}`);
+          await saveLog(supabase, {
+            source: 'campaign-processor',
+            level: 'error',
+            message: `Template Meta não encontrado para campanha: ${campaignData.name}`,
+            metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, meta_template_id: campaignData.meta_template_id },
+          });
           results.push({ campaignId: campaignData.id, sent: false, reason: "meta_template_not_found" });
           continue;
         }
@@ -386,11 +400,23 @@ serve(async (req) => {
         // Verificar se template está aprovado
         if (metaTemplate.status !== 'approved') {
           console.error(`[campaign-processor] Meta template not approved: ${metaTemplateData.name}`);
+          await saveLog(supabase, {
+            source: 'campaign-processor',
+            level: 'error',
+            message: `Template Meta não aprovado: ${metaTemplateData.name}`,
+            metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, template_name: metaTemplateData.name, template_status: metaTemplate.status },
+          });
           results.push({ campaignId: campaignData.id, sent: false, reason: "meta_template_not_approved" });
           continue;
         }
 
         console.log(`[campaign-processor] Sending template "${metaTemplateData.name}" to ${lead.phone}`);
+        await saveLog(supabase, {
+          source: 'campaign-processor',
+          level: 'info',
+          message: `Iniciando envio de template para ${lead.phone}`,
+          metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, template_name: metaTemplateData.name, lead_phone: lead.phone, lead_name: lead.name },
+        });
 
         // Enviar via Meta Template API
         sendResult = await sendTemplateViaMeta(lead.phone, metaTemplateData, lead, ninaSettings);
@@ -650,6 +676,12 @@ serve(async (req) => {
             const pauseUntil = new Date(now.getTime() + campaignData.pause_duration_minutes * 60000);
             updateData.paused_until = pauseUntil.toISOString();
             console.log(`[campaign-processor] Anti-ban pause until ${pauseUntil.toISOString()}`);
+            await saveLog(supabase, {
+              source: 'campaign-processor',
+              level: 'warning',
+              message: `Anti-ban: campanha "${campaignData.name}" pausada até ${pauseUntil.toISOString()}`,
+              metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, paused_until: pauseUntil.toISOString(), pause_duration_minutes: campaignData.pause_duration_minutes, total_sent: newTotalSent },
+            });
           }
         }
 
@@ -658,11 +690,23 @@ serve(async (req) => {
           .update(updateData)
           .eq("id", campaignData.id);
 
+        await saveLog(supabase, {
+          source: 'campaign-processor',
+          level: 'info',
+          message: `Mensagem enviada com sucesso para ${lead.phone}`,
+          metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, lead_phone: lead.phone, lead_name: lead.name, api_source: campaignData.api_source, message_id: sendResult.messageId },
+        });
         results.push({ campaignId: campaignData.id, sent: true });
         console.log(`[campaign-processor] Successfully sent message to ${lead.phone}`);
 
       } else {
         console.error(`[campaign-processor] Error sending message: ${sendResult.error}`);
+        await saveLog(supabase, {
+          source: 'campaign-processor',
+          level: 'error',
+          message: `Erro ao enviar para ${lead.phone}: ${sendResult.error}`,
+          metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, lead_phone: lead.phone, lead_name: lead.name, error_detail: sendResult.error, api_source: campaignData.api_source },
+        });
 
         const errorLower = sendResult.error?.toLowerCase() || '';
 
@@ -735,6 +779,12 @@ serve(async (req) => {
 
         if (consecutiveErrors[campaignData.id] >= 5) {
           console.error(`[campaign-processor] CIRCUIT BREAKER: 5+ consecutive errors for "${campaignData.name}" - auto-pausing campaign`);
+          await saveLog(supabase, {
+            source: 'campaign-processor',
+            level: 'error',
+            message: `Circuit breaker ativado: campanha "${campaignData.name}" pausada por erros consecutivos`,
+            metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, consecutive_errors: consecutiveErrors[campaignData.id], last_error: sendResult.error },
+          });
           await supabase
             .from("campaigns")
             .update({ 
@@ -763,6 +813,12 @@ serve(async (req) => {
           .update({ status: 'completed' })
           .eq("id", campaignData.id);
         console.log(`[campaign-processor] Campaign "${campaignData.name}" auto-completed (safety net - no pending leads)`);
+        await saveLog(supabase, {
+          source: 'campaign-processor',
+          level: 'info',
+          message: `Campanha concluída automaticamente (safety net): ${campaignData.name}`,
+          metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name },
+        });
       }
     }
 
