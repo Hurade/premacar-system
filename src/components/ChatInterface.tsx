@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
-  Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft
+import {
+  Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
+  Smile, Play, Loader2, MessageSquare, Info, X, Mail,
+  Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
+  KanbanSquare, Pencil
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, ApiSource, formatDateSeparator } from '../types';
@@ -38,6 +39,7 @@ import InlineCreateContact from './chat/InlineCreateContact';
 import { useConversationWindow } from '@/hooks/useConversationWindow';
 import { WindowStatusBadge } from './chat/WindowStatusBadge';
 import { WindowExpiredAlert } from './chat/WindowExpiredAlert';
+import { PipelineDrawer } from './chat/PipelineDrawer';
 
 type FilterType = 'all' | 'unread';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
@@ -91,6 +93,17 @@ const ChatInterface: React.FC = () => {
   const [audioProgress, setAudioProgress] = useState<Record<string, number>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
   
+  // Pipeline Drawer
+  const [showPipelineDrawer, setShowPipelineDrawer] = useState(false);
+  // Contact inline editing
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [editContactName, setEditContactName] = useState('');
+  const [editContactEmail, setEditContactEmail] = useState('');
+  const [editContactCompany, setEditContactCompany] = useState('');
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  // Local overrides so UI reflects saved values without waiting for hook refetch
+  const [contactOverrides, setContactOverrides] = useState<Record<string, { name: string; email: string; oficina: string }>>({});
+
   const activeChat = conversations.find(c => c.id === selectedChatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -182,6 +195,53 @@ const ChatInterface: React.FC = () => {
       toast.error('Erro ao salvar notas');
     } finally {
       setIsSavingNotes(false);
+    }
+  };
+
+  // Reset edit mode when active chat changes
+  useEffect(() => {
+    setIsEditingContact(false);
+    setShowPipelineDrawer(false);
+  }, [selectedChatId]);
+
+  const handleStartEditContact = async () => {
+    if (!activeChat) return;
+    setEditContactName(contactOverrides[activeChat.contactId]?.name ?? activeChat.contactName ?? '');
+    setEditContactEmail(contactOverrides[activeChat.contactId]?.email ?? activeChat.contactEmail ?? '');
+    // Fetch company (oficina) from DB on demand
+    try {
+      const { data } = await supabase
+        .from('contacts')
+        .select('oficina')
+        .eq('id', activeChat.contactId)
+        .maybeSingle();
+      setEditContactCompany(contactOverrides[activeChat.contactId]?.oficina ?? data?.oficina ?? '');
+    } catch {
+      setEditContactCompany(contactOverrides[activeChat.contactId]?.oficina ?? '');
+    }
+    setIsEditingContact(true);
+  };
+
+  const handleSaveContact = async () => {
+    if (!activeChat) return;
+    setIsSavingContact(true);
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ name: editContactName, email: editContactEmail || null, oficina: editContactCompany || null })
+        .eq('id', activeChat.contactId);
+      if (error) throw error;
+      setContactOverrides(prev => ({
+        ...prev,
+        [activeChat.contactId]: { name: editContactName, email: editContactEmail, oficina: editContactCompany },
+      }));
+      toast.success('Contato atualizado!');
+      setIsEditingContact(false);
+    } catch (error) {
+      console.error('Error saving contact:', error);
+      toast.error('Erro ao salvar contato');
+    } finally {
+      setIsSavingContact(false);
     }
   };
 
@@ -1223,13 +1283,53 @@ const ChatInterface: React.FC = () => {
             <div className="w-80 h-full flex flex-col">
               {/* Header */}
               <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 flex-shrink-0">
-                <span className="font-semibold text-white">Informações do Lead</span>
-                <button 
-                  onClick={() => setShowProfileInfo(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <span className="font-semibold text-white">
+                  {isEditingContact ? 'Editando Contato' : 'Informações do Lead'}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  {isEditingContact ? (
+                    <>
+                      <button
+                        onClick={handleSaveContact}
+                        disabled={isSavingContact}
+                        className="p-1.5 rounded-lg hover:bg-green-800/40 text-green-400 hover:text-green-300 transition-colors"
+                        title="Salvar contato"
+                      >
+                        {isSavingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => setIsEditingContact(false)}
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                        title="Cancelar edição"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleStartEditContact}
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                        title="Editar contato"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowPipelineDrawer(true)}
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors"
+                        title="Ver no Pipeline"
+                      >
+                        <KanbanSquare className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowProfileInfo(false)}
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Content */}
@@ -1239,9 +1339,11 @@ const ChatInterface: React.FC = () => {
                   <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-cyan-500 to-teal-600 shadow-xl mb-4">
                     <img src={activeChat.contactAvatar} alt={activeChat.contactName} className="w-full h-full rounded-full object-cover border-2 border-slate-900" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-1">{activeChat.contactName}</h3>
+                  <h3 className="text-xl font-bold text-white mb-1">
+                    {contactOverrides[activeChat.contactId]?.name ?? activeChat.contactName}
+                  </h3>
                   <p className="text-sm text-slate-400 mb-4">
-                    {activeChat.clientMemory.lead_profile.lead_stage === 'new' ? 'Novo Lead' : 
+                    {activeChat.clientMemory.lead_profile.lead_stage === 'new' ? 'Novo Lead' :
                      activeChat.clientMemory.lead_profile.lead_stage === 'qualified' ? 'Lead Qualificado' :
                      activeChat.clientMemory.lead_profile.lead_stage}
                   </p>
@@ -1250,27 +1352,91 @@ const ChatInterface: React.FC = () => {
                 {/* Details List */}
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dados de Contato</h4>
-                  
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 text-slate-400">
-                      <Phone className="w-4 h-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs text-slate-500">Telefone</span>
-                      <span className="text-slate-200 font-medium">{activeChat.contactPhone}</span>
-                    </div>
-                  </div>
 
-                  {activeChat.contactEmail && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 text-slate-400">
-                        <Mail className="w-4 h-4" />
+                  {isEditingContact ? (
+                    /* ── Edit mode ── */
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">Nome</label>
+                        <input
+                          type="text"
+                          value={editContactName}
+                          onChange={(e) => setEditContactName(e.target.value)}
+                          className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none"
+                          placeholder="Nome do contato"
+                        />
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs text-slate-500">Email</span>
-                        <span className="text-slate-200 font-medium">{activeChat.contactEmail}</span>
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">Email</label>
+                        <input
+                          type="email"
+                          value={editContactEmail}
+                          onChange={(e) => setEditContactEmail(e.target.value)}
+                          className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none"
+                          placeholder="email@exemplo.com"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">Empresa</label>
+                        <input
+                          type="text"
+                          value={editContactCompany}
+                          onChange={(e) => setEditContactCompany(e.target.value)}
+                          className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none"
+                          placeholder="Nome da empresa"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 text-sm pt-1">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 text-slate-400">
+                          <Phone className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-500">Telefone (não editável)</span>
+                          <span className="text-slate-400">{activeChat.contactPhone}</span>
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    /* ── View mode ── */
+                    <>
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 text-slate-400">
+                          <Phone className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-500">Telefone</span>
+                          <span className="text-slate-200 font-medium">{activeChat.contactPhone}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 text-slate-400">
+                          <Mail className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-500">Email</span>
+                          <span className="text-slate-200 font-medium">
+                            {contactOverrides[activeChat.contactId]?.email || activeChat.contactEmail || (
+                              <span className="text-slate-500 italic">Não informado</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 text-slate-400">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-500">Empresa</span>
+                          <span className="text-slate-200 font-medium">
+                            {contactOverrides[activeChat.contactId]?.oficina || (
+                              <span className="text-slate-500 italic">Não informado</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -1692,6 +1858,17 @@ const ChatInterface: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Pipeline Drawer */}
+      {activeChat && (
+        <PipelineDrawer
+          open={showPipelineDrawer}
+          onClose={() => setShowPipelineDrawer(false)}
+          contactId={activeChat.contactId}
+          contactName={contactOverrides[activeChat.contactId]?.name ?? activeChat.contactName}
+          teamMembers={teamMembers}
+        />
+      )}
     </div>
   );
 };
