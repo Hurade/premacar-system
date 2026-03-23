@@ -676,6 +676,80 @@ async function processQueueItem(
     }
   }
 
+  // ═══════════════════════════════════════════
+  // AUDIO TRANSCRIPTION: Resolve before sending to AI
+  // ═══════════════════════════════════════════
+  if (message.type === 'audio' &&
+      (message.content?.includes('[áudio') || message.content?.includes('[audio'))) {
+
+    // Wait up to 2s in case the message-grouper is already transcribing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const { data: updatedMsg } = await supabase
+      .from('messages')
+      .select('content')
+      .eq('id', message.id)
+      .single();
+
+    if (updatedMsg?.content &&
+        !updatedMsg.content.includes('[áudio') &&
+        !updatedMsg.content.includes('[audio')) {
+      // Grouper already transcribed it
+      message.content = updatedMsg.content;
+      console.log('[Nina] Using transcription from grouper:', updatedMsg.content.substring(0, 50));
+    } else if (message.media_url) {
+      // Try to transcribe now
+      console.log('[Nina] Audio message without transcription — trying to transcribe now');
+      try {
+        const { data: audioSettings } = await supabase
+          .from('nina_settings')
+          .select('meta_access_token')
+          .limit(1)
+          .single();
+
+        if (audioSettings?.meta_access_token) {
+          const mediaResp = await fetch(
+            `https://graph.facebook.com/v21.0/${message.media_url}`,
+            { headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` } }
+          );
+          const mediaData = await mediaResp.json();
+
+          if (mediaData.url) {
+            const audioResp = await fetch(mediaData.url, {
+              headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` }
+            });
+            const audioBuffer = await audioResp.arrayBuffer();
+
+            const formData = new FormData();
+            formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
+            formData.append('model', 'whisper-1');
+
+            const transcribeResp = await fetch(
+              'https://ai.gateway.lovable.dev/v1/audio/transcriptions',
+              { method: 'POST', headers: { 'Authorization': `Bearer ${lovableApiKey}` }, body: formData }
+            );
+
+            if (transcribeResp.ok) {
+              const result = await transcribeResp.json();
+              if (result.text) {
+                await supabase.from('messages').update({ content: result.text }).eq('id', message.id);
+                message.content = result.text;
+                console.log('[Nina] Audio transcribed successfully:', result.text.substring(0, 50));
+              }
+            }
+          }
+        } else {
+          message.content = '[O usuário enviou um áudio. Peça para ele enviar uma mensagem de texto pois não foi possível processar o áudio.]';
+        }
+      } catch (transcribeError) {
+        console.error('[Nina] Error transcribing audio:', transcribeError);
+        message.content = '[O usuário enviou um áudio. Peça para ele enviar uma mensagem de texto.]';
+      }
+    } else {
+      message.content = '[O usuário enviou um áudio. Peça para ele enviar uma mensagem de texto pois não foi possível processar o áudio.]';
+    }
+  }
+
   // Get recent messages for context (last 20)
   const { data: recentMessages } = await supabase
     .from('messages')
@@ -1266,15 +1340,29 @@ INSTRUÇÃO CRÍTICA DE FORMATO:
 function breakMessageIntoChunks(content: string): string[] {
   const chunks = content.split(/\n\n+/).map(c => c.trim()).filter(c => c.length > 0);
 
-  if (chunks.length > 1) {
-    const questionsCount = chunks.filter(c => c.trim().endsWith('?')).length;
-    if (questionsCount > 1) {
-      console.log('[Nina] Multiple questions in chunks detected, merging into 1 message');
-      return [chunks.join('\n\n')];
-    }
+  if (chunks.length <= 1) return chunks.length > 0 ? chunks : [content];
+
+  // Regra 1: 2+ perguntas independentes → juntar
+  const questionsCount = chunks.filter(c => c.trim().endsWith('?')).length;
+  if (questionsCount > 1) {
+    console.log('[Nina] Multiple questions detected, merging into 1 message');
+    return [chunks.join('\n\n')];
   }
 
-  return chunks.length > 0 ? chunks : [content];
+  // Regra 2: 2+ chunks com frases completas → são mensagens independentes, juntar
+  const completeChunks = chunks.filter(c => /[.!?😊😄🙂]$/.test(c.trim()));
+  if (completeChunks.length >= 2) {
+    console.log('[Nina] Multiple complete sentences detected, merging into 1 message');
+    return [chunks.join('\n\n')];
+  }
+
+  // Regra 3: Mais de 2 chunks → sempre juntar
+  if (chunks.length > 2) {
+    console.log('[Nina] Too many chunks, merging into 1 message');
+    return [chunks.join('\n\n')];
+  }
+
+  return chunks;
 }
 
 function getModelSettings(settings: any, conversationHistory: any[], message: any, contact: any, clientMemory: any): { model: string; temperature: number } {
