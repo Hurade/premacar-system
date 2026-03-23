@@ -357,6 +357,62 @@ function validateAIResponse(response: string): { message: string; issues: string
 }
 
 // ═══════════════════════════════════════════
+// BOT DETECTION
+// ═══════════════════════════════════════════
+function detectBot(message: string, lastNinaMessageAt: string | null): { isBot: boolean; score: number; reasons: string[] } {
+  let score = 0;
+  const reasons: string[] = [];
+
+  // Sinal 1: Se identifica como bot/assistente (+50 pontos)
+  const botIdentifiers = [
+    /sou (um |uma )?(assistente|bot|robô|sistema|chatbot|ia|inteligência artificial|atendente virtual|agente virtual)/i,
+    /assistente (virtual|automático|digital)/i,
+    /atendimento (automático|virtual|robotizado)/i,
+    /sou (o |a )?[a-z]+ (bot|ia|assistant)/i,
+    /this is an? (automated|automatic|virtual|ai)/i,
+    /I am an? (ai|bot|assistant|automated)/i,
+  ];
+  if (botIdentifiers.some(r => r.test(message))) {
+    score += 50;
+    reasons.push('Se identificou como bot/assistente');
+  }
+
+  // Sinal 2: Resposta em menos de 3 segundos (+20 pontos)
+  if (lastNinaMessageAt) {
+    const diffMs = Date.now() - new Date(lastNinaMessageAt).getTime();
+    if (diffMs < 3000) {
+      score += 20;
+      reasons.push(`Respondeu em ${diffMs}ms (< 3s)`);
+    }
+  }
+
+  // Sinal 3: Mensagem muito longa e formatada (+15 pontos)
+  const hasFormatting = /(\*[^*]+\*|_[^_]+_|\n[-•]\s|\n\d+\.\s)/.test(message);
+  if (message.length > 300 && hasFormatting) {
+    score += 15;
+    reasons.push('Mensagem longa com formatação estruturada');
+  }
+
+  // Sinal 4: Linguagem extremamente formal e padronizada (+15 pontos)
+  const formalPatterns = [
+    /como posso (te |lhe )?ajudar hoje\??/i,
+    /estou (aqui |disponível )?para (te |lhe )?auxiliar/i,
+    /em que posso (ser útil|ajudar|auxiliar)/i,
+    /atenciosamente/i,
+    /cordialmente/i,
+    /prezado(a)? (cliente|usuário)/i,
+    /para (mais )?informações/i,
+  ];
+  const formalMatches = formalPatterns.filter(r => r.test(message)).length;
+  if (formalMatches >= 2) {
+    score += 15;
+    reasons.push(`${formalMatches} padrões de linguagem robótica detectados`);
+  }
+
+  return { isBot: score >= 50, score, reasons };
+}
+
+// ═══════════════════════════════════════════
 // APPOINTMENT HELPERS (unchanged logic)
 // ═══════════════════════════════════════════
 function parseTimeToMinutes(timeStr: string): number {
@@ -542,6 +598,46 @@ async function processQueueItem(
       await supabase.from('messages').update({ processed_by_nina: true }).eq('id', message.id);
       return;
     }
+  }
+
+  // ═══════════════════════════════════════════
+  // BOT DETECTION
+  // ═══════════════════════════════════════════
+  const { data: lastNinaMsg } = await supabase
+    .from('messages')
+    .select('sent_at')
+    .eq('conversation_id', conversation.id)
+    .eq('from_type', 'nina')
+    .order('sent_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const botDetection = detectBot(message.content || '', lastNinaMsg?.sent_at || null);
+  console.log('[Nina] Bot detection score:', botDetection.score, 'reasons:', botDetection.reasons);
+
+  if (botDetection.isBot) {
+    await supabase
+      .from('conversations')
+      .update({ status: 'paused' })
+      .eq('id', conversation.id);
+
+    const { data: contactData } = await supabase
+      .from('contacts')
+      .select('tags')
+      .eq('id', conversation.contact_id)
+      .single();
+
+    const currentTags: string[] = contactData?.tags || [];
+    if (!currentTags.includes('BOT-SUSPEITO')) {
+      await supabase
+        .from('contacts')
+        .update({ tags: [...currentTags, 'BOT-SUSPEITO'] })
+        .eq('id', conversation.contact_id);
+    }
+
+    console.log('[Nina] BOT DETECTED - conversation paused. Score:', botDetection.score, 'Reasons:', botDetection.reasons.join(', '));
+    await supabase.from('messages').update({ processed_by_nina: true }).eq('id', message.id);
+    return;
   }
 
   // Check if the latest message from user is the one we're processing (avoid stale processing)
