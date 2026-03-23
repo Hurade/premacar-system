@@ -679,47 +679,94 @@ async function processQueueItem(
   // ═══════════════════════════════════════════
   // AUDIO TRANSCRIPTION: Resolve before sending to AI
   // ═══════════════════════════════════════════
-  if (message.type === 'audio' &&
-      (message.content?.includes('[áudio') || message.content?.includes('[audio'))) {
+  if (message.type === 'audio') {
+    console.log('[Nina] Audio message detected, attempting transcription...');
 
-    // Wait up to 2s in case the message-grouper is already transcribing
+    // Wait 2s in case the message-grouper is already transcribing
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const { data: updatedMsg } = await supabase
+    // Re-fetch — grouper may have updated the content
+    const { data: refreshedMsg } = await supabase
       .from('messages')
-      .select('content')
+      .select('content, media_url')
       .eq('id', message.id)
       .single();
 
-    if (updatedMsg?.content &&
-        !updatedMsg.content.includes('[áudio') &&
-        !updatedMsg.content.includes('[audio')) {
-      // Grouper already transcribed it
-      message.content = updatedMsg.content;
-      console.log('[Nina] Using transcription from grouper:', updatedMsg.content.substring(0, 50));
-    } else if (message.media_url) {
-      // Try to transcribe now
-      console.log('[Nina] Audio message without transcription — trying to transcribe now');
-      try {
-        const { data: audioSettings } = await supabase
-          .from('nina_settings')
-          .select('meta_access_token')
-          .limit(1)
-          .single();
+    const currentContent = refreshedMsg?.content || message.content || '';
+    const isAlreadyTranscribed =
+      currentContent.length > 5 &&
+      !currentContent.includes('[áudio') &&
+      !currentContent.includes('[audio') &&
+      currentContent !== '[áudio recebido]';
 
-        if (audioSettings?.meta_access_token) {
-          const mediaResp = await fetch(
-            `https://graph.facebook.com/v21.0/${message.media_url}`,
-            { headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` } }
-          );
-          const mediaData = await mediaResp.json();
+    if (isAlreadyTranscribed) {
+      message.content = currentContent;
+      console.log('[Nina] Grouper already transcribed:', currentContent.substring(0, 50));
+    } else {
+      const mediaId = refreshedMsg?.media_url || message.media_url;
 
-          if (mediaData.url) {
-            const audioResp = await fetch(mediaData.url, {
-              headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` }
-            });
-            const audioBuffer = await audioResp.arrayBuffer();
+      if (mediaId) {
+        try {
+          const { data: audioSettings } = await supabase
+            .from('nina_settings')
+            .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
+            .limit(1)
+            .single();
 
+          let audioBuffer: ArrayBuffer | null = null;
+
+          // Try Meta API first
+          if (audioSettings?.meta_access_token) {
+            try {
+              const mediaResp = await fetch(
+                `https://graph.facebook.com/v21.0/${mediaId}`,
+                { headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` } }
+              );
+              if (mediaResp.ok) {
+                const mediaData = await mediaResp.json();
+                if (mediaData.url) {
+                  const audioResp = await fetch(mediaData.url, {
+                    headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` }
+                  });
+                  if (audioResp.ok) {
+                    audioBuffer = await audioResp.arrayBuffer();
+                    console.log('[Nina] Audio downloaded via Meta API, size:', audioBuffer.byteLength);
+                  }
+                }
+              }
+            } catch (metaErr) {
+              console.error('[Nina] Meta API download failed:', metaErr);
+            }
+          }
+
+          // Fallback: Evolution API
+          if (!audioBuffer && audioSettings?.evolution_api_url && audioSettings?.evolution_api_key) {
+            try {
+              const evoResp = await fetch(
+                `${audioSettings.evolution_api_url}/chat/getBase64FromMediaMessage/${audioSettings.evolution_instance_name}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'apikey': audioSettings.evolution_api_key },
+                  body: JSON.stringify({ message: { key: { id: mediaId } } })
+                }
+              );
+              if (evoResp.ok) {
+                const evoData = await evoResp.json();
+                if (evoData.base64) {
+                  const binaryStr = atob(evoData.base64);
+                  const bytes = new Uint8Array(binaryStr.length);
+                  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                  audioBuffer = bytes.buffer;
+                  console.log('[Nina] Audio downloaded via Evolution API');
+                }
+              }
+            } catch (evoErr) {
+              console.error('[Nina] Evolution API download failed:', evoErr);
+            }
+          }
+
+          // Transcribe with Whisper
+          if (audioBuffer && audioBuffer.byteLength > 0) {
             const formData = new FormData();
             formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
             formData.append('model', 'whisper-1');
@@ -732,21 +779,24 @@ async function processQueueItem(
             if (transcribeResp.ok) {
               const result = await transcribeResp.json();
               if (result.text) {
-                await supabase.from('messages').update({ content: result.text }).eq('id', message.id);
                 message.content = result.text;
-                console.log('[Nina] Audio transcribed successfully:', result.text.substring(0, 50));
+                await supabase.from('messages').update({ content: result.text }).eq('id', message.id);
+                console.log('[Nina] Audio transcribed:', result.text.substring(0, 80));
               }
+            } else {
+              console.error('[Nina] Whisper error:', transcribeResp.status);
+              message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
             }
+          } else {
+            message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
           }
-        } else {
-          message.content = '[O usuário enviou um áudio. Peça para ele enviar uma mensagem de texto pois não foi possível processar o áudio.]';
+        } catch (err) {
+          console.error('[Nina] Audio transcription error:', err);
+          message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
         }
-      } catch (transcribeError) {
-        console.error('[Nina] Error transcribing audio:', transcribeError);
-        message.content = '[O usuário enviou um áudio. Peça para ele enviar uma mensagem de texto.]';
+      } else {
+        message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
       }
-    } else {
-      message.content = '[O usuário enviou um áudio. Peça para ele enviar uma mensagem de texto pois não foi possível processar o áudio.]';
     }
   }
 
@@ -760,8 +810,9 @@ async function processQueueItem(
 
   const conversationHistory = (recentMessages || [])
     .reverse()
+    .filter((msg: any) => ['nina', 'human', 'user'].includes(msg.from_type))
     .map((msg: any) => ({
-      role: msg.from_type === 'user' ? 'user' : 'assistant',
+      role: msg.from_type === 'nina' ? 'assistant' : 'user',
       content: msg.content || '[media]'
     }));
 
