@@ -4,7 +4,6 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { StatMetric } from '../types';
 import { api } from '../services/api';
 import { OnboardingBanner } from './OnboardingBanner';
-import { SystemHealthCard } from './SystemHealthCard';
 import { useOutletContext } from 'react-router-dom';
 
 interface OutletContext {
@@ -96,9 +95,6 @@ const Dashboard: React.FC = () => {
     <div className="p-6 space-y-8 overflow-y-auto h-full bg-slate-950 text-slate-50 custom-scrollbar">
       {/* Onboarding Banner */}
       <OnboardingBanner onOpenWizard={() => setShowOnboarding(true)} />
-
-      {/* System Health Card */}
-      <SystemHealthCard />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

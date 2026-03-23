@@ -124,17 +124,19 @@ export const api = {
         appointmentsPrevResult,
         avgResponseResult
       ] = await Promise.all([
-        // Atendimentos = conversas únicas com atividade no período
+        // Atendimentos = mensagens recebidas de clientes no período
         supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_message_at', periodStartStr),
+          .from('messages')
+          .select('conversation_id', { count: 'exact', head: true })
+          .eq('from_type', 'customer')
+          .gte('sent_at', periodStartStr),
         // Atendimentos no período anterior
         supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_message_at', prevPeriodStartStr)
-          .lt('last_message_at', periodStartStr),
+          .from('messages')
+          .select('conversation_id', { count: 'exact', head: true })
+          .eq('from_type', 'customer')
+          .gte('sent_at', prevPeriodStartStr)
+          .lt('sent_at', periodStartStr),
         // New contacts in period
         supabase
           .from('contacts')
@@ -244,7 +246,8 @@ export const api = {
       const [messagesResult, dealsResult, appointmentsResult] = await Promise.all([
         supabase
           .from('messages')
-          .select('sent_at')
+          .select('sent_at, conversation_id')
+          .eq('from_type', 'customer')
           .gte('sent_at', periodStart.toISOString()),
         supabase
           .from('deals')
