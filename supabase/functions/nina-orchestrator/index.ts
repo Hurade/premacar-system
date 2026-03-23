@@ -337,6 +337,16 @@ function validateAIResponse(response: string): { message: string; issues: string
     }
   }
 
+  // Detect multiple independent paragraphs — IA deve enviar apenas 1 mensagem
+  const paragraphs = cleaned.split(/\n\n+/).filter(p => p.trim().length > 0);
+  if (paragraphs.length > 2) {
+    const firstMeaningfulParagraph = paragraphs.find(p => p.trim().length > 20);
+    if (firstMeaningfulParagraph) {
+      issues.push('Multiple paragraphs detected — keeping first meaningful paragraph');
+      cleaned = firstMeaningfulParagraph;
+    }
+  }
+
   // Check emoji count - max 2
   const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
   const emojis = cleaned.match(emojiRegex) || [];
@@ -1241,11 +1251,29 @@ ${origemConversa.origem === 'retorno' ? `
     }
   }
 
-  return basePrompt + contextInfo;
+  const antiDoubleMessageInstruction = `
+
+INSTRUÇÃO CRÍTICA DE FORMATO:
+- Responda com APENAS 1 mensagem curta
+- NUNCA envie 2 perguntas ou 2 blocos de texto separados
+- Se precisar fazer uma pergunta, faça APENAS 1
+- Não use duplo Enter (parágrafo duplo) para separar ideias diferentes
+- Use Enter simples se precisar de quebra de linha`;
+
+  return basePrompt + contextInfo + antiDoubleMessageInstruction;
 }
 
 function breakMessageIntoChunks(content: string): string[] {
-  const chunks = content.split(/\n\n+/).map(chunk => chunk.trim()).filter(chunk => chunk.length > 0);
+  const chunks = content.split(/\n\n+/).map(c => c.trim()).filter(c => c.length > 0);
+
+  if (chunks.length > 1) {
+    const questionsCount = chunks.filter(c => c.trim().endsWith('?')).length;
+    if (questionsCount > 1) {
+      console.log('[Nina] Multiple questions in chunks detected, merging into 1 message');
+      return [chunks.join('\n\n')];
+    }
+  }
+
   return chunks.length > 0 ? chunks : [content];
 }
 
