@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -45,6 +46,9 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [previewData, setPreviewData] = useState<any[]>([]);
+  const [validateWhatsapp, setValidateWhatsapp] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationProgress, setValidationProgress] = useState({ current: 0, total: 0, valid: 0, invalid: 0 });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -150,7 +154,7 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
         .map(row => {
           const phoneRaw = row[columnMapping.telefone];
           const phone = normalizePhone(phoneRaw);
-          
+
           // Pegar nome e oficina pelos headers mapeados
           const nome = columnMapping.nome ? row[columnMapping.nome] : null;
           const oficina = columnMapping.oficina ? row[columnMapping.oficina] : null;
@@ -167,20 +171,82 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
       console.log(`Total de contatos válidos para importar: ${contacts.length}`);
       console.log('Amostra dos primeiros 3:', contacts.slice(0, 3));
 
+      // ── WhatsApp validation ────────────────────────────────────────────
+      let contactsToImport = contacts;
+
+      if (validateWhatsapp) {
+        setImporting(false);
+        setValidating(true);
+        setValidationProgress({ current: 0, total: contacts.length, valid: 0, invalid: 0 });
+
+        const { data: settings } = await supabase
+          .from('nina_settings')
+          .select('evolution_api_url, evolution_api_key, evolution_instance_name')
+          .limit(1)
+          .single();
+
+        if (!settings?.evolution_api_url || !settings?.evolution_api_key) {
+          toast.warning('Evolution API não configurada. Importando sem validação de WhatsApp.');
+        } else {
+          const validNumbers = new Set<string>();
+          const waBatchSize = 50;
+
+          for (let i = 0; i < contacts.length; i += waBatchSize) {
+            const batch = contacts.slice(i, i + waBatchSize);
+            const numbers = batch.map(c => c.phone_number);
+
+            try {
+              const response = await fetch(
+                `${settings.evolution_api_url}/chat/whatsappNumbers/${settings.evolution_instance_name}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'apikey': settings.evolution_api_key },
+                  body: JSON.stringify({ numbers })
+                }
+              );
+
+              if (response.ok) {
+                const result: { number: string; exists: boolean }[] = await response.json();
+                result.forEach(item => { if (item.exists) validNumbers.add(item.number); });
+              } else {
+                batch.forEach(c => validNumbers.add(c.phone_number));
+              }
+            } catch (err) {
+              console.error('[Import] WhatsApp validation error:', err);
+              batch.forEach(c => validNumbers.add(c.phone_number));
+            }
+
+            const processed = Math.min(i + waBatchSize, contacts.length);
+            setValidationProgress({
+              current: processed,
+              total: contacts.length,
+              valid: validNumbers.size,
+              invalid: processed - validNumbers.size
+            });
+          }
+
+          contactsToImport = contacts.filter(c => validNumbers.has(c.phone_number));
+        }
+
+        setValidating(false);
+        setImporting(true);
+      }
+      // ──────────────────────────────────────────────────────────────────
+
       // Importar em lotes menores para evitar timeout e limites
       const batchSize = 100;
-      const totalBatches = Math.ceil(contacts.length / batchSize);
-      
-      for (let i = 0; i < contacts.length; i += batchSize) {
-        const batch = contacts.slice(i, i + batchSize);
+      const totalBatches = Math.ceil(contactsToImport.length / batchSize);
+
+      for (let i = 0; i < contactsToImport.length; i += batchSize) {
+        const batch = contactsToImport.slice(i, i + batchSize);
         const batchNumber = Math.floor(i / batchSize) + 1;
-        
+
         // Usar insert com onConflict em vez de upsert para melhor controle
         const { data, error } = await supabase
           .from('contacts')
-          .upsert(batch, { 
+          .upsert(batch, {
             onConflict: 'phone_number',
-            ignoreDuplicates: false 
+            ignoreDuplicates: false
           })
           .select('id');
 
@@ -194,13 +260,17 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
         }
 
         // Pequeno delay entre lotes para não sobrecarregar
-        if (i + batchSize < contacts.length) {
+        if (i + batchSize < contactsToImport.length) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
       if (successCount > 0) {
-        toast.success(`Importação concluída! ${successCount} contatos importados/atualizados.`);
+        toast.success(
+          validateWhatsapp
+            ? `Importação concluída! ${successCount} importados. ${contacts.length - contactsToImport.length} ignorados (sem WhatsApp).`
+            : `Importação concluída! ${successCount} contatos importados/atualizados.`
+        );
       }
       if (errorCount > 0) {
         toast.warning(`${errorCount} contatos não puderam ser importados.`);
@@ -335,6 +405,39 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
                 </div>
               </div>
 
+              {/* WhatsApp validation toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+                <div>
+                  <p className="text-sm font-medium text-white">Validar WhatsApp antes de importar</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Verifica quais números têm WhatsApp ativo. Números inválidos serão ignorados.
+                  </p>
+                </div>
+                <Switch checked={validateWhatsapp} onCheckedChange={setValidateWhatsapp} />
+              </div>
+
+              {/* Validation progress */}
+              {validating && (
+                <div className="space-y-3 p-4 bg-slate-800/50 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                    <span className="text-sm text-slate-300">
+                      Validando WhatsApp... {validationProgress.current}/{validationProgress.total}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-cyan-500 rounded-full transition-all"
+                      style={{ width: `${validationProgress.total > 0 ? (validationProgress.current / validationProgress.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <div className="flex gap-4 text-xs">
+                    <span className="text-emerald-400">✓ {validationProgress.valid} com WhatsApp</span>
+                    <span className="text-red-400">✗ {validationProgress.invalid} sem WhatsApp</span>
+                  </div>
+                </div>
+              )}
+
               {/* Target folder */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -405,10 +508,15 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
               </Button>
               <Button
                 onClick={handleImport}
-                disabled={importing || !columnMapping.telefone}
+                disabled={importing || validating || !columnMapping.telefone}
                 className="min-w-32"
               >
-                {importing ? (
+                {validating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Validando WhatsApp...
+                  </>
+                ) : importing ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Importando...
