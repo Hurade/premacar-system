@@ -124,17 +124,17 @@ export const api = {
         appointmentsPrevResult,
         avgResponseResult
       ] = await Promise.all([
-        // Atendimentos = mensagens recebidas de clientes no período
+        // Atendimentos = conversas únicas com resposta real de cliente no período
         supabase
           .from('messages')
-          .select('conversation_id', { count: 'exact', head: true })
-          .eq('from_type', 'customer')
+          .select('conversation_id')
+          .eq('from_type', 'human')
           .gte('sent_at', periodStartStr),
         // Atendimentos no período anterior
         supabase
           .from('messages')
-          .select('conversation_id', { count: 'exact', head: true })
-          .eq('from_type', 'customer')
+          .select('conversation_id')
+          .eq('from_type', 'human')
           .gte('sent_at', prevPeriodStartStr)
           .lt('sent_at', periodStartStr),
         // New contacts in period
@@ -181,8 +181,8 @@ export const api = {
           .gte('sent_at', periodStartStr)
       ]);
 
-      const atendimentosPeriod = messagesPeriodResult.count || 0;
-      const atendimentosPrev = messagesPrevResult.count || 0;
+      const atendimentosPeriod = new Set(messagesPeriodResult.data?.map(m => m.conversation_id)).size;
+      const atendimentosPrev = new Set(messagesPrevResult.data?.map(m => m.conversation_id)).size;
       const contactsPeriod = contactsPeriodResult.count || 0;
       const contactsPrev = contactsPrevResult.count || 0;
       
@@ -247,7 +247,7 @@ export const api = {
         supabase
           .from('messages')
           .select('sent_at, conversation_id')
-          .eq('from_type', 'customer')
+          .eq('from_type', 'human')
           .gte('sent_at', periodStart.toISOString()),
         supabase
           .from('deals')
@@ -260,11 +260,12 @@ export const api = {
           .gte('created_at', periodStart.toISOString())
       ]);
 
-      // Group messages by day
-      const messagesMap = new Map<string, number>();
+      // Group messages by day (count distinct conversation_id per day)
+      const messagesSetMap = new Map<string, Set<string>>();
       (messagesResult.data || []).forEach(m => {
         const dateStr = getDateString(new Date(m.sent_at));
-        messagesMap.set(dateStr, (messagesMap.get(dateStr) || 0) + 1);
+        if (!messagesSetMap.has(dateStr)) messagesSetMap.set(dateStr, new Set());
+        messagesSetMap.get(dateStr)!.add(m.conversation_id);
       });
 
       // Group conversions by day (deals + appointments)
@@ -301,7 +302,7 @@ export const api = {
         
         result.push({
           name,
-          chats: messagesMap.get(dateStr) || 0,
+          chats: messagesSetMap.get(dateStr)?.size || 0,
           sales: conversionsMap.get(dateStr) || 0
         });
       }
