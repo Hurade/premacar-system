@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(find /c/Users/vitor/premacar-system/supabase/functions/whatsapp-sender/ -type f -name *)",
-      "Bash(find /c/Users/vitor/premacar-system/supabase/ -name *.json -o -name config.*)"
+      "Bash(find /c/Users/vitor/premacar-system/supabase/ -name *.json -o -name config.*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

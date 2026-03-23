@@ -70,12 +70,13 @@ export function WindowExpiredAlert({
             template: {
               name: template.name,
               language: { code: 'pt_BR' },
-              components: template.category !== 'UTILITY' ? [
+              components: template.parameters_count > 0 ? [
                 {
                   type: 'body',
-                  parameters: [
-                    { type: 'text', text: contact.name || 'Cliente' },
-                  ],
+                  parameters: template.parameters_mapping.map((mapping) => ({
+                    type: 'text',
+                    text: mapping.field === 'name' ? (contact.name || 'Cliente') : '',
+                  })),
                 },
               ] : undefined,
             },
