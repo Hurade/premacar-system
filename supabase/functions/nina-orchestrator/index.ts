@@ -369,9 +369,47 @@ async function createAppointmentFromAI(
   args: { title: string; date: string; time: string; duration?: number; type: 'demo' | 'meeting' | 'support' | 'followup'; description?: string; }
 ): Promise<any> {
   console.log('[Nina] Creating appointment from AI:', args);
-  
+
   const appointmentDate = new Date(`${args.date}T${args.time}:00`);
   if (appointmentDate < new Date()) return { error: 'date_in_past' };
+
+  // ── Availability validation ──────────────────────────────────────────
+  const { data: availSettings } = await supabase
+    .from('nina_settings')
+    .select('scheduling_available_days, scheduling_start_time, scheduling_end_time, scheduling_slot_duration, scheduling_lunch_break_enabled, scheduling_lunch_start, scheduling_lunch_end')
+    .limit(1)
+    .single();
+
+  const dayOfWeek = new Date(`${args.date}T12:00:00`).getDay();
+  const availableDays: number[] = availSettings?.scheduling_available_days || [1, 2, 3, 4, 5];
+  if (!availableDays.includes(dayOfWeek)) {
+    return { error: 'day_not_available', dayOfWeek };
+  }
+
+  const requestedMinutes = parseTimeToMinutes(args.time);
+  const startMinutes = parseTimeToMinutes(availSettings?.scheduling_start_time?.slice(0, 5) || '09:00');
+  const endMinutes = parseTimeToMinutes(availSettings?.scheduling_end_time?.slice(0, 5) || '18:00');
+  const slotDuration = availSettings?.scheduling_slot_duration || 30;
+  if (requestedMinutes < startMinutes || requestedMinutes + slotDuration > endMinutes) {
+    return {
+      error: 'outside_hours',
+      availableStart: availSettings?.scheduling_start_time?.slice(0, 5) || '09:00',
+      availableEnd: availSettings?.scheduling_end_time?.slice(0, 5) || '18:00',
+    };
+  }
+
+  if (availSettings?.scheduling_lunch_break_enabled) {
+    const lunchStart = parseTimeToMinutes(availSettings.scheduling_lunch_start?.slice(0, 5) || '12:00');
+    const lunchEnd = parseTimeToMinutes(availSettings.scheduling_lunch_end?.slice(0, 5) || '13:30');
+    if (requestedMinutes < lunchEnd && requestedMinutes + slotDuration > lunchStart) {
+      return {
+        error: 'lunch_break',
+        lunchStart: availSettings.scheduling_lunch_start?.slice(0, 5) || '12:00',
+        lunchEnd: availSettings.scheduling_lunch_end?.slice(0, 5) || '13:30',
+      };
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────
   
   const query = supabase.from('appointments').select('id, time, duration, title').eq('date', args.date).eq('status', 'scheduled');
   if (userId) query.eq('user_id', userId);
@@ -629,10 +667,44 @@ async function processQueueItem(
         if (appointmentCreated && !appointmentCreated.error) {
           const dateFormatted = args.date.split('-').reverse().join('/');
           aiContent = (aiContent || '') + `\n\n✅ Agendamento confirmado para ${dateFormatted} às ${args.time}!`;
+
+          // Commercial notification
+          try {
+            const { data: contact } = await supabase
+              .from('contacts')
+              .select('name, phone_number')
+              .eq('id', conversation.contact_id)
+              .single();
+
+            const { data: notifSettings } = await supabase
+              .from('nina_settings')
+              .select('scheduling_notify_commercial, scheduling_notify_phone, evolution_api_url, evolution_api_key, evolution_instance_name, scheduling_notify_evolution_instance')
+              .limit(1)
+              .single();
+
+            if (notifSettings?.scheduling_notify_commercial && notifSettings?.scheduling_notify_phone) {
+              const instance = notifSettings.scheduling_notify_evolution_instance || notifSettings.evolution_instance_name;
+              const notifMessage = `🗓️ *Novo Agendamento PremaCar*\n\n👤 *Lead:* ${contact?.name || 'Sem nome'}\n📱 *Telefone:* ${contact?.phone_number}\n📅 *Data:* ${dateFormatted}\n🕐 *Horário:* ${args.time}\n📋 *Título:* ${args.title}\n\n${args.description ? `📝 *Contexto:* ${args.description}` : ''}`;
+              await fetch(`${notifSettings.evolution_api_url}/message/sendText/${instance}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': notifSettings.evolution_api_key },
+                body: JSON.stringify({ number: notifSettings.scheduling_notify_phone.replace(/\D/g, ''), text: notifMessage })
+              });
+              console.log('[Nina] Commercial notification sent');
+            }
+          } catch (notifError) {
+            console.error('[Nina] Error sending commercial notification:', notifError);
+          }
         } else if (appointmentCreated?.error === 'date_in_past') {
           aiContent = (aiContent || '') + '\n\n⚠️ Não foi possível agendar para uma data passada. Por favor, escolha uma data futura.';
         } else if (appointmentCreated?.error === 'time_conflict') {
           aiContent = (aiContent || '') + `\n\n⚠️ Já existe um agendamento para esse horário (${appointmentCreated.conflictWith}). Podemos agendar em outro horário?`;
+        } else if (appointmentCreated?.error === 'day_not_available') {
+          aiContent = (aiContent || '') + '\n\n⚠️ Não tenho disponibilidade nesse dia. Meus dias disponíveis são de segunda a sexta. Podemos escolher outro dia?';
+        } else if (appointmentCreated?.error === 'outside_hours') {
+          aiContent = (aiContent || '') + `\n\n⚠️ Esse horário está fora do meu expediente (${appointmentCreated.availableStart} às ${appointmentCreated.availableEnd}). Qual horário dentro desse período funciona pra você?`;
+        } else if (appointmentCreated?.error === 'lunch_break') {
+          aiContent = (aiContent || '') + `\n\n⚠️ Esse horário coincide com o intervalo de almoço (${appointmentCreated.lunchStart} às ${appointmentCreated.lunchEnd}). Podemos agendar antes ou depois?`;
         }
       } catch (parseError) { console.error('[Nina] Error parsing create_appointment:', parseError); }
     }

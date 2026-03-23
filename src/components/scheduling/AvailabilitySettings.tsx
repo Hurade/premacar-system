@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, Settings2, Save, Loader2, Link2 } from 'lucide-react';
+import { Clock, Calendar, Settings2, Save, Loader2, Link2, Bell, Coffee } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/Button';
@@ -12,6 +12,12 @@ interface AvailabilityConfig {
   scheduling_slot_duration: number;
   scheduling_buffer_between: number;
   google_calendar_url: string | null;
+  scheduling_lunch_break_enabled: boolean;
+  scheduling_lunch_start: string;
+  scheduling_lunch_end: string;
+  scheduling_notify_commercial: boolean;
+  scheduling_notify_phone: string;
+  scheduling_notify_evolution_instance: string;
 }
 
 const DAYS_OF_WEEK = [
@@ -52,6 +58,12 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
     scheduling_slot_duration: 30,
     scheduling_buffer_between: 0,
     google_calendar_url: null,
+    scheduling_lunch_break_enabled: false,
+    scheduling_lunch_start: '12:00',
+    scheduling_lunch_end: '13:30',
+    scheduling_notify_commercial: false,
+    scheduling_notify_phone: '',
+    scheduling_notify_evolution_instance: '',
   });
 
   useEffect(() => {
@@ -62,7 +74,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
     try {
       const { data, error } = await supabase
         .from('nina_settings')
-        .select('scheduling_available_days, scheduling_start_time, scheduling_end_time, scheduling_slot_duration, scheduling_buffer_between, google_calendar_url')
+        .select('scheduling_available_days, scheduling_start_time, scheduling_end_time, scheduling_slot_duration, scheduling_buffer_between, google_calendar_url, scheduling_lunch_break_enabled, scheduling_lunch_start, scheduling_lunch_end, scheduling_notify_commercial, scheduling_notify_phone, scheduling_notify_evolution_instance')
         .limit(1)
         .maybeSingle();
 
@@ -76,6 +88,12 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
           scheduling_slot_duration: (data as any).scheduling_slot_duration || 30,
           scheduling_buffer_between: (data as any).scheduling_buffer_between || 0,
           google_calendar_url: (data as any).google_calendar_url || null,
+          scheduling_lunch_break_enabled: (data as any).scheduling_lunch_break_enabled ?? false,
+          scheduling_lunch_start: (data as any).scheduling_lunch_start?.slice(0, 5) || '12:00',
+          scheduling_lunch_end: (data as any).scheduling_lunch_end?.slice(0, 5) || '13:30',
+          scheduling_notify_commercial: (data as any).scheduling_notify_commercial ?? false,
+          scheduling_notify_phone: (data as any).scheduling_notify_phone || '',
+          scheduling_notify_evolution_instance: (data as any).scheduling_notify_evolution_instance || '',
         });
       }
     } catch (error) {
@@ -108,6 +126,12 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
         scheduling_slot_duration: config.scheduling_slot_duration,
         scheduling_buffer_between: config.scheduling_buffer_between,
         google_calendar_url: config.google_calendar_url,
+        scheduling_lunch_break_enabled: config.scheduling_lunch_break_enabled,
+        scheduling_lunch_start: config.scheduling_lunch_start + ':00',
+        scheduling_lunch_end: config.scheduling_lunch_end + ':00',
+        scheduling_notify_commercial: config.scheduling_notify_commercial,
+        scheduling_notify_phone: config.scheduling_notify_phone || null,
+        scheduling_notify_evolution_instance: config.scheduling_notify_evolution_instance || null,
       };
 
       if (existing?.id) {
@@ -236,6 +260,44 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
         </div>
       </div>
 
+      {/* Lunch Break */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+            <Coffee className="w-4 h-4 text-slate-400" />
+            Intervalo de Almoço
+          </label>
+          <button
+            onClick={() => setConfig(prev => ({ ...prev, scheduling_lunch_break_enabled: !prev.scheduling_lunch_break_enabled }))}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${config.scheduling_lunch_break_enabled ? 'bg-cyan-500' : 'bg-slate-600'}`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${config.scheduling_lunch_break_enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        {config.scheduling_lunch_break_enabled && (
+          <div className="grid grid-cols-2 gap-4 pl-6">
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400">Início do intervalo</label>
+              <input
+                type="time"
+                value={config.scheduling_lunch_start}
+                onChange={(e) => setConfig(prev => ({ ...prev, scheduling_lunch_start: e.target.value }))}
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400">Fim do intervalo</label>
+              <input
+                type="time"
+                value={config.scheduling_lunch_end}
+                onChange={(e) => setConfig(prev => ({ ...prev, scheduling_lunch_end: e.target.value }))}
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Slot Duration & Buffer */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -280,6 +342,49 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
         <p className="text-xs text-slate-500">
           Cole o link do seu Google Calendar Appointment Schedule para referência
         </p>
+      </div>
+
+      {/* Commercial Notification */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-slate-400" />
+            Notificação de Agendamento
+          </label>
+          <button
+            onClick={() => setConfig(prev => ({ ...prev, scheduling_notify_commercial: !prev.scheduling_notify_commercial }))}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${config.scheduling_notify_commercial ? 'bg-cyan-500' : 'bg-slate-600'}`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${config.scheduling_notify_commercial ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        {config.scheduling_notify_commercial && (
+          <div className="space-y-3 pl-6">
+            <p className="text-xs text-slate-500">
+              Quando a IA confirmar um agendamento, uma mensagem será enviada automaticamente para este número via WhatsApp.
+            </p>
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400">Número do comercial</label>
+              <input
+                type="text"
+                value={config.scheduling_notify_phone}
+                onChange={(e) => setConfig(prev => ({ ...prev, scheduling_notify_phone: e.target.value }))}
+                placeholder="5511999999999"
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400">Instância Evolution (opcional)</label>
+              <input
+                type="text"
+                value={config.scheduling_notify_evolution_instance}
+                onChange={(e) => setConfig(prev => ({ ...prev, scheduling_notify_evolution_instance: e.target.value }))}
+                placeholder="Deixe vazio para usar a instância padrão"
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Preview */}
