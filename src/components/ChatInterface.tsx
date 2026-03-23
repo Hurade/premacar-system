@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
@@ -40,6 +41,8 @@ import { useConversationWindow } from '@/hooks/useConversationWindow';
 import { WindowStatusBadge } from './chat/WindowStatusBadge';
 import { WindowExpiredAlert } from './chat/WindowExpiredAlert';
 import { PipelineDrawer } from './chat/PipelineDrawer';
+import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 type FilterType = 'all' | 'unread';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
@@ -86,6 +89,8 @@ const ChatInterface: React.FC = () => {
   const [selectedContactForConv, setSelectedContactForConv] = useState<ContactOption | null>(null);
   const [selectedTagsForConv, setSelectedTagsForConv] = useState<string[]>([]);
   const [selectedApiSource, setSelectedApiSource] = useState<'meta' | 'evolution'>('evolution');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [newContactMode, setNewContactMode] = useState(false);
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -117,7 +122,23 @@ const ChatInterface: React.FC = () => {
     loading: windowLoading,
     refetch: refetchWindow,
   } = useConversationWindow(selectedChatId, activeChat?.apiSource);
-  
+
+  // Approved Meta templates for new conversation modal
+  const { data: approvedMetaTemplates = [] } = useApprovedMetaTemplates();
+
+  // Active WhatsApp connections for new conversation modal
+  const { data: activeConnections = [] } = useQuery({
+    queryKey: ['whatsapp-connections-active'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('whatsapp_connections')
+        .select('id, name, phone_number, is_connected')
+        .eq('is_connected', true)
+        .order('name');
+      return data || [];
+    }
+  });
+
   // Format audio time helper
   const formatAudioTime = (seconds: number): string => {
     if (!seconds || isNaN(seconds)) return '0:00';
@@ -345,30 +366,47 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // Carregar lista de contatos para modal de nova conversa
-  const loadContacts = async () => {
+  // Busca server-side de contatos para modal de nova conversa
+  const searchContacts = useCallback(async (query: string) => {
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('contacts')
         .select('id, name, phone_number')
-        .order('name', { ascending: true });
-      
+        .order('name', { ascending: true })
+        .limit(50);
+
+      if (query.trim()) {
+        q = q.or(`name.ilike.%${query}%,phone_number.ilike.%${query}%`);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       setContactsList(data || []);
     } catch (err) {
-      console.error('Error loading contacts:', err);
-      toast.error('Erro ao carregar contatos');
+      console.error('Error searching contacts:', err);
+      toast.error('Erro ao buscar contatos');
     }
-  };
+  }, []);
+
+  // Debounce contact search
+  useEffect(() => {
+    if (!showNewConversationModal) return;
+    const timer = setTimeout(() => {
+      searchContacts(contactSearchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [contactSearchQuery, showNewConversationModal, searchContacts]);
 
   const handleOpenNewConversationModal = () => {
-    loadContacts();
     setContactSearchQuery('');
     setSelectedContactForConv(null);
     setSelectedTagsForConv([]);
     setSelectedApiSource('evolution');
+    setSelectedTemplateId('');
+    setSelectedConnectionId('');
     setNewContactMode(false);
     setShowNewConversationModal(true);
+    searchContacts('');
   };
 
   const handleInlineContactCreated = async (contactId: string) => {
@@ -400,15 +438,28 @@ const ChatInterface: React.FC = () => {
 
   const handleStartNewConversation = async () => {
     if (!selectedContactForConv) return;
-    
+    if (selectedApiSource === 'meta' && !selectedTemplateId) {
+      toast.error('Selecione um template para iniciar conversa via Meta API');
+      return;
+    }
+    if (selectedApiSource === 'evolution' && activeConnections.length > 1 && !selectedConnectionId) {
+      toast.error('Selecione qual conexão usar');
+      return;
+    }
+
     setIsCreatingConversation(true);
     try {
       // Atualizar tags do contato se selecionadas
       if (selectedTagsForConv.length > 0) {
         await api.updateContactTags(selectedContactForConv.id, selectedTagsForConv);
       }
-      
-      const newConvId = await createConversation(selectedContactForConv.id, selectedApiSource);
+
+      const newConvId = await createConversation(
+        selectedContactForConv.id,
+        selectedApiSource,
+        selectedApiSource === 'meta' ? selectedTemplateId : undefined,
+        selectedApiSource === 'evolution' && activeConnections.length > 0 ? (selectedConnectionId || activeConnections[0].id) : undefined
+      );
       setSelectedChatId(newConvId);
       setShowNewConversationModal(false);
       toast.success(`Conversa iniciada via ${selectedApiSource === 'meta' ? 'Meta API' : 'Evolution API'}!`);
@@ -420,13 +471,6 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  const filteredContactsList = contactsList.filter(contact => {
-    const query = contactSearchQuery.toLowerCase();
-    return (
-      (contact.name?.toLowerCase() || '').includes(query) ||
-      contact.phone_number.includes(query)
-    );
-  });
 
   const filteredConversations = conversations.filter(chat => {
     // Filtro por não lidas
@@ -1661,7 +1705,13 @@ const ChatInterface: React.FC = () => {
       </AlertDialog>
 
       {/* New Conversation Modal */}
-      <Dialog open={showNewConversationModal} onOpenChange={setShowNewConversationModal}>
+      <Dialog open={showNewConversationModal} onOpenChange={(open) => {
+        setShowNewConversationModal(open);
+        if (!open) {
+          setSelectedTemplateId('');
+          setSelectedConnectionId('');
+        }
+      }}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
@@ -1719,13 +1769,13 @@ const ChatInterface: React.FC = () => {
 
                 {/* Lista de contatos */}
                 <div className="max-h-64 overflow-y-auto space-y-1 border border-slate-800 rounded-lg p-2 bg-slate-950/50">
-                  {filteredContactsList.length === 0 ? (
+                  {contactsList.length === 0 ? (
                     <div className="text-center py-8 text-slate-500">
                       <Phone className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">Nenhum contato encontrado</p>
                     </div>
                   ) : (
-                    filteredContactsList.map((contact) => (
+                    contactsList.map((contact) => (
                       <button
                         key={contact.id}
                         onClick={() => handleSelectContactForConv(contact)}
@@ -1802,6 +1852,60 @@ const ChatInterface: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Seletor de template (Meta API) */}
+                {selectedApiSource === 'meta' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-300">Template de abertura *</label>
+                    {approvedMetaTemplates.length === 0 ? (
+                      <p className="text-xs text-slate-500 p-3 border border-slate-700 rounded-lg">
+                        Nenhum template aprovado disponível
+                      </p>
+                    ) : (
+                      <>
+                        <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                          <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200">
+                            <SelectValue placeholder="Selecione um template..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            {approvedMetaTemplates.map(t => (
+                              <SelectItem key={t.id} value={t.id} className="text-slate-200">
+                                {t.display_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedTemplateId && (() => {
+                          const tpl = approvedMetaTemplates.find(t => t.id === selectedTemplateId);
+                          return tpl ? (
+                            <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                              <p className="text-xs text-slate-400 whitespace-pre-wrap">{tpl.body_text}</p>
+                            </div>
+                          ) : null;
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Seletor de conexão (Evolution, múltiplas) */}
+                {selectedApiSource === 'evolution' && activeConnections.length > 1 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-300">Qual conexão usar?</label>
+                    <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
+                      <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200">
+                        <SelectValue placeholder="Selecione uma conexão..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        {activeConnections.map(c => (
+                          <SelectItem key={c.id} value={c.id} className="text-slate-200">
+                            {c.name} ({c.phone_number})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {/* Seleção de Tags */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
@@ -1838,7 +1942,11 @@ const ChatInterface: React.FC = () => {
                 {/* Botão de iniciar */}
                 <Button
                   onClick={handleStartNewConversation}
-                  disabled={isCreatingConversation}
+                  disabled={
+                    isCreatingConversation ||
+                    (selectedApiSource === 'meta' && !selectedTemplateId) ||
+                    (selectedApiSource === 'evolution' && activeConnections.length > 1 && !selectedConnectionId)
+                  }
                   className="w-full h-11 gap-2"
                 >
                   {isCreatingConversation ? (
