@@ -3,7 +3,9 @@
     "allow": [
       "Bash(find /c/Users/vitor/premacar-system/supabase/functions/whatsapp-sender/ -type f -name *)",
       "Bash(find /c/Users/vitor/premacar-system/supabase/ -name *.json -o -name config.*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(./node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

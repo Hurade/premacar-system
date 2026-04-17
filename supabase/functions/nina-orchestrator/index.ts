@@ -9,6 +9,31 @@ const corsHeaders = {
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 // Tool definitions
+const updateContactInfoTool = {
+  type: "function",
+  function: {
+    name: "update_contact_info",
+    description: "Atualizar informações do contato: nome, empresa e notas com contexto coletado durante a qualificação. Chamar ao coletar o nome e ao finalizar a qualificação com o resumo do contexto.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Nome do cliente coletado na conversa"
+        },
+        company: {
+          type: "string",
+          description: "Empresa/oficina do cliente"
+        },
+        notes: {
+          type: "string",
+          description: "Resumo estruturado do contexto do lead para a equipe comercial consultar depois. Inclua: segmento, ERP, porte, pós-venda atual, perfil, dores mencionadas."
+        }
+      }
+    }
+  }
+};
+
 const handoffToHumanTool = {
   type: "function",
   function: {
@@ -488,6 +513,41 @@ _A conversa já foi transferida para modo humano no sistema._`;
   }
 }
 
+async function updateContactInfo(
+  supabase: any,
+  contactId: string,
+  args: { name?: string; company?: string; notes?: string }
+): Promise<{ success: boolean }> {
+  console.log('[Nina] Updating contact info:', args);
+
+  const updateData: any = {};
+  if (args.name && args.name.trim()) updateData.name = args.name.trim();
+  if (args.company && args.company.trim()) updateData.company = args.company.trim();
+  if (args.notes && args.notes.trim()) updateData.notes = args.notes.trim();
+
+  if (Object.keys(updateData).length === 0) {
+    return { success: false };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('contacts')
+      .update(updateData)
+      .eq('id', contactId);
+
+    if (error) {
+      console.error('[Nina] Error updating contact:', error);
+      return { success: false };
+    }
+
+    console.log('[Nina] Contact updated successfully');
+    return { success: true };
+  } catch (err) {
+    console.error('[Nina] Error updating contact:', err);
+    return { success: false };
+  }
+}
+
 async function createAppointmentFromAI(
   supabase: any, contactId: string, conversationId: string, userId: string | null,
   args: { title: string; date: string; time: string; duration?: number; type: 'demo' | 'meeting' | 'support' | 'followup'; description?: string; }
@@ -901,6 +961,7 @@ async function processQueueItem(
 
   const tools: any[] = [];
   tools.push(handoffToHumanTool);
+  tools.push(updateContactInfoTool);
 
   const requestBody: any = {
     model: aiSettings.model,
@@ -960,6 +1021,16 @@ async function processQueueItem(
         console.error('[Nina] Error parsing request_demo_handoff:', parseError);
       }
     }
+
+    if (toolCall.function?.name === 'update_contact_info') {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        await updateContactInfo(supabase, conversation.contact_id, args);
+        // Silent action — no message added to aiContent
+      } catch (parseError) {
+        console.error('[Nina] Error parsing update_contact_info:', parseError);
+      }
+    }
   }
 
   if (!aiContent && toolCalls.length > 0) {
@@ -1009,7 +1080,7 @@ async function processQueueItem(
   const totalChunks = settings?.message_breaking_enabled 
     ? breakMessageIntoChunks(aiContent).length 
     : 1;
-  await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay, appointmentCreated);
+  await queueTextResponse(supabase, conversation, message, aiContent, settings, aiSettings, delay);
 
   // Trigger whatsapp-sender
   const lastChunkDelay = delay + ((totalChunks - 1) * 1500);
