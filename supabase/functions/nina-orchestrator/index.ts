@@ -8,55 +8,25 @@ const corsHeaders = {
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
-// Tool definitions (unchanged)
-const createAppointmentTool = {
+// Tool definitions
+const handoffToHumanTool = {
   type: "function",
   function: {
-    name: "create_appointment",
-    description: "Criar um agendamento/reunião/demo para o cliente. Use quando o cliente solicitar agendar algo, confirmar uma data/horário para reunião, demo ou suporte.",
+    name: "request_demo_handoff",
+    description: "Acionar quando o lead qualificado aceita agendar demonstração. Encerra a IA e notifica a equipe comercial.",
     parameters: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Título do agendamento" },
-        date: { type: "string", description: "Data no formato YYYY-MM-DD" },
-        time: { type: "string", description: "Horário no formato HH:MM (24h)" },
-        duration: { type: "number", description: "Duração em minutos. Padrão: 60" },
-        type: { type: "string", enum: ["demo", "meeting", "support", "followup"], description: "Tipo do agendamento" },
-        description: { type: "string", description: "Descrição ou pauta da reunião" }
+        reason: {
+          type: "string",
+          description: "Contexto do lead: ERP usado, porte da oficina, dores mencionadas, urgência"
+        },
+        preferred_time: {
+          type: "string",
+          description: "Horário/dia que o lead mencionou preferir (se informou). Ex: 'terça de manhã', 'qualquer horário', 'entre 14h e 16h'"
+        }
       },
-      required: ["title", "date", "time", "type"]
-    }
-  }
-};
-
-const rescheduleAppointmentTool = {
-  type: "function",
-  function: {
-    name: "reschedule_appointment",
-    description: "Reagendar um agendamento existente do cliente.",
-    parameters: {
-      type: "object",
-      properties: {
-        new_date: { type: "string", description: "Nova data no formato YYYY-MM-DD" },
-        new_time: { type: "string", description: "Novo horário no formato HH:MM (24h)" },
-        reason: { type: "string", description: "Motivo do reagendamento" }
-      },
-      required: ["new_date", "new_time"]
-    }
-  }
-};
-
-const cancelAppointmentTool = {
-  type: "function",
-  function: {
-    name: "cancel_appointment",
-    description: "Cancelar um agendamento existente do cliente.",
-    parameters: {
-      type: "object",
-      properties: {
-        reason: { type: "string", description: "Motivo do cancelamento" }
-      },
-      required: []
+      required: ["reason"]
     }
   }
 };
@@ -428,6 +398,94 @@ function detectBot(message: string, lastNinaMessageAt: string | null): { isBot: 
 function parseTimeToMinutes(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours * 60 + minutes;
+}
+
+async function handoffToHuman(
+  supabase: any,
+  conversation: any,
+  args: { reason: string; preferred_time?: string }
+): Promise<{ success: boolean; error?: string }> {
+  console.log('[Nina] Handoff to human requested:', args);
+
+  try {
+    const { data: notifSettings } = await supabase
+      .from('nina_settings')
+      .select('scheduling_notify_commercial, scheduling_notify_phone, evolution_api_url, evolution_api_key, evolution_instance_name, scheduling_notify_evolution_instance')
+      .limit(1)
+      .single();
+
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('name, phone_number, company, tags')
+      .eq('id', conversation.contact_id)
+      .single();
+
+    // Switch conversation to human mode
+    await supabase
+      .from('conversations')
+      .update({ status: 'human' })
+      .eq('id', conversation.id);
+
+    console.log('[Nina] Conversation switched to human mode');
+
+    // Tag the contact
+    const currentTags = contact?.tags || [];
+    if (!currentTags.includes('DEMO-SOLICITADA')) {
+      await supabase
+        .from('contacts')
+        .update({ tags: [...currentTags, 'DEMO-SOLICITADA'] })
+        .eq('id', conversation.contact_id);
+    }
+
+    // Send commercial notification
+    if (notifSettings?.scheduling_notify_commercial && notifSettings?.scheduling_notify_phone) {
+      const instance = notifSettings.scheduling_notify_evolution_instance || notifSettings.evolution_instance_name;
+
+      const notifMessage = `🔔 *Novo Lead Qualificado - PremaCar*
+
+👤 *Nome:* ${contact?.name || 'Sem nome'}
+📱 *Telefone:* ${contact?.phone_number}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
+
+📋 *Contexto:*
+${args.reason}
+${args.preferred_time ? `\n⏰ *Horário preferido:* ${args.preferred_time}` : ''}
+
+👉 *Ação:* Entre em contato via WhatsApp para agendar a demo.
+
+_A conversa já foi transferida para modo humano no sistema._`;
+
+      try {
+        const response = await fetch(
+          `${notifSettings.evolution_api_url}/message/sendText/${instance}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': notifSettings.evolution_api_key },
+            body: JSON.stringify({
+              number: notifSettings.scheduling_notify_phone.replace(/\D/g, ''),
+              text: notifMessage
+            })
+          }
+        );
+
+        if (response.ok) {
+          console.log('[Nina] Commercial notification sent successfully');
+          return { success: true };
+        } else {
+          console.error('[Nina] Notification send failed:', response.status);
+          return { success: true, error: 'notification_failed' };
+        }
+      } catch (err) {
+        console.error('[Nina] Error sending notification:', err);
+        return { success: true, error: 'notification_error' };
+      }
+    } else {
+      console.warn('[Nina] Commercial notification not configured — handoff done without notification');
+      return { success: true, error: 'not_configured' };
+    }
+  } catch (err) {
+    console.error('[Nina] Error in handoff:', err);
+    return { success: false, error: String(err) };
+  }
 }
 
 async function createAppointmentFromAI(
@@ -842,9 +900,7 @@ async function processQueueItem(
   const aiSettings = getModelSettings(settings, conversationHistory, message, conversation.contact, clientMemory);
 
   const tools: any[] = [];
-  if (settings?.ai_scheduling_enabled !== false) {
-    tools.push(createAppointmentTool, rescheduleAppointmentTool, cancelAppointmentTool);
-  }
+  tools.push(handoffToHumanTool);
 
   const requestBody: any = {
     model: aiSettings.model,
@@ -886,99 +942,29 @@ async function processQueueItem(
   console.log('[Nina] AI response received, content length:', aiContent?.length || 0, ', tool_calls:', toolCalls.length);
 
   // Process tool calls
-  let appointmentCreated = null;
-  let appointmentRescheduled = null;
-  let appointmentCancelled = null;
-  
+  let handoffDone = false;
+
   for (const toolCall of toolCalls) {
-    if (toolCall.function?.name === 'create_appointment') {
+    if (toolCall.function?.name === 'request_demo_handoff') {
       try {
         const args = JSON.parse(toolCall.function.arguments);
-        appointmentCreated = await createAppointmentFromAI(supabase, conversation.contact_id, conversation.id, settings?.user_id || null, args);
-        if (appointmentCreated && !appointmentCreated.error) {
-          const dateFormatted = args.date.split('-').reverse().join('/');
-          aiContent = (aiContent || '') + `\n\n✅ Agendamento confirmado para ${dateFormatted} às ${args.time}!`;
+        const handoffResult = await handoffToHuman(supabase, conversation, args);
 
-          // Commercial notification
-          try {
-            const { data: contact } = await supabase
-              .from('contacts')
-              .select('name, phone_number')
-              .eq('id', conversation.contact_id)
-              .single();
-
-            const { data: notifSettings } = await supabase
-              .from('nina_settings')
-              .select('scheduling_notify_commercial, scheduling_notify_phone, evolution_api_url, evolution_api_key, evolution_instance_name, scheduling_notify_evolution_instance')
-              .limit(1)
-              .single();
-
-            if (notifSettings?.scheduling_notify_commercial && notifSettings?.scheduling_notify_phone) {
-              const instance = notifSettings.scheduling_notify_evolution_instance || notifSettings.evolution_instance_name;
-              const notifMessage = `🗓️ *Novo Agendamento PremaCar*\n\n👤 *Lead:* ${contact?.name || 'Sem nome'}\n📱 *Telefone:* ${contact?.phone_number}\n📅 *Data:* ${dateFormatted}\n🕐 *Horário:* ${args.time}\n📋 *Título:* ${args.title}\n\n${args.description ? `📝 *Contexto:* ${args.description}` : ''}`;
-              await fetch(`${notifSettings.evolution_api_url}/message/sendText/${instance}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': notifSettings.evolution_api_key },
-                body: JSON.stringify({ number: notifSettings.scheduling_notify_phone.replace(/\D/g, ''), text: notifMessage })
-              });
-              console.log('[Nina] Commercial notification sent');
-            }
-          } catch (notifError) {
-            console.error('[Nina] Error sending commercial notification:', notifError);
-          }
-        } else if (appointmentCreated?.error === 'date_in_past') {
-          aiContent = (aiContent || '') + '\n\n⚠️ Não foi possível agendar para uma data passada. Por favor, escolha uma data futura.';
-        } else if (appointmentCreated?.error === 'time_conflict') {
-          aiContent = (aiContent || '') + `\n\n⚠️ Já existe um agendamento para esse horário (${appointmentCreated.conflictWith}). Podemos agendar em outro horário?`;
-        } else if (appointmentCreated?.error === 'day_not_available') {
-          aiContent = (aiContent || '') + '\n\n⚠️ Não tenho disponibilidade nesse dia. Meus dias disponíveis são de segunda a sexta. Podemos escolher outro dia?';
-        } else if (appointmentCreated?.error === 'outside_hours') {
-          aiContent = (aiContent || '') + `\n\n⚠️ Esse horário está fora do meu expediente (${appointmentCreated.availableStart} às ${appointmentCreated.availableEnd}). Qual horário dentro desse período funciona pra você?`;
-        } else if (appointmentCreated?.error === 'lunch_break') {
-          aiContent = (aiContent || '') + `\n\n⚠️ Esse horário coincide com o intervalo de almoço (${appointmentCreated.lunchStart} às ${appointmentCreated.lunchEnd}). Podemos agendar antes ou depois?`;
+        if (handoffResult.success) {
+          aiContent = (aiContent || '') + '\n\nPerfeito! Nossa equipe comercial vai entrar em contato em breve para agendar sua demo. Obrigada pelo interesse! 😊';
+        } else {
+          aiContent = (aiContent || '') + '\n\nVou te passar para nossa equipe. Eles entrarão em contato em breve!';
         }
-      } catch (parseError) { console.error('[Nina] Error parsing create_appointment:', parseError); }
-    }
-    
-    if (toolCall.function?.name === 'reschedule_appointment') {
-      try {
-        const args = JSON.parse(toolCall.function.arguments);
-        appointmentRescheduled = await rescheduleAppointmentFromAI(supabase, conversation.contact_id, settings?.user_id || null, args);
-        if (appointmentRescheduled && !appointmentRescheduled.error) {
-          const newDateFormatted = args.new_date.split('-').reverse().join('/');
-          const oldDateFormatted = appointmentRescheduled.previous_date.split('-').reverse().join('/');
-          aiContent = (aiContent || '') + `\n\n✅ Agendamento reagendado! De ${oldDateFormatted} às ${appointmentRescheduled.previous_time} para ${newDateFormatted} às ${args.new_time}.`;
-        } else if (appointmentRescheduled?.error === 'no_appointment_found') {
-          aiContent = (aiContent || '') + '\n\n⚠️ Não encontrei nenhum agendamento ativo para você. Deseja criar um novo?';
-        } else if (appointmentRescheduled?.error === 'date_in_past') {
-          aiContent = (aiContent || '') + '\n\n⚠️ Não foi possível reagendar para uma data passada.';
-        } else if (appointmentRescheduled?.error === 'time_conflict') {
-          aiContent = (aiContent || '') + `\n\n⚠️ Já existe um agendamento para esse horário (${appointmentRescheduled.conflictWith}).`;
-        }
-      } catch (parseError) { console.error('[Nina] Error parsing reschedule_appointment:', parseError); }
-    }
-    
-    if (toolCall.function?.name === 'cancel_appointment') {
-      try {
-        const args = JSON.parse(toolCall.function.arguments);
-        appointmentCancelled = await cancelAppointmentFromAI(supabase, conversation.contact_id, settings?.user_id || null, args);
-        if (appointmentCancelled && !appointmentCancelled.error) {
-          const dateFormatted = appointmentCancelled.date.split('-').reverse().join('/');
-          aiContent = (aiContent || '') + `\n\n✅ Agendamento de ${dateFormatted} às ${appointmentCancelled.time} cancelado com sucesso.`;
-        } else if (appointmentCancelled?.error === 'no_appointment_found') {
-          aiContent = (aiContent || '') + '\n\n⚠️ Não encontrei nenhum agendamento ativo para cancelar.';
-        }
-      } catch (parseError) { console.error('[Nina] Error parsing cancel_appointment:', parseError); }
+        handoffDone = true;
+      } catch (parseError) {
+        console.error('[Nina] Error parsing request_demo_handoff:', parseError);
+      }
     }
   }
 
   if (!aiContent && toolCalls.length > 0) {
-    if (appointmentCreated && !appointmentCreated.error) {
-      aiContent = `Perfeito! ✅ Agendamento confirmado para ${appointmentCreated.date.split('-').reverse().join('/')} às ${appointmentCreated.time}!`;
-    } else if (appointmentRescheduled && !appointmentRescheduled.error) {
-      aiContent = `Pronto! ✅ Seu agendamento foi reagendado para ${appointmentRescheduled.date.split('-').reverse().join('/')} às ${appointmentRescheduled.time}.`;
-    } else if (appointmentCancelled && !appointmentCancelled.error) {
-      aiContent = `Certo! ✅ Seu agendamento foi cancelado com sucesso.`;
+    if (handoffDone) {
+      aiContent = 'Nossa equipe comercial vai entrar em contato em breve! 😊';
     } else {
       aiContent = 'Entendi! Como posso ajudar?';
     }

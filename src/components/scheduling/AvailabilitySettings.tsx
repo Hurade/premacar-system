@@ -349,7 +349,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
             <Bell className="w-4 h-4 text-slate-400" />
-            Notificação de Agendamento
+            Notificação de Handoff
           </label>
           <button
             onClick={() => setConfig(prev => ({ ...prev, scheduling_notify_commercial: !prev.scheduling_notify_commercial }))}
@@ -361,7 +361,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
         {config.scheduling_notify_commercial && (
           <div className="space-y-3 pl-6">
             <p className="text-xs text-slate-500">
-              Quando a IA confirmar um agendamento, uma mensagem será enviada automaticamente para este número via WhatsApp.
+              Quando a IA identificar um lead qualificado que quer demo, envia mensagem automaticamente para este número com os dados do lead.
             </p>
             <div className="space-y-2">
               <label className="text-xs text-slate-400">Número do comercial</label>
