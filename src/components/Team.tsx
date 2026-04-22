@@ -110,11 +110,11 @@ const Team: React.FC = () => {
           user_id: userId,
           name: formData.name,
           email: formData.email,
-          role: formData.role,
+          role: formData.role as 'admin' | 'manager' | 'agent',
           team_id: formData.team_id || null,
           function_id: formData.function_id || null,
           weight: formData.weight || 1,
-          status: 'active',
+          status: 'active' as const,
         });
       }
 
