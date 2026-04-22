@@ -127,8 +127,7 @@ serve(async (req) => {
             // SMS not implemented yet
             sendResult = { success: false, error: "SMS não implementado ainda" };
           } else if (dayConfig.type === "call") {
-            // Call not implemented yet
-            sendResult = { success: false, error: "Ligação não implementada ainda" };
+            sendResult = await sendCall(contact, dayConfig, supabase, supabaseUrl);
           } else {
             sendResult = { success: false, error: `Tipo desconhecido: ${dayConfig.type}` };
           }
@@ -487,4 +486,39 @@ async function sendWhatsApp(
   }
 
   return { success: false, error: "Nenhuma API WhatsApp configurada" };
+}
+
+// ===== Ligação via make-voice-call =====
+async function sendCall(
+  contact: any,
+  dayConfig: any,
+  supabase: any,
+  supabaseUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  const config = dayConfig.config || {};
+  const message = config.message || 'Olá {{nome}}, esta é uma mensagem da PremaCar.';
+
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/make-voice-call`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`
+      },
+      body: JSON.stringify({
+        contactId: contact.id,
+        message
+      })
+    });
+
+    const result = await resp.json();
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Erro ao fazer ligação' };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }

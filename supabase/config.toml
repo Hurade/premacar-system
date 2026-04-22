@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.recurring-campaign-processor]
 verify_jwt = false
+
+[functions.voice-call-twiml]
+verify_jwt = false
+
+[functions.make-voice-call]
+verify_jwt = false
