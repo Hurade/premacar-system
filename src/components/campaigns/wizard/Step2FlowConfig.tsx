@@ -417,24 +417,47 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
 
               {/* === CALL config === */}
               {editConfig.type === 'call' && (
-                <div className="space-y-2">
-                  <Label>Tipo de Voz</Label>
-                  <Select
-                    value={editConfig.config?.voiceType || 'ai'}
-                    onValueChange={(v) => setEditConfig({
-                      ...editConfig,
-                      config: { ...editConfig.config, voiceType: v },
-                    })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ai">🎙️ Voz AI (ElevenLabs)</SelectItem>
-                      <SelectItem value="tts">🔊 TTS Padrão (Twilio)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    ℹ️ O script usará automaticamente o prompt configurado no sistema
-                  </p>
+                <div className="space-y-4">
+                  {/* Script da ligação */}
+                  <div className="space-y-2">
+                    <Label>Script da Ligação *</Label>
+                    <Textarea
+                      value={editConfig.config?.message || ''}
+                      onChange={(e) => setEditConfig({
+                        ...editConfig,
+                        config: { ...editConfig.config, message: e.target.value }
+                      })}
+                      placeholder={`Exemplo:\nOlá {{nome}}, aqui é a Cris da PremaCar. Estou ligando para apresentar nossa solução de pós-venda automotivo que tem ajudado oficinas a aumentar o retorno de clientes em 40%. Você tem interesse em conhecer melhor?`}
+                      rows={6}
+                      className="resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      💡 Use {'{{nome}}'} para personalizar com o nome do contato.
+                      Ao final do áudio, o sistema pedirá para o lead teclar 1 (interessado) ou 2 (não).
+                      Se teclar 1, o comercial é notificado automaticamente.
+                    </p>
+                  </div>
+
+                  {/* Tipo de voz */}
+                  <div className="space-y-2">
+                    <Label>Tipo de Voz</Label>
+                    <Select
+                      value={editConfig.config?.voiceType || 'ai'}
+                      onValueChange={(v) => setEditConfig({
+                        ...editConfig,
+                        config: { ...editConfig.config, voiceType: v },
+                      })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ai">🎙️ Voz AI (ElevenLabs)</SelectItem>
+                        <SelectItem value="tts">🔊 TTS Padrão (Twilio)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Recomendado: Voz AI para mais naturalidade
+                    </p>
+                  </div>
                 </div>
               )}
 
