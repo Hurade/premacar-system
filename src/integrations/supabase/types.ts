@@ -863,6 +863,39 @@ export type Database = {
         }
         Relationships: []
       }
+      followup_settings: {
+        Row: {
+          created_at: string | null
+          delay_hours: number
+          id: string
+          is_active: boolean | null
+          message: string
+          tag_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          delay_hours?: number
+          id?: string
+          is_active?: boolean | null
+          message?: string
+          tag_name?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          delay_hours?: number
+          id?: string
+          is_active?: boolean | null
+          message?: string
+          tag_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       integration_settings: {
         Row: {
           aws_access_key_id: string | null
@@ -1321,6 +1354,12 @@ export type Database = {
           scheduling_available_days: number[] | null
           scheduling_buffer_between: number | null
           scheduling_end_time: string | null
+          scheduling_lunch_break_enabled: boolean | null
+          scheduling_lunch_end: string | null
+          scheduling_lunch_start: string | null
+          scheduling_notify_commercial: boolean | null
+          scheduling_notify_evolution_instance: string | null
+          scheduling_notify_phone: string | null
           scheduling_slot_duration: number | null
           scheduling_start_time: string | null
           sdr_name: string | null
@@ -1377,6 +1416,12 @@ export type Database = {
           scheduling_available_days?: number[] | null
           scheduling_buffer_between?: number | null
           scheduling_end_time?: string | null
+          scheduling_lunch_break_enabled?: boolean | null
+          scheduling_lunch_end?: string | null
+          scheduling_lunch_start?: string | null
+          scheduling_notify_commercial?: boolean | null
+          scheduling_notify_evolution_instance?: string | null
+          scheduling_notify_phone?: string | null
           scheduling_slot_duration?: number | null
           scheduling_start_time?: string | null
           sdr_name?: string | null
@@ -1433,6 +1478,12 @@ export type Database = {
           scheduling_available_days?: number[] | null
           scheduling_buffer_between?: number | null
           scheduling_end_time?: string | null
+          scheduling_lunch_break_enabled?: boolean | null
+          scheduling_lunch_end?: string | null
+          scheduling_lunch_start?: string | null
+          scheduling_notify_commercial?: boolean | null
+          scheduling_notify_evolution_instance?: string | null
+          scheduling_notify_phone?: string | null
           scheduling_slot_duration?: number | null
           scheduling_start_time?: string | null
           sdr_name?: string | null
@@ -1670,6 +1721,36 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          level: string
+          message: string
+          metadata: Json | null
+          source: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          level?: string
+          message: string
+          metadata?: Json | null
+          source: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          level?: string
+          message?: string
+          metadata?: Json | null
+          source?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       tag_definitions: {
         Row: {
           category: string
@@ -1852,6 +1933,70 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      voice_calls: {
+        Row: {
+          audio_url: string | null
+          call_sid: string | null
+          campaign_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          dtmf_response: string | null
+          duration_seconds: number | null
+          error_message: string | null
+          id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          call_sid?: string | null
+          campaign_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          dtmf_response?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          call_sid?: string | null
+          campaign_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          dtmf_response?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_calls_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_connections: {
         Row: {
