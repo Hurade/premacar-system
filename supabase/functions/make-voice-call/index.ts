@@ -68,8 +68,19 @@ serve(async (req) => {
 
     if (!ttsResp.ok) {
       const errText = await ttsResp.text()
-      console.error('[make-voice-call] ElevenLabs error:', errText)
-      return new Response(JSON.stringify({ success: false, error: 'Erro ao gerar áudio' }), { status: 500, headers: corsHeaders })
+      console.error('[make-voice-call] ElevenLabs error status:', ttsResp.status)
+      console.error('[make-voice-call] ElevenLabs error body:', errText)
+      console.error('[make-voice-call] Voice ID used:', voiceId)
+      console.error('[make-voice-call] Message length:', personalizedMessage.length)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `ElevenLabs ${ttsResp.status}: ${errText.substring(0, 500)}`,
+          voice_id: voiceId,
+          message_length: personalizedMessage.length
+        }),
+        { status: 500, headers: corsHeaders }
+      )
     }
 
     const audioBuffer = await ttsResp.arrayBuffer()
@@ -120,8 +131,20 @@ serve(async (req) => {
     const callData = await callResp.json()
 
     if (!callResp.ok) {
-      console.error('[make-voice-call] Twilio error:', callData)
-      return new Response(JSON.stringify({ success: false, error: callData.message || 'Erro Twilio' }), { status: 500, headers: corsHeaders })
+      console.error('[make-voice-call] Twilio error status:', callResp.status)
+      console.error('[make-voice-call] Twilio error body:', JSON.stringify(callData))
+      console.error('[make-voice-call] To phone:', toPhone)
+      console.error('[make-voice-call] From phone:', settings.twilio_phone_number)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Twilio ${callResp.status}: ${callData.message || JSON.stringify(callData)}`,
+          twilio_code: callData.code,
+          twilio_more_info: callData.more_info,
+          to_phone: toPhone
+        }),
+        { status: 500, headers: corsHeaders }
+      )
     }
 
     // 8. Registrar no banco
