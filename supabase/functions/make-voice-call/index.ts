@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { saveLog } from "../_shared/logger.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const SOURCE = 'make-voice-call'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
@@ -16,6 +19,14 @@ serve(async (req) => {
   try {
     const { contactId, campaignId, message } = await req.json()
 
+    // LOG 1: Call initiated
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Call initiated',
+      metadata: { contactId, campaignId: campaignId || null }
+    })
+
     // 1. Buscar settings
     const { data: settings } = await supabase
       .from('integration_settings')
@@ -23,9 +34,11 @@ serve(async (req) => {
       .limit(1).single()
 
     if (!settings?.twilio_enabled || !settings?.twilio_account_sid) {
+      await saveLog(supabase, { source: SOURCE, level: 'error', message: 'Twilio not configured', metadata: { contactId } })
       return new Response(JSON.stringify({ success: false, error: 'Twilio não configurado' }), { status: 400, headers: corsHeaders })
     }
     if (!settings?.elevenlabs_enabled || !settings?.elevenlabs_api_key_integration) {
+      await saveLog(supabase, { source: SOURCE, level: 'error', message: 'ElevenLabs not configured', metadata: { contactId } })
       return new Response(JSON.stringify({ success: false, error: 'ElevenLabs não configurado' }), { status: 400, headers: corsHeaders })
     }
 
@@ -36,6 +49,7 @@ serve(async (req) => {
       .eq('id', contactId).single()
 
     if (!contact) {
+      await saveLog(supabase, { source: SOURCE, level: 'error', message: 'Contact not found', metadata: { contactId } })
       return new Response(JSON.stringify({ success: false, error: 'Contato não encontrado' }), { status: 404, headers: corsHeaders })
     }
 
@@ -45,6 +59,15 @@ serve(async (req) => {
 
     // 4. Gerar áudio via ElevenLabs
     const voiceId = settings.elevenlabs_voice_id_integration || 'EXAVITQu4vr4xnSDxMaL'
+
+    // LOG 2: Calling ElevenLabs
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Calling ElevenLabs',
+      metadata: { voice_id: voiceId, message_length: personalizedMessage.length, contactId }
+    })
+
     const ttsResp = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
@@ -70,8 +93,20 @@ serve(async (req) => {
       const errText = await ttsResp.text()
       console.error('[make-voice-call] ElevenLabs error status:', ttsResp.status)
       console.error('[make-voice-call] ElevenLabs error body:', errText)
-      console.error('[make-voice-call] Voice ID used:', voiceId)
-      console.error('[make-voice-call] Message length:', personalizedMessage.length)
+
+      // LOG 3: ElevenLabs error
+      await saveLog(supabase, {
+        source: SOURCE,
+        level: 'error',
+        message: 'ElevenLabs error',
+        metadata: {
+          status_code: ttsResp.status,
+          response_body: errText.substring(0, 1000),
+          voice_id: voiceId,
+          contactId
+        }
+      })
+
       return new Response(
         JSON.stringify({
           success: false,
@@ -93,6 +128,12 @@ serve(async (req) => {
 
     if (uploadError) {
       console.error('[make-voice-call] Upload error:', uploadError)
+      await saveLog(supabase, {
+        source: SOURCE,
+        level: 'error',
+        message: 'Upload error',
+        metadata: { error: uploadError.message, contactId }
+      })
       return new Response(JSON.stringify({ success: false, error: 'Erro ao salvar áudio' }), { status: 500, headers: corsHeaders })
     }
 
@@ -105,6 +146,14 @@ serve(async (req) => {
     // 7. Fazer ligação via Twilio
     const cleanPhone = contact.phone_number.replace(/\D/g, '')
     const toPhone = cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`
+
+    // LOG 4: Calling Twilio
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Calling Twilio',
+      metadata: { to_phone: toPhone, from_phone: settings.twilio_phone_number, contactId }
+    })
 
     const twilioAuth = btoa(`${settings.twilio_account_sid}:${settings.twilio_auth_token}`)
     const callParams = new URLSearchParams({
@@ -133,8 +182,20 @@ serve(async (req) => {
     if (!callResp.ok) {
       console.error('[make-voice-call] Twilio error status:', callResp.status)
       console.error('[make-voice-call] Twilio error body:', JSON.stringify(callData))
-      console.error('[make-voice-call] To phone:', toPhone)
-      console.error('[make-voice-call] From phone:', settings.twilio_phone_number)
+
+      // LOG 5: Twilio error
+      await saveLog(supabase, {
+        source: SOURCE,
+        level: 'error',
+        message: 'Twilio error',
+        metadata: {
+          status_code: callResp.status,
+          response_body: callData,
+          to_phone: toPhone,
+          contactId
+        }
+      })
+
       return new Response(
         JSON.stringify({
           success: false,
@@ -156,11 +217,25 @@ serve(async (req) => {
       audio_url: audioUrl
     })
 
+    // LOG 6: Call created
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Call created',
+      metadata: { call_sid: callData.sid, to_phone: toPhone, contactId }
+    })
+
     console.log('[make-voice-call] Call initiated:', callData.sid, 'to', toPhone)
     return new Response(JSON.stringify({ success: true, callSid: callData.sid }), { headers: corsHeaders })
 
   } catch (err: any) {
     console.error('[make-voice-call] Error:', err)
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'error',
+      message: 'Unhandled error',
+      metadata: { error: err?.message || String(err) }
+    })
     return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: corsHeaders })
   }
 })
