@@ -131,6 +131,14 @@ serve(async (req) => {
       )
     }
 
+    // LOG: ElevenLabs response sucesso
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'ElevenLabs response',
+      metadata: { status: ttsResp.status, contactId }
+    })
+
     const audioBuffer = await ttsResp.arrayBuffer()
 
     // 5. Upload para Supabase Storage
@@ -152,6 +160,14 @@ serve(async (req) => {
 
     const { data: publicUrl } = supabase.storage.from('call-audios').getPublicUrl(fileName)
     const audioUrl = publicUrl.publicUrl
+
+    // LOG: Audio uploaded
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Audio uploaded',
+      metadata: { file_name: fileName, audio_url: audioUrl, size_bytes: audioBuffer.byteLength }
+    })
 
     // 6. URL do TwiML (a função voice-call-twiml não requer JWT)
     const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?audio=${encodeURIComponent(audioUrl)}&contact=${contactId}`
