@@ -27,11 +27,24 @@ serve(async (req) => {
       metadata: { contactId, campaignId: campaignId || null }
     })
 
-    // 1. Buscar settings
+    // 1. Buscar settings (tabela integration_settings - migração 20260227133652)
     const { data: settings } = await supabase
       .from('integration_settings')
       .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled, elevenlabs_api_key_integration, elevenlabs_voice_id_integration, elevenlabs_enabled')
       .limit(1).single()
+
+    // LOG 2: Settings loaded
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Settings loaded',
+      metadata: {
+        has_twilio: !!(settings?.twilio_enabled && settings?.twilio_account_sid),
+        has_elevenlabs: !!(settings?.elevenlabs_enabled && settings?.elevenlabs_api_key_integration),
+        voice_id: settings?.elevenlabs_voice_id_integration || null,
+        twilio_phone: settings?.twilio_phone_number || null
+      }
+    })
 
     if (!settings?.twilio_enabled || !settings?.twilio_account_sid) {
       await saveLog(supabase, { source: SOURCE, level: 'error', message: 'Twilio not configured', metadata: { contactId } })
