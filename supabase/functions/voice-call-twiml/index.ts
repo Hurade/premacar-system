@@ -7,7 +7,7 @@ serve(async (req) => {
 
   const url = new URL(req.url)
   const contactId = url.searchParams.get('contact')
-  const audioUrl = url.searchParams.get('audio')
+  const message = url.searchParams.get('message') || 'Olá, esta é uma ligação automática.'
   const callback = url.searchParams.get('callback')
 
   // STATUS CALLBACK — chamada finalizou
@@ -99,19 +99,27 @@ serve(async (req) => {
     )
   }
 
-  // TwiML inicial — toca áudio e coleta DTMF
+  // TwiML inicial — TTS nativo do Twilio (Polly.Camila pt-BR) e coleta DTMF
   const dtmfUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?dtmf=1&contact=${contactId}`
+
+  // Escapar caracteres XML na mensagem
+  const safeMessage = message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 
   return new Response(
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather action="${dtmfUrl}" method="POST" numDigits="1" timeout="10">
-    <Play>${audioUrl}</Play>
+    <Say voice="Polly.Camila" language="pt-BR">${safeMessage}</Say>
     <Pause length="1"/>
-    <Say voice="alice" language="pt-BR">Se você tem interesse em agendar uma demonstração, tecle 1 agora. Caso contrário, tecle 2 ou aguarde.</Say>
+    <Say voice="Polly.Camila" language="pt-BR">Se você tem interesse em agendar uma demonstração, tecle 1 agora. Caso contrário, tecle 2 ou aguarde.</Say>
     <Pause length="5"/>
   </Gather>
-  <Say voice="alice" language="pt-BR">Obrigada pela atenção. Tenha um ótimo dia!</Say>
+  <Say voice="Polly.Camila" language="pt-BR">Obrigada pela atenção. Tenha um ótimo dia!</Say>
   <Hangup/>
 </Response>`,
     { headers: { 'Content-Type': 'text/xml' } }

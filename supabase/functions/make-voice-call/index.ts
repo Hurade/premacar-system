@@ -27,10 +27,10 @@ serve(async (req) => {
       metadata: { contactId, campaignId: campaignId || null }
     })
 
-    // 1. Buscar settings (tabela integration_settings - migração 20260227133652)
+    // 1. Buscar settings (apenas Twilio - usando TTS nativo)
     const { data: settings } = await supabase
       .from('integration_settings')
-      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled, elevenlabs_api_key_integration, elevenlabs_voice_id_integration, elevenlabs_enabled')
+      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled')
       .limit(1).single()
 
     // LOG 2: Settings loaded
@@ -40,8 +40,6 @@ serve(async (req) => {
       message: 'Settings loaded',
       metadata: {
         has_twilio: !!(settings?.twilio_enabled && settings?.twilio_account_sid),
-        has_elevenlabs: !!(settings?.elevenlabs_enabled && settings?.elevenlabs_api_key_integration),
-        voice_id: settings?.elevenlabs_voice_id_integration || null,
         twilio_phone: settings?.twilio_phone_number || null
       }
     })
@@ -49,10 +47,6 @@ serve(async (req) => {
     if (!settings?.twilio_enabled || !settings?.twilio_account_sid) {
       await saveLog(supabase, { source: SOURCE, level: 'error', message: 'Twilio not configured', metadata: { contactId } })
       return new Response(JSON.stringify({ success: false, error: 'Twilio não configurado' }), { status: 400, headers: corsHeaders })
-    }
-    if (!settings?.elevenlabs_enabled || !settings?.elevenlabs_api_key_integration) {
-      await saveLog(supabase, { source: SOURCE, level: 'error', message: 'ElevenLabs not configured', metadata: { contactId } })
-      return new Response(JSON.stringify({ success: false, error: 'ElevenLabs não configurado' }), { status: 400, headers: corsHeaders })
     }
 
     // 2. Buscar contato
@@ -70,109 +64,10 @@ serve(async (req) => {
     const contactName = contact.name || contact.call_name || 'Cliente'
     const personalizedMessage = message.replace(/\{\{nome\}\}/g, contactName)
 
-    // 4. Gerar áudio via ElevenLabs
-    const voiceId = settings.elevenlabs_voice_id_integration || 'EXAVITQu4vr4xnSDxMaL'
+    // 4. URL do TwiML — passa mensagem direto via query param (TTS no Twilio)
+    const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?message=${encodeURIComponent(personalizedMessage)}&contact=${contactId}`
 
-    // LOG 2: Calling ElevenLabs
-    await saveLog(supabase, {
-      source: SOURCE,
-      level: 'info',
-      message: 'Calling ElevenLabs',
-      metadata: { voice_id: voiceId, message_length: personalizedMessage.length, contactId }
-    })
-
-    const ttsResp = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'xi-api-key': settings.elevenlabs_api_key_integration
-        },
-        body: JSON.stringify({
-          text: personalizedMessage,
-          model_id: 'eleven_turbo_v2_5',
-          voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.80,
-            style: 0.30,
-            use_speaker_boost: true
-          }
-        })
-      }
-    )
-
-    if (!ttsResp.ok) {
-      const errText = await ttsResp.text()
-      console.error('[make-voice-call] ElevenLabs error status:', ttsResp.status)
-      console.error('[make-voice-call] ElevenLabs error body:', errText)
-
-      // LOG 3: ElevenLabs error
-      await saveLog(supabase, {
-        source: SOURCE,
-        level: 'error',
-        message: 'ElevenLabs error',
-        metadata: {
-          status_code: ttsResp.status,
-          response_body: errText.substring(0, 1000),
-          voice_id: voiceId,
-          contactId
-        }
-      })
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `ElevenLabs ${ttsResp.status}: ${errText.substring(0, 500)}`,
-          voice_id: voiceId,
-          message_length: personalizedMessage.length
-        }),
-        { status: 500, headers: corsHeaders }
-      )
-    }
-
-    // LOG: ElevenLabs response sucesso
-    await saveLog(supabase, {
-      source: SOURCE,
-      level: 'info',
-      message: 'ElevenLabs response',
-      metadata: { status: ttsResp.status, contactId }
-    })
-
-    const audioBuffer = await ttsResp.arrayBuffer()
-
-    // 5. Upload para Supabase Storage
-    const fileName = `call-${contactId}-${Date.now()}.mp3`
-    const { error: uploadError } = await supabase.storage
-      .from('call-audios')
-      .upload(fileName, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
-
-    if (uploadError) {
-      console.error('[make-voice-call] Upload error:', uploadError)
-      await saveLog(supabase, {
-        source: SOURCE,
-        level: 'error',
-        message: 'Upload error',
-        metadata: { error: uploadError.message, contactId }
-      })
-      return new Response(JSON.stringify({ success: false, error: 'Erro ao salvar áudio' }), { status: 500, headers: corsHeaders })
-    }
-
-    const { data: publicUrl } = supabase.storage.from('call-audios').getPublicUrl(fileName)
-    const audioUrl = publicUrl.publicUrl
-
-    // LOG: Audio uploaded
-    await saveLog(supabase, {
-      source: SOURCE,
-      level: 'info',
-      message: 'Audio uploaded',
-      metadata: { file_name: fileName, audio_url: audioUrl, size_bytes: audioBuffer.byteLength }
-    })
-
-    // 6. URL do TwiML (a função voice-call-twiml não requer JWT)
-    const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?audio=${encodeURIComponent(audioUrl)}&contact=${contactId}`
-
-    // 7. Fazer ligação via Twilio
+    // 5. Fazer ligação via Twilio
     const cleanPhone = contact.phone_number.replace(/\D/g, '')
     const toPhone = cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`
 
@@ -181,7 +76,7 @@ serve(async (req) => {
       source: SOURCE,
       level: 'info',
       message: 'Calling Twilio',
-      metadata: { to_phone: toPhone, from_phone: settings.twilio_phone_number, contactId }
+      metadata: { to_phone: toPhone, from_phone: settings.twilio_phone_number, contactId, message_length: personalizedMessage.length }
     })
 
     const twilioAuth = btoa(`${settings.twilio_account_sid}:${settings.twilio_auth_token}`)
@@ -237,20 +132,19 @@ serve(async (req) => {
       )
     }
 
-    // 8. Registrar no banco
+    // 6. Registrar no banco (sem audio_url — TTS é renderizado pelo Twilio)
     await supabase.from('voice_calls').insert({
       contact_id: contactId,
       campaign_id: campaignId || null,
       call_sid: callData.sid,
-      status: 'initiated',
-      audio_url: audioUrl
+      status: 'initiated'
     })
 
-    // LOG: Twilio response sucesso
+    // LOG 6: Call created
     await saveLog(supabase, {
       source: SOURCE,
       level: 'info',
-      message: 'Twilio response',
+      message: 'Call created',
       metadata: { status: callResp.status, call_sid: callData.sid, to_phone: toPhone, contactId }
     })
 
