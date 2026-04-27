@@ -246,12 +246,12 @@ serve(async (req) => {
       audio_url: audioUrl
     })
 
-    // LOG 6: Call created
+    // LOG: Twilio response sucesso
     await saveLog(supabase, {
       source: SOURCE,
       level: 'info',
-      message: 'Call created',
-      metadata: { call_sid: callData.sid, to_phone: toPhone, contactId }
+      message: 'Twilio response',
+      metadata: { status: callResp.status, call_sid: callData.sid, to_phone: toPhone, contactId }
     })
 
     console.log('[make-voice-call] Call initiated:', callData.sid, 'to', toPhone)
