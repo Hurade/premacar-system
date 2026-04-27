@@ -120,6 +120,8 @@ export default function Logs() {
             <SelectItem value="campaign-processor">campaign-processor</SelectItem>
             <SelectItem value="whatsapp-sender">whatsapp-sender</SelectItem>
             <SelectItem value="nina-orchestrator">nina-orchestrator</SelectItem>
+            <SelectItem value="make-voice-call">make-voice-call</SelectItem>
+            <SelectItem value="recurring-campaign-processor">recurring-campaign-processor</SelectItem>
           </SelectContent>
         </Select>
 

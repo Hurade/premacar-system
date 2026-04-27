@@ -27,11 +27,24 @@ serve(async (req) => {
       metadata: { contactId, campaignId: campaignId || null }
     })
 
-    // 1. Buscar settings
+    // 1. Buscar settings (tabela integration_settings - migração 20260227133652)
     const { data: settings } = await supabase
       .from('integration_settings')
       .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled, elevenlabs_api_key_integration, elevenlabs_voice_id_integration, elevenlabs_enabled')
       .limit(1).single()
+
+    // LOG 2: Settings loaded
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Settings loaded',
+      metadata: {
+        has_twilio: !!(settings?.twilio_enabled && settings?.twilio_account_sid),
+        has_elevenlabs: !!(settings?.elevenlabs_enabled && settings?.elevenlabs_api_key_integration),
+        voice_id: settings?.elevenlabs_voice_id_integration || null,
+        twilio_phone: settings?.twilio_phone_number || null
+      }
+    })
 
     if (!settings?.twilio_enabled || !settings?.twilio_account_sid) {
       await saveLog(supabase, { source: SOURCE, level: 'error', message: 'Twilio not configured', metadata: { contactId } })
@@ -118,6 +131,14 @@ serve(async (req) => {
       )
     }
 
+    // LOG: ElevenLabs response sucesso
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'ElevenLabs response',
+      metadata: { status: ttsResp.status, contactId }
+    })
+
     const audioBuffer = await ttsResp.arrayBuffer()
 
     // 5. Upload para Supabase Storage
@@ -139,6 +160,14 @@ serve(async (req) => {
 
     const { data: publicUrl } = supabase.storage.from('call-audios').getPublicUrl(fileName)
     const audioUrl = publicUrl.publicUrl
+
+    // LOG: Audio uploaded
+    await saveLog(supabase, {
+      source: SOURCE,
+      level: 'info',
+      message: 'Audio uploaded',
+      metadata: { file_name: fileName, audio_url: audioUrl, size_bytes: audioBuffer.byteLength }
+    })
 
     // 6. URL do TwiML (a função voice-call-twiml não requer JWT)
     const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?audio=${encodeURIComponent(audioUrl)}&contact=${contactId}`
@@ -217,12 +246,12 @@ serve(async (req) => {
       audio_url: audioUrl
     })
 
-    // LOG 6: Call created
+    // LOG: Twilio response sucesso
     await saveLog(supabase, {
       source: SOURCE,
       level: 'info',
-      message: 'Call created',
-      metadata: { call_sid: callData.sid, to_phone: toPhone, contactId }
+      message: 'Twilio response',
+      metadata: { status: callResp.status, call_sid: callData.sid, to_phone: toPhone, contactId }
     })
 
     console.log('[make-voice-call] Call initiated:', callData.sid, 'to', toPhone)
