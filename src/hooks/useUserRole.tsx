@@ -102,6 +102,7 @@ export const MENU_ROLE_REQUIREMENTS: Record<string, TeamRole[]> = {
   settings: ['admin'],
   logs: ['admin', 'manager'],
   followup: ['admin', 'manager'],
+  agentes: ['admin', 'manager'],
 };
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);

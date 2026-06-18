@@ -56,6 +56,54 @@ const handoffToHumanTool = {
   }
 };
 
+// ═══════════════════════════════════════════
+// AGENT SELECTION: campaign > origin > default
+// ═══════════════════════════════════════════
+async function selectAgentConfig(
+  supabase: ReturnType<typeof createClient>,
+  ctx: { origin: string; campaignId: string | null }
+) {
+  // 1. Campaign-specific agent (highest priority)
+  if (ctx.campaignId) {
+    const { data } = await supabase
+      .from('agent_configs')
+      .select('*')
+      .eq('trigger_type', 'campaign')
+      .eq('trigger_campaign_id', ctx.campaignId)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  // 2. Origin-based agent
+  if (ctx.origin) {
+    const { data } = await supabase
+      .from('agent_configs')
+      .select('*')
+      .eq('trigger_type', 'origin')
+      .eq('trigger_origin', ctx.origin)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  // 3. Global default agent
+  const { data } = await supabase
+    .from('agent_configs')
+    .select('*')
+    .eq('trigger_type', 'default')
+    .eq('is_active', true)
+    .order('priority', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data ?? null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -140,10 +188,10 @@ serve(async (req) => {
           continue;
         }
 
-        // Get user_id from conversation
+        // Get conversation context for agent selection
         const { data: conversation } = await supabase
           .from('conversations')
-          .select('user_id')
+          .select('user_id, origin, campaign_id')
           .eq('id', item.conversation_id)
           .single();
 
@@ -217,9 +265,27 @@ serve(async (req) => {
           continue;
         }
 
-        const systemPrompt = effectiveSettings.system_prompt_override || getDefaultSystemPrompt();
-        
-        await processQueueItem(supabase, lovableApiKey, item, systemPrompt, effectiveSettings);
+        // Select agent config: campaign > origin > default > nina_settings fallback
+        const agentConfig = await selectAgentConfig(supabase, {
+          origin: conversation.origin ?? 'inbound',
+          campaignId: conversation.campaign_id ?? null,
+        });
+
+        const systemPrompt = agentConfig?.system_prompt
+          || effectiveSettings.system_prompt_override
+          || getDefaultSystemPrompt();
+
+        // Merge agent-level overrides into effective settings when config found
+        const mergedSettings = agentConfig ? {
+          ...effectiveSettings,
+          ai_model_mode: agentConfig.model_mode ?? effectiveSettings.ai_model_mode,
+          message_breaking_enabled: agentConfig.message_breaking_enabled ?? effectiveSettings.message_breaking_enabled,
+          ai_activation_delay_minutes: agentConfig.ai_activation_delay_minutes ?? effectiveSettings.ai_activation_delay_minutes,
+        } : effectiveSettings;
+
+        console.log(`[Nina] Agent selected: ${agentConfig?.name ?? 'nina_settings fallback'} (trigger: ${agentConfig?.trigger_type ?? 'none'})`);
+
+        await processQueueItem(supabase, lovableApiKey, item, systemPrompt, mergedSettings);
         
         await supabase
           .from('nina_processing_queue')
