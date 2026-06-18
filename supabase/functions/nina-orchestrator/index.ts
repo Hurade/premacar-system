@@ -759,7 +759,7 @@ async function processQueueItem(
   const { data: message } = await supabase.from('messages').select('*').eq('id', item.message_id).maybeSingle();
   if (!message) throw new Error('Message not found');
 
-  const { data: conversation } = await supabase.from('conversations').select('*, contact:contacts(*)').eq('id', item.conversation_id).maybeSingle();
+  const { data: conversation } = await supabase.from('conversations').select('*, contact:contacts(*), calendar_flow').eq('id', item.conversation_id).maybeSingle();
   if (!conversation) throw new Error('Conversation not found');
 
   if (conversation.status !== 'nina') {
@@ -831,6 +831,85 @@ async function processQueueItem(
 
     console.log('[Nina] BOT DETECTED - conversation paused. Score:', botDetection.score, 'Reasons:', botDetection.reasons.join(', '));
     await supabase.from('messages').update({ processed_by_nina: true }).eq('id', message.id);
+    return;
+  }
+
+  // ═══════════════════════════════════════════
+  // CALENDAR FLOW: handle ongoing booking state
+  // ═══════════════════════════════════════════
+  const calendarFlow = conversation.calendar_flow as {
+    state?: string;
+    offered_slots?: { iso: string; label: string }[];
+    selected_slot?: string;
+  } | null;
+
+  if (calendarFlow?.state === 'showing_slots') {
+    console.log('[Nina] 📅 Calendar flow: showing_slots — parsing slot selection');
+    const userText = (message.content || '').trim();
+    const slotIndex = parseSlotSelection(userText, calendarFlow.offered_slots?.length || 0);
+
+    if (slotIndex !== null && calendarFlow.offered_slots?.[slotIndex]) {
+      const selected = calendarFlow.offered_slots[slotIndex];
+      await supabase.from('conversations').update({
+        calendar_flow: { ...calendarFlow, state: 'requesting_email', selected_slot: selected.iso }
+      }).eq('id', conversation.id);
+      await queueCalendarMessage(supabase, conversation, message,
+        `Ótimo! Reservei *${selected.label}* para você 🗓️\n\nPara confirmar e enviar o convite, qual é o seu e-mail?`,
+        settings);
+    } else {
+      await queueCalendarMessage(supabase, conversation, message,
+        `Digite só o número do horário que prefere:\n\n${(calendarFlow.offered_slots || []).map((s, i) => `${i + 1}. ${s.label}`).join('\n')}`,
+        settings);
+    }
+
+    await supabase.from('messages').update({
+      processed_by_nina: true,
+      nina_response_time: Date.now() - new Date(message.sent_at).getTime()
+    }).eq('id', message.id);
+    return;
+  }
+
+  if (calendarFlow?.state === 'requesting_email') {
+    console.log('[Nina] 📅 Calendar flow: requesting_email — parsing email');
+    const userText = (message.content || '').trim();
+    const email = parseEmail(userText);
+
+    if (email && calendarFlow.selected_slot) {
+      try {
+        const eventResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
+          action: 'create_event',
+          user_id: conversation.user_id,
+          slot_iso: calendarFlow.selected_slot,
+          lead_name: conversation.contact?.name || 'Lead',
+          lead_email: email,
+          lead_company: conversation.contact?.company || '',
+          conversation_id: conversation.id,
+          contact_id: conversation.contact_id,
+        });
+
+        await supabase.from('conversations').update({ calendar_flow: null }).eq('id', conversation.id);
+        await supabase.from('contacts').update({ email }).eq('id', conversation.contact_id);
+
+        const slotLabel = formatSlotLabel(calendarFlow.selected_slot);
+        let confirmMsg = `Perfeito! Sua demo está confirmada para *${slotLabel}* 🎉\n\nEnviei um convite para ${email}.`;
+        if (eventResult?.meet_link) confirmMsg += `\n\n🔗 Link: ${eventResult.meet_link}`;
+
+        await queueCalendarMessage(supabase, conversation, message, confirmMsg, settings);
+      } catch (err) {
+        console.error('[Nina] 📅 Calendar event creation failed:', err);
+        await supabase.from('conversations').update({ calendar_flow: null }).eq('id', conversation.id);
+        await queueCalendarMessage(supabase, conversation, message,
+          'Recebi seu e-mail! Nossa equipe vai confirmar o agendamento em breve 😊', settings);
+      }
+    } else {
+      await queueCalendarMessage(supabase, conversation, message,
+        'Não reconheci o e-mail. Pode me enviar de novo? (ex: nome@email.com)', settings);
+    }
+
+    await supabase.from('messages').update({
+      processed_by_nina: true,
+      nina_response_time: Date.now() - new Date(message.sent_at).getTime()
+    }).eq('id', message.id);
     return;
   }
 
@@ -1113,6 +1192,16 @@ async function processQueueItem(
   }
 
   // ═══════════════════════════════════════════
+  // CALENDAR FLOW: detect [AGENDAR_DEMO] marker
+  // ═══════════════════════════════════════════
+  let startCalendarFlow = false;
+  if (aiContent.includes('[AGENDAR_DEMO]')) {
+    aiContent = aiContent.replace(/\[AGENDAR_DEMO\]/gi, '').trim();
+    startCalendarFlow = true;
+    console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected — will fetch Google Calendar slots');
+  }
+
+  // ═══════════════════════════════════════════
   // VALIDATE AI RESPONSE
   // ═══════════════════════════════════════════
   const validation = validateAIResponse(aiContent);
@@ -1175,6 +1264,41 @@ async function processQueueItem(
       user_message: message.content, ai_response: aiContent, current_memory: clientMemory
     })
   }).catch(err => console.error('[Nina] Error triggering analyze-conversation:', err));
+
+  // ═══════════════════════════════════════════
+  // CALENDAR FLOW: fetch slots and queue listing
+  // ═══════════════════════════════════════════
+  if (startCalendarFlow) {
+    try {
+      const slotsResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
+        action: 'available_slots',
+        user_id: conversation.user_id,
+      });
+      const slots: { iso: string; label: string }[] = slotsResult?.slots || [];
+
+      if (slots.length > 0) {
+        await supabase.from('conversations').update({
+          calendar_flow: { state: 'showing_slots', offered_slots: slots }
+        }).eq('id', conversation.id);
+
+        await supabase.from('send_queue').insert({
+          conversation_id: conversation.id,
+          contact_id: conversation.contact_id,
+          content: formatSlotsMessage(slots),
+          from_type: 'nina',
+          message_type: 'text',
+          priority: 1,
+          scheduled_at: new Date(Date.now() + senderTriggerDelay + 3000).toISOString(),
+          metadata: { response_to_message_id: message.id, calendar_flow: true }
+        });
+        console.log('[Nina] 📅 Calendar slots queued, state: showing_slots');
+      } else {
+        console.warn('[Nina] 📅 No available calendar slots — flow aborted');
+      }
+    } catch (err) {
+      console.error('[Nina] 📅 Calendar flow start error:', err);
+    }
+  }
 }
 
 // Queue text response with chunking
@@ -1206,6 +1330,100 @@ async function queueTextResponse(
       throw sendQueueError;
     }
   }
+}
+
+// ═══════════════════════════════════════════
+// GOOGLE CALENDAR HELPERS
+// ═══════════════════════════════════════════
+
+async function callGoogleCalendarFunction(
+  supabaseUrl: string, serviceKey: string, payload: Record<string, any>
+): Promise<any> {
+  const res = await fetch(`${supabaseUrl}/functions/v1/google-calendar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`google-calendar: ${res.status} — ${errText.substring(0, 200)}`);
+  }
+  return res.json();
+}
+
+function formatSlotsMessage(slots: { iso: string; label: string }[]): string {
+  const lines = slots.map((s, i) => `${i + 1}. ${s.label}`).join('\n');
+  return `Aqui estão os horários disponíveis para a demo 📅\n\n${lines}\n\nQual horário fica melhor pra você? É só digitar o número.`;
+}
+
+function formatSlotLabel(isoString: string): string {
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      weekday: 'long', day: '2-digit', month: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    }).format(new Date(isoString));
+  } catch {
+    return isoString;
+  }
+}
+
+function parseSlotSelection(text: string, slotCount: number): number | null {
+  const t = text.trim();
+  const numMatch = t.match(/^(\d+)/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    if (n >= 1 && n <= slotCount) return n - 1;
+  }
+  const wordMap: Record<string, number> = {
+    'primeiro': 0, 'segunda': 0, 'segundo': 1, 'terceiro': 2, 'terceira': 2,
+    'quarto': 3, 'quarta': 3, 'quinto': 4, 'quinta': 4,
+    'um': 0, 'dois': 1, 'três': 2, 'quatro': 3, 'cinco': 4,
+  };
+  for (const [word, idx] of Object.entries(wordMap)) {
+    if (t.toLowerCase().includes(word) && idx < slotCount) return idx;
+  }
+  return null;
+}
+
+function parseEmail(text: string): string | null {
+  const match = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  return match ? match[0].toLowerCase() : null;
+}
+
+async function queueCalendarMessage(
+  supabase: any, conversation: any, triggerMessage: any,
+  content: string, settings: any, extraDelayMs = 0
+): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const delay = (settings?.response_delay_min || 1000) + extraDelayMs;
+
+  await supabase.from('send_queue').insert({
+    conversation_id: conversation.id,
+    contact_id: conversation.contact_id,
+    content,
+    from_type: 'nina',
+    message_type: 'text',
+    priority: 1,
+    scheduled_at: new Date(Date.now() + delay).toISOString(),
+    metadata: { response_to_message_id: triggerMessage.id, calendar_flow: true }
+  });
+
+  await supabase.rpc('mark_ai_message_sent', {
+    p_conversation_id: conversation.id,
+    p_content: content.substring(0, 500),
+  });
+
+  await new Promise(resolve => setTimeout(resolve, delay + 500));
+  fetch(`${supabaseUrl}/functions/v1/whatsapp-sender`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+    body: JSON.stringify({ triggered_by: 'nina-orchestrator-calendar' }),
+  }).catch(err => console.error('[Nina] Calendar sender trigger failed:', err));
 }
 
 function getDefaultSystemPrompt(): string {
@@ -1250,6 +1468,12 @@ REGRA CRÍTICA:
 - Aguarde SEMPRE a resposta antes de continuar
 - Nunca se identifique como IA, robô ou assistente virtual
 - Nunca pressione para fechar — deixe o interesse surgir naturalmente
+
+AGENDAMENTO DE DEMO:
+- Quando o lead CONFIRMAR que quer agendar, inclua exatamente [AGENDAR_DEMO] em sua resposta
+- Exemplo: "Que ótimo! Vou verificar os horários disponíveis agora. [AGENDAR_DEMO]"
+- O sistema buscará horários no Google Calendar e enviará a lista automaticamente
+- NÃO inclua [AGENDAR_DEMO] se o lead ainda não confirmou interesse em agendar
 </guidelines>
 
 <cognitive_process>

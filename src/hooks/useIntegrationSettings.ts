@@ -24,6 +24,14 @@ export interface IntegrationSettingsData {
   call_max_duration?: number;
   call_hours_start?: string;
   call_hours_end?: string;
+  google_calendar_service_account_json?: Record<string, string> | null;
+  google_calendar_id?: string;
+  google_calendar_slot_duration?: number;
+  google_calendar_buffer?: number;
+  google_calendar_work_start?: number;
+  google_calendar_work_end?: number;
+  google_calendar_timezone?: string;
+  google_calendar_days_ahead?: number;
 }
 
 export function useIntegrationSettings() {

@@ -5,6 +5,7 @@ import IntegrationCard from './IntegrationCard';
 import TwilioConfigModal from './TwilioConfigModal';
 import ElevenLabsConfigModal from './ElevenLabsConfigModal';
 import AWSConfigModal from './AWSConfigModal';
+import GoogleCalendarConfigModal from './GoogleCalendarConfigModal';
 
 const IntegrationSettings: React.FC = () => {
   const { settings, loading, saveSettings } = useIntegrationSettings();
@@ -51,6 +52,14 @@ const IntegrationSettings: React.FC = () => {
       configured: true,
       enabled: !!settings?.whatsapp_enabled,
     },
+    {
+      id: 'google_calendar',
+      icon: '📅',
+      name: 'Google Calendar - Agendamento',
+      description: 'Cris agenda demos automaticamente com horários do Google Calendar',
+      configured: !!(settings as any)?.google_calendar_service_account_json,
+      enabled: !!(settings as any)?.google_calendar_service_account_json,
+    },
   ];
 
   return (
@@ -94,6 +103,13 @@ const IntegrationSettings: React.FC = () => {
         open={activeModal === 'aws_ses'}
         onClose={() => setActiveModal(null)}
         currentConfig={settings}
+        onSave={saveSettings}
+      />
+
+      <GoogleCalendarConfigModal
+        open={activeModal === 'google_calendar'}
+        onClose={() => setActiveModal(null)}
+        currentConfig={settings as any}
         onSave={saveSettings}
       />
     </div>
