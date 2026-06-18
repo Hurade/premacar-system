@@ -10,6 +10,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ═══════════════════════════════════════════
+// HMAC-SHA256 signature validation
+// Set EVOLUTION_WEBHOOK_SECRET in Supabase secrets to enable.
+// Evolution API must be configured with the same secret.
+// ═══════════════════════════════════════════
+async function verifyHmacSha256(secret: string, payload: string, signature: string): Promise<boolean> {
+  if (!secret || !signature) return false;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sigBytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  const computed = Array.from(new Uint8Array(sigBytes))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  // Timing-safe comparison to prevent timing attacks
+  if (computed.length !== signature.length) return false;
+  let diff = 0;
+  for (let i = 0; i < computed.length; i++) {
+    diff |= computed.charCodeAt(i) ^ signature.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 const DEFAULT_GROUPING_DELAY_MS = 20000; // 20 seconds default
 
 serve(async (req) => {
@@ -57,7 +84,24 @@ serve(async (req) => {
 
     // POST request = Incoming message from Evolution API
     if (req.method === 'POST') {
-      const body = await req.json();
+      const rawBody = await req.text();
+
+      // HMAC validation (optional — only enforced when EVOLUTION_WEBHOOK_SECRET is set)
+      const webhookSecret = Deno.env.get('EVOLUTION_WEBHOOK_SECRET');
+      if (webhookSecret) {
+        const signature = req.headers.get('x-signature') ?? '';
+        const valid = await verifyHmacSha256(webhookSecret, rawBody, signature);
+        if (!valid) {
+          console.warn('[Webhook] ❌ Assinatura HMAC inválida — requisição rejeitada');
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        console.log('[Webhook] ✅ Assinatura HMAC válida');
+      }
+
+      const body = JSON.parse(rawBody);
       console.log('[Webhook] Received Evolution API payload:', JSON.stringify(body, null, 2));
 
       // Evolution API format
