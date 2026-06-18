@@ -11,7 +11,6 @@ ALTER TABLE public.conversations
 
 CREATE TABLE IF NOT EXISTS public.calendar_events (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id   UUID        REFERENCES public.organizations(id) ON DELETE CASCADE,
   user_id           UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
   conversation_id   UUID        REFERENCES public.conversations(id) ON DELETE SET NULL,
   contact_id        UUID        REFERENCES public.contacts(id) ON DELETE SET NULL,
@@ -31,16 +30,11 @@ CREATE TABLE IF NOT EXISTS public.calendar_events (
 
 ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "org members can manage calendar_events"
+CREATE POLICY "calendar_events_user_access"
   ON public.calendar_events FOR ALL
-  USING (
-    organization_id IN (
-      SELECT organization_id FROM public.organization_members
-      WHERE user_id = auth.uid()
-    )
-  );
+  USING (user_id = auth.uid());
 
-CREATE INDEX IF NOT EXISTS idx_calendar_events_org      ON public.calendar_events(organization_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_user     ON public.calendar_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_conv     ON public.calendar_events(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_scheduled ON public.calendar_events(scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_conversations_calendar_flow
