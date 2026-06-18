@@ -16,6 +16,7 @@ import CampaignDetails from './pages/CampaignDetails';
 import Logs from './pages/Logs';
 import Followup from './pages/Followup';
 import Agentes from './pages/Agentes';
+import BroadcastDetails from './pages/BroadcastDetails';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
@@ -35,6 +36,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/contacts': 'PremaCar - Contatos',
   '/pipeline': 'PremaCar - Pipeline',
   '/broadcasts': 'PremaCar - Disparos',
+  '/broadcasts/:id': 'PremaCar - Detalhe do Disparo',
   '/campanhas': 'PremaCar - Campanhas',
   '/scheduling': 'PremaCar - Agendamentos',
   '/team': 'PremaCar - Equipe',
@@ -144,6 +146,11 @@ const App: React.FC = () => {
                   <Route path="/followup" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
                       <Followup />
+                    </RoleGate>
+                  } />
+                  <Route path="/broadcasts/:id" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <BroadcastDetails />
                     </RoleGate>
                   } />
                   <Route path="/agentes" element={

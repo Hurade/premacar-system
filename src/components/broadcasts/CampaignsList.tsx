@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCampaigns, useUpdateCampaign, useDeleteCampaign, useProcessCampaigns, useCampaignLeads, Campaign } from '@/hooks/useCampaigns';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Play, Pause, BarChart3, Pencil, Trash2, PlusCircle, Clock, 
-  CheckCircle, Send, Eye, MessageSquare, AlertTriangle, Loader2, Zap, RefreshCw
+import {
+  Play, Pause, BarChart3, Pencil, Trash2, PlusCircle, Clock,
+  CheckCircle, Send, Eye, MessageSquare, AlertTriangle, Loader2, Zap, RefreshCw, FlaskConical
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -45,6 +46,7 @@ const POLLING_INTERVALS = [
 ];
 
 export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCampaign }) => {
+  const navigate = useNavigate();
   const { data: campaigns, isLoading, refetch } = useCampaigns();
   const updateCampaign = useUpdateCampaign();
   const deleteCampaign = useDeleteCampaign();
@@ -274,6 +276,15 @@ export const BroadcastCampaignsList: React.FC<CampaignsListProps> = ({ onNewCamp
                       <Play className="w-4 h-4" /> Iniciar
                     </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                    onClick={() => navigate(`/broadcasts/${campaign.id}`)}
+                  >
+                    <FlaskConical className="w-3.5 h-3.5" />
+                    A/B
+                  </Button>
                   <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setSelectedCampaignId(campaign.id)}>
                     <BarChart3 className="w-4 h-4" />
                   </Button>

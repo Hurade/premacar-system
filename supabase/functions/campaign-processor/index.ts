@@ -77,6 +77,52 @@ interface NinaSettings {
   timezone: string;
 }
 
+interface CampaignVariation {
+  id: string;
+  campaign_id: string;
+  label: string;
+  name: string;
+  weight: number;
+  meta_template_id: string | null;
+  total_sent: number;
+  is_winner: boolean;
+  is_active: boolean;
+}
+
+interface SendRules {
+  max_per_hour: number;
+  max_per_day: number;
+  min_interval_seconds: number;
+  max_interval_seconds: number;
+  auto_pause_on_errors: boolean;
+  error_rate_threshold: number;
+  error_window_sends: number;
+  pause_duration_minutes: number;
+  ab_auto_winner: boolean;
+  ab_winner_min_sends: number;
+  ab_winner_metric: string;
+}
+
+// Weighted random selection of A/B variation
+function selectVariation(variations: CampaignVariation[]): { variation: CampaignVariation; index: number } {
+  const winner = variations.find(v => v.is_winner && v.is_active);
+  if (winner) {
+    return { variation: winner, index: variations.indexOf(winner) };
+  }
+  const active = variations.filter(v => v.is_active);
+  if (active.length === 0) return { variation: variations[0], index: 0 };
+  const totalWeight = active.reduce((s, v) => s + v.weight, 0);
+  const rand = Math.random() * totalWeight;
+  let cumulative = 0;
+  for (let i = 0; i < active.length; i++) {
+    cumulative += active[i].weight;
+    if (rand <= cumulative) {
+      return { variation: active[i], index: variations.indexOf(active[i]) };
+    }
+  }
+  return { variation: active[0], index: 0 };
+}
+
 // Função para enviar template via Meta API
 async function sendTemplateViaMeta(
   phoneNumber: string,
@@ -279,17 +325,69 @@ serve(async (req) => {
       const campaignData = campaign as Campaign;
       console.log(`[campaign-processor] Processing campaign: ${campaignData.name} (API: ${campaignData.api_source})`);
 
-      // Verificar configuração da API baseada na fonte
-      if (campaignData.api_source === 'meta') {
-        if (!ninaSettings?.meta_phone_number_id || !ninaSettings?.meta_access_token) {
-          console.log(`[campaign-processor] Meta API not configured for campaign ${campaignData.name}`);
-          results.push({ campaignId: campaignData.id, sent: false, reason: "meta_api_not_configured" });
-          continue;
+      // ── Apenas API Oficial Meta é suportada em campanhas ──────────
+      if (campaignData.api_source !== 'meta') {
+        console.log(`[campaign-processor] ⚠️ Campanha "${campaignData.name}" usa API não-oficial — ignorada (apenas Meta API permitida em campanhas)`);
+        results.push({ campaignId: campaignData.id, sent: false, reason: "non_meta_api_not_supported" });
+        continue;
+      }
+      if (!ninaSettings?.meta_phone_number_id || !ninaSettings?.meta_access_token) {
+        console.log(`[campaign-processor] Meta API não configurada para campanha ${campaignData.name}`);
+        results.push({ campaignId: campaignData.id, sent: false, reason: "meta_api_not_configured" });
+        continue;
+      }
+
+      // ── Send Rules: verificar taxa de erro recente ─────────────
+      const { data: sendRulesData } = await supabase
+        .from('campaign_send_rules')
+        .select('*')
+        .eq('campaign_id', campaignData.id)
+        .maybeSingle();
+      const sendRules = sendRulesData as SendRules | null;
+
+      if (sendRules?.auto_pause_on_errors) {
+        const windowSize = sendRules.error_window_sends || 30;
+        const { data: recentLeads } = await supabase
+          .from('campaign_leads')
+          .select('status')
+          .eq('campaign_id', campaignData.id)
+          .in('status', ['sent', 'delivered', 'read', 'replied', 'error'])
+          .order('sent_at', { ascending: false })
+          .limit(windowSize);
+
+        if (recentLeads && recentLeads.length >= windowSize) {
+          const errors = recentLeads.filter((l: any) => l.status === 'error').length;
+          const errorRate = (errors / recentLeads.length) * 100;
+          if (errorRate >= (sendRules.error_rate_threshold || 15)) {
+            const pauseUntil = new Date(Date.now() + (sendRules.pause_duration_minutes || 60) * 60_000).toISOString();
+            await supabase
+              .from('campaigns')
+              .update({ status: 'paused', paused_until: pauseUntil })
+              .eq('id', campaignData.id);
+            console.log(`[campaign-processor] 🛑 Auto-pause campanha "${campaignData.name}" — taxa de erro ${errorRate.toFixed(1)}% >= ${sendRules.error_rate_threshold}%`);
+            await saveLog(supabase, {
+              source: 'campaign-processor',
+              level: 'warn',
+              message: `Auto-pause anti-bloqueio: ${campaignData.name} (${errorRate.toFixed(1)}% erros)`,
+              metadata: { campaign_id: campaignData.id, error_rate: errorRate, threshold: sendRules.error_rate_threshold },
+            });
+            results.push({ campaignId: campaignData.id, sent: false, reason: 'auto_paused_error_rate' });
+            continue;
+          }
         }
-      } else {
-        if (!ninaSettings?.evolution_api_url || !ninaSettings?.evolution_api_key || !ninaSettings?.evolution_instance_name) {
-          console.log(`[campaign-processor] Evolution API not configured for campaign ${campaignData.name}`);
-          results.push({ campaignId: campaignData.id, sent: false, reason: "evolution_api_not_configured" });
+      }
+
+      // ── Send Rules: verificar limite por hora ─────────────────
+      if (sendRules?.max_per_hour) {
+        const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+        const { count: sentLastHour } = await supabase
+          .from('campaign_leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', campaignData.id)
+          .gte('sent_at', oneHourAgo);
+        if ((sentLastHour ?? 0) >= sendRules.max_per_hour) {
+          console.log(`[campaign-processor] Limite por hora atingido para "${campaignData.name}" (${sentLastHour}/${sendRules.max_per_hour})`);
+          results.push({ campaignId: campaignData.id, sent: false, reason: 'hourly_limit_reached' });
           continue;
         }
       }
@@ -367,29 +465,87 @@ serve(async (req) => {
       let message = "";
       let sendResult: { success: boolean; messageId?: string; error?: string };
 
-      // Lógica diferente para Meta vs Evolution
+      // ── A/B variation selection ────────────────────────────────
+      const { data: variationsData } = await supabase
+        .from('campaign_variations')
+        .select('*')
+        .eq('campaign_id', campaignData.id)
+        .eq('is_active', true)
+        .order('label');
+
+      const variations = (variationsData ?? []) as CampaignVariation[];
+      let selectedVariation: CampaignVariation | null = null;
+      let variationIndex = 0;
+
+      if (variations.length > 0) {
+        const { variation, index } = selectVariation(variations);
+        selectedVariation = variation;
+        variationIndex = index;
+        console.log(`[campaign-processor] A/B: variação "${variation.label}" selecionada (peso ${variation.weight}%)`);
+
+        // A/B auto-winner check
+        if (sendRules?.ab_auto_winner && !variations.some(v => v.is_winner)) {
+          const minSends = sendRules.ab_winner_min_sends || 100;
+          const metric = sendRules.ab_winner_metric || 'reply_rate';
+          if (variations.every(v => v.total_sent >= minSends)) {
+            const { data: varMetrics } = await supabase
+              .from('campaign_variations')
+              .select('id, label, total_sent, total_delivered, total_read, total_replied')
+              .eq('campaign_id', campaignData.id)
+              .eq('is_active', true);
+
+            if (varMetrics && varMetrics.length >= 2) {
+              const scored = varMetrics.map((v: any) => ({
+                id: v.id,
+                label: v.label,
+                score: metric === 'reply_rate'
+                  ? (v.total_replied / Math.max(v.total_sent, 1))
+                  : metric === 'read_rate'
+                  ? (v.total_read / Math.max(v.total_sent, 1))
+                  : (v.total_delivered / Math.max(v.total_sent, 1)),
+              })).sort((a: any, b: any) => b.score - a.score);
+
+              const winnerId = scored[0].id;
+              await supabase.from('campaign_variations').update({ is_winner: false }).eq('campaign_id', campaignData.id);
+              await supabase.from('campaign_variations').update({ is_winner: true }).eq('id', winnerId);
+              await supabase.from('campaign_variations').update({ is_active: false }).eq('campaign_id', campaignData.id).neq('id', winnerId);
+              console.log(`[campaign-processor] 🏆 Auto-winner selecionado: variação "${scored[0].label}" (métrica: ${metric})`);
+              await saveLog(supabase, {
+                source: 'campaign-processor',
+                level: 'info',
+                message: `A/B auto-winner: variação ${scored[0].label} para campanha ${campaignData.name}`,
+                metadata: { campaign_id: campaignData.id, winner_id: winnerId, metric, scores: scored },
+              });
+            }
+          }
+        }
+      }
+
+      // Resolve effective Meta template (variation overrides campaign default)
+      const effectiveMetaTemplateId = selectedVariation?.meta_template_id || campaignData.meta_template_id;
+
+      // ── Envio via Meta API ─────────────────────────────────────
       if (campaignData.api_source === 'meta') {
-        // Para Meta: usar template aprovado
-        if (!campaignData.meta_template_id) {
-          console.error(`[campaign-processor] Campaign ${campaignData.name} uses Meta API but has no meta_template_id`);
+        if (!effectiveMetaTemplateId) {
+          console.error(`[campaign-processor] Campaign ${campaignData.name} sem meta_template_id`);
           results.push({ campaignId: campaignData.id, sent: false, reason: "no_meta_template" });
           continue;
         }
 
-        // Buscar meta template
+        // Buscar meta template (variação A/B tem prioridade sobre default da campanha)
         const { data: metaTemplate, error: metaTemplateError } = await supabase
           .from("meta_templates")
           .select("*")
-          .eq("id", campaignData.meta_template_id)
+          .eq("id", effectiveMetaTemplateId)
           .single();
 
         if (metaTemplateError || !metaTemplate) {
-          console.error(`[campaign-processor] Meta template not found: ${campaignData.meta_template_id}`);
+          console.error(`[campaign-processor] Meta template não encontrado: ${effectiveMetaTemplateId}`);
           await saveLog(supabase, {
             source: 'campaign-processor',
             level: 'error',
             message: `Template Meta não encontrado para campanha: ${campaignData.name}`,
-            metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, meta_template_id: campaignData.meta_template_id },
+            metadata: { campaign_id: campaignData.id, campaign_name: campaignData.name, meta_template_id: effectiveMetaTemplateId },
           });
           results.push({ campaignId: campaignData.id, sent: false, reason: "meta_template_not_found" });
           continue;
@@ -479,11 +635,19 @@ serve(async (req) => {
           .from("campaign_leads")
           .update({
             status: "sent",
-            variation_used: 0,
+            variation_used: variationIndex,
             sent_at: new Date().toISOString(),
             whatsapp_message_id: sendResult.messageId || null,
           })
           .eq("id", lead.id);
+
+        // Increment A/B variation counter
+        if (selectedVariation) {
+          await supabase
+            .from('campaign_variations')
+            .update({ total_sent: selectedVariation.total_sent + 1, updated_at: new Date().toISOString() })
+            .eq('id', selectedVariation.id);
+        }
 
         // ===== Criar/atualizar contato e criar mensagem no chat =====
         let contactId: string | null = null;
