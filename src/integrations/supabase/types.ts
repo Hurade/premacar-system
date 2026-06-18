@@ -124,6 +124,82 @@ export type Database = {
           },
         ]
       }
+      calendar_events: {
+        Row: {
+          contact_id: string | null
+          conversation_id: string | null
+          created_at: string
+          duration_minutes: number
+          google_event_id: string | null
+          google_meet_link: string | null
+          id: string
+          lead_company: string | null
+          lead_email: string
+          lead_name: string
+          notes: string | null
+          scheduled_at: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          duration_minutes?: number
+          google_event_id?: string | null
+          google_meet_link?: string | null
+          id?: string
+          lead_company?: string | null
+          lead_email: string
+          lead_name: string
+          notes?: string | null
+          scheduled_at: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          duration_minutes?: number
+          google_event_id?: string | null
+          google_meet_link?: string | null
+          id?: string
+          lead_company?: string | null
+          lead_email?: string
+          lead_name?: string
+          notes?: string | null
+          scheduled_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_blacklist: {
         Row: {
           created_at: string
@@ -583,6 +659,7 @@ export type Database = {
           api_source: string | null
           assigned_team: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id: string | null
+          calendar_flow: Json | null
           connection_id: string | null
           contact_id: string
           created_at: string
@@ -605,6 +682,7 @@ export type Database = {
           api_source?: string | null
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
+          calendar_flow?: Json | null
           connection_id?: string | null
           contact_id: string
           created_at?: string
@@ -627,6 +705,7 @@ export type Database = {
           api_source?: string | null
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
+          calendar_flow?: Json | null
           connection_id?: string | null
           contact_id?: string
           created_at?: string
