@@ -2,6 +2,11 @@
 desktop.ini
 Thumbs.db
 
+# Environment — nunca commitar secrets
+.env
+.env.local
+.env.production
+
 # Logs
 logs
 *.log
