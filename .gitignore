@@ -21,6 +21,9 @@ dist
 dist-ssr
 *.local
 
+# Preview HTML files (gerados localmente, não são código de produção)
+preview-*.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
