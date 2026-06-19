@@ -1,5 +1,6 @@
 # Windows
 desktop.ini
+**/desktop.ini
 Thumbs.db
 
 # Environment — nunca commitar secrets
@@ -34,3 +35,4 @@ preview-*.html
 *.njsproj
 *.sln
 *.sw?
+.vercel
