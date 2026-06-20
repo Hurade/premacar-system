@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
@@ -7,6 +7,7 @@ import SystemRoadmap from './SystemRoadmap';
 import IntegrationSettings from './integrations/IntegrationSettings';
 import { ConnectionsManager } from './connections/ConnectionsManager';
 import { MetaTemplatesManager } from './broadcasts/MetaTemplates';
+import QuickRepliesSettings from './settings/QuickRepliesSettings';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
 import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
@@ -112,13 +113,17 @@ const Settings: React.FC = () => {
               <MessageSquare className="w-4 h-4" />
               Templates
             </TabsTrigger>
+            <TabsTrigger value="quick-replies" className="gap-2">
+              <Zap className="w-4 h-4" />
+              Resp. Rápidas
+            </TabsTrigger>
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
             </TabsTrigger>
           </TabsList>
 
-          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && isAdmin && (
+          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'quick-replies' && isAdmin && (
             <div className="flex gap-3">
               <Button
                 variant="ghost"
@@ -173,6 +178,9 @@ const Settings: React.FC = () => {
         </TabsContent>
         <TabsContent value="templates">
           <MetaTemplatesManager />
+        </TabsContent>
+        <TabsContent value="quick-replies">
+          <QuickRepliesSettings />
         </TabsContent>
         <TabsContent value="docs">
           <SystemRoadmap />

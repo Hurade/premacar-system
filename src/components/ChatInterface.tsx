@@ -392,6 +392,15 @@ const ChatInterface: React.FC = () => {
     inputText === '/' || qr.trigger.toLowerCase().includes(inputText.slice(1).toLowerCase())
   );
 
+  const expandQuickReply = (text: string): string => {
+    const hour = new Date().getHours();
+    const saudacao = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    const nome = activeChat?.contactName?.split(' ')[0] || '';
+    return text
+      .replace(/\{\{nome\}\}/g, nome)
+      .replace(/\{\{saudacao\}\}/g, saudacao);
+  };
+
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
     await updateStatus(activeChat.id, status);
@@ -1372,7 +1381,7 @@ const ChatInterface: React.FC = () => {
                     {filteredQuickReplies.map((qr, i) => (
                       <button
                         key={i}
-                        onClick={() => { setInputText(qr.text); setShowQuickRepliesPanel(false); textareaRef.current?.focus(); }}
+                        onClick={() => { setInputText(expandQuickReply(qr.text)); setShowQuickRepliesPanel(false); textareaRef.current?.focus(); }}
                         className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-slate-800 transition-colors text-left"
                       >
                         <span className="text-xs bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono shrink-0">/{qr.trigger}</span>
