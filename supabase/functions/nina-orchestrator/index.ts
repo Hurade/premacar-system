@@ -1084,7 +1084,7 @@ async function processQueueItem(
   const origemConversa = await detectarOrigemConversa(supabase, conversation.contact_id, conversation.id, recentMessages || []);
   console.log('[Nina] Origem da conversa:', origemConversa);
 
-  const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa);
+  const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa, message.content || '');
 
   // Fetch deal data
   let dealData: any = null;
@@ -1188,7 +1188,12 @@ async function processQueueItem(
 
   if (!aiContent) {
     console.warn('[Nina] Empty AI response, using fallback');
-    aiContent = 'Olá! Como posso ajudar você hoje? 😊';
+    const fallbackIntent = detectExplicitIntent(message.content || '');
+    if (fallbackIntent.has && fallbackIntent.desc.includes('demonstração')) {
+      aiContent = 'Ótimo! Vou verificar os horários disponíveis para sua demo agora. [AGENDAR_DEMO]';
+    } else {
+      aiContent = 'Olá! Como posso ajudar você hoje? 😊';
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -1604,7 +1609,30 @@ function processPromptTemplate(
   return prompt.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, varName) => variables[varName] || match);
 }
 
-function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any, origemConversa?: { origem: string; detalhes: string }): string {
+const EXPLICIT_INTENT_PATTERNS = [
+  /agendar|agendam|agend/i,
+  /demonstra[çc][aã]o|demonstra[çc]|demo\b/i,
+  /quero (ver|conhecer|saber|testar|assinar|contratar)/i,
+  /como funciona|como (é|e) o sistema/i,
+  /pre[çc]o|valor|plano|mensalidade|custo/i,
+  /marcar|marque|marca/i,
+  /trial|teste gratuito/i,
+  /quero (mais )?informa[çc][oõ]es/i,
+];
+
+function detectExplicitIntent(msg: string): { has: boolean; desc: string } {
+  const lower = msg.toLowerCase();
+  if (EXPLICIT_INTENT_PATTERNS.some(p => p.test(lower))) {
+    if (/agendar|demonstra|demo|marcar/i.test(lower)) return { has: true, desc: 'quer agendar demonstração' };
+    if (/pre[çc]o|valor|plano|mensalidade/i.test(lower)) return { has: true, desc: 'perguntou sobre preço/planos' };
+    if (/quero (ver|conhecer|saber|testar)|como funciona/i.test(lower)) return { has: true, desc: 'quer conhecer o produto' };
+    return { has: true, desc: 'expressou interesse explícito' };
+  }
+  return { has: false, desc: '' };
+}
+
+function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any, origemConversa?: { origem: string; detalhes: string }, latestUserMessage = ''): string {
+  const intent = detectExplicitIntent(latestUserMessage);
   let contextInfo = '';
 
   if (origemConversa) {
@@ -1618,10 +1646,10 @@ ${origemConversa.origem === 'disparo' ? `
 - Continue a conversa naturalmente
 - Agradeça a resposta e avance para descobrir a dor/interesse
 ` : ''}
-${origemConversa.origem === 'inbound' ? `
+${origemConversa.origem === 'inbound' && !intent.has ? `
 - Apresente-se formalmente (primeiro contato)
 - Use saudação calorosa
-- Faça perguntas de descoberta
+- Faça UMA pergunta de descoberta
 ` : ''}
 ${origemConversa.origem === 'retorno' ? `
 - Reconheça que já conversaram antes
@@ -1651,6 +1679,16 @@ ${origemConversa.origem === 'retorno' ? `
       if (si.pain_points?.length) contextInfo += `\n- Dores: ${si.pain_points.join(', ')}`;
       if (si.next_best_action) contextInfo += `\n- Próxima ação sugerida: ${si.next_best_action}`;
     }
+  }
+
+  if (intent.has) {
+    contextInfo += `\n\n<intencao_explicita>
+ATENÇÃO: O lead acabou de expressar intenção explícita: "${intent.desc}".
+- NÃO use saudação genérica como "Olá! Como posso ajudar?"
+- Responda DIRETAMENTE à solicitação
+- Se quiser agendar demo: confirme o interesse, colete tipo de estabelecimento (se ainda não tem), e quando tiver informação suficiente, inclua [AGENDAR_DEMO] na resposta
+- Seja objetivo e mostre que entendeu o pedido
+</intencao_explicita>`;
   }
 
   const antiDoubleMessageInstruction = `
