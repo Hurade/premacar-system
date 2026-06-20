@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_configs: {
+        Row: {
+          ai_activation_delay_minutes: number
+          created_at: string
+          description: string | null
+          handoff_keywords: string[] | null
+          handoff_message: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          max_messages_per_hour: number
+          message_breaking_enabled: boolean
+          model_mode: string
+          name: string
+          priority: number
+          response_delay_seconds: number
+          system_prompt: string
+          trigger_campaign_id: string | null
+          trigger_event: string | null
+          trigger_origin: string | null
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          ai_activation_delay_minutes?: number
+          created_at?: string
+          description?: string | null
+          handoff_keywords?: string[] | null
+          handoff_message?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          max_messages_per_hour?: number
+          message_breaking_enabled?: boolean
+          model_mode?: string
+          name: string
+          priority?: number
+          response_delay_seconds?: number
+          system_prompt: string
+          trigger_campaign_id?: string | null
+          trigger_event?: string | null
+          trigger_origin?: string | null
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          ai_activation_delay_minutes?: number
+          created_at?: string
+          description?: string | null
+          handoff_keywords?: string[] | null
+          handoff_message?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          max_messages_per_hour?: number
+          message_breaking_enabled?: boolean
+          model_mode?: string
+          name?: string
+          priority?: number
+          response_delay_seconds?: number
+          system_prompt?: string
+          trigger_campaign_id?: string | null
+          trigger_event?: string | null
+          trigger_origin?: string | null
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_configs_trigger_campaign_id_fkey"
+            columns: ["trigger_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_control: {
         Row: {
           conversation_id: string
@@ -992,6 +1069,14 @@ export type Database = {
           elevenlabs_api_key_integration: string | null
           elevenlabs_enabled: boolean | null
           elevenlabs_voice_id_integration: string | null
+          google_calendar_buffer: number | null
+          google_calendar_days_ahead: number | null
+          google_calendar_id: string | null
+          google_calendar_service_account_json: Json | null
+          google_calendar_slot_duration: number | null
+          google_calendar_timezone: string | null
+          google_calendar_work_end: number | null
+          google_calendar_work_start: number | null
           id: string
           twilio_account_sid: string | null
           twilio_auth_token: string | null
@@ -1018,6 +1103,14 @@ export type Database = {
           elevenlabs_api_key_integration?: string | null
           elevenlabs_enabled?: boolean | null
           elevenlabs_voice_id_integration?: string | null
+          google_calendar_buffer?: number | null
+          google_calendar_days_ahead?: number | null
+          google_calendar_id?: string | null
+          google_calendar_service_account_json?: Json | null
+          google_calendar_slot_duration?: number | null
+          google_calendar_timezone?: string | null
+          google_calendar_work_end?: number | null
+          google_calendar_work_start?: number | null
           id?: string
           twilio_account_sid?: string | null
           twilio_auth_token?: string | null
@@ -1044,6 +1137,14 @@ export type Database = {
           elevenlabs_api_key_integration?: string | null
           elevenlabs_enabled?: boolean | null
           elevenlabs_voice_id_integration?: string | null
+          google_calendar_buffer?: number | null
+          google_calendar_days_ahead?: number | null
+          google_calendar_id?: string | null
+          google_calendar_service_account_json?: Json | null
+          google_calendar_slot_duration?: number | null
+          google_calendar_timezone?: string | null
+          google_calendar_work_end?: number | null
+          google_calendar_work_start?: number | null
           id?: string
           twilio_account_sid?: string | null
           twilio_auth_token?: string | null
