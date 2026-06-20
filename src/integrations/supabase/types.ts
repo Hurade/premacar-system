@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_configs: {
+        Row: {
+          ai_activation_delay_minutes: number
+          created_at: string
+          description: string | null
+          handoff_keywords: string[] | null
+          handoff_message: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          max_messages_per_hour: number
+          message_breaking_enabled: boolean
+          model_mode: string
+          name: string
+          priority: number
+          response_delay_seconds: number
+          system_prompt: string
+          trigger_campaign_id: string | null
+          trigger_event: string | null
+          trigger_origin: string | null
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          ai_activation_delay_minutes?: number
+          created_at?: string
+          description?: string | null
+          handoff_keywords?: string[] | null
+          handoff_message?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          max_messages_per_hour?: number
+          message_breaking_enabled?: boolean
+          model_mode?: string
+          name: string
+          priority?: number
+          response_delay_seconds?: number
+          system_prompt: string
+          trigger_campaign_id?: string | null
+          trigger_event?: string | null
+          trigger_origin?: string | null
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          ai_activation_delay_minutes?: number
+          created_at?: string
+          description?: string | null
+          handoff_keywords?: string[] | null
+          handoff_message?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          max_messages_per_hour?: number
+          message_breaking_enabled?: boolean
+          model_mode?: string
+          name?: string
+          priority?: number
+          response_delay_seconds?: number
+          system_prompt?: string
+          trigger_campaign_id?: string | null
+          trigger_event?: string | null
+          trigger_origin?: string | null
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_configs_trigger_campaign_id_fkey"
+            columns: ["trigger_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_control: {
         Row: {
           conversation_id: string
@@ -370,6 +447,137 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_send_rules: {
+        Row: {
+          ab_auto_winner: boolean
+          ab_winner_metric: string
+          ab_winner_min_sends: number
+          auto_pause_on_errors: boolean
+          campaign_id: string
+          created_at: string
+          error_rate_threshold: number
+          error_window_sends: number
+          id: string
+          max_interval_seconds: number
+          max_per_day: number
+          max_per_hour: number
+          min_interval_seconds: number
+          pause_duration_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          ab_auto_winner?: boolean
+          ab_winner_metric?: string
+          ab_winner_min_sends?: number
+          auto_pause_on_errors?: boolean
+          campaign_id: string
+          created_at?: string
+          error_rate_threshold?: number
+          error_window_sends?: number
+          id?: string
+          max_interval_seconds?: number
+          max_per_day?: number
+          max_per_hour?: number
+          min_interval_seconds?: number
+          pause_duration_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          ab_auto_winner?: boolean
+          ab_winner_metric?: string
+          ab_winner_min_sends?: number
+          auto_pause_on_errors?: boolean
+          campaign_id?: string
+          created_at?: string
+          error_rate_threshold?: number
+          error_window_sends?: number
+          id?: string
+          max_interval_seconds?: number
+          max_per_day?: number
+          max_per_hour?: number
+          min_interval_seconds?: number
+          pause_duration_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_send_rules_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_variations: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_winner: boolean
+          label: string
+          meta_template_id: string | null
+          name: string
+          total_delivered: number
+          total_errors: number
+          total_read: number
+          total_replied: number
+          total_sent: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_winner?: boolean
+          label: string
+          meta_template_id?: string | null
+          name?: string
+          total_delivered?: number
+          total_errors?: number
+          total_read?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_winner?: boolean
+          label?: string
+          meta_template_id?: string | null
+          name?: string
+          total_delivered?: number
+          total_errors?: number
+          total_read?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_variations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_variations_meta_template_id_fkey"
+            columns: ["meta_template_id"]
+            isOneToOne: false
+            referencedRelation: "meta_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -992,6 +1200,14 @@ export type Database = {
           elevenlabs_api_key_integration: string | null
           elevenlabs_enabled: boolean | null
           elevenlabs_voice_id_integration: string | null
+          google_calendar_buffer: number | null
+          google_calendar_days_ahead: number | null
+          google_calendar_id: string | null
+          google_calendar_service_account_json: Json | null
+          google_calendar_slot_duration: number | null
+          google_calendar_timezone: string | null
+          google_calendar_work_end: number | null
+          google_calendar_work_start: number | null
           id: string
           twilio_account_sid: string | null
           twilio_auth_token: string | null
@@ -1018,6 +1234,14 @@ export type Database = {
           elevenlabs_api_key_integration?: string | null
           elevenlabs_enabled?: boolean | null
           elevenlabs_voice_id_integration?: string | null
+          google_calendar_buffer?: number | null
+          google_calendar_days_ahead?: number | null
+          google_calendar_id?: string | null
+          google_calendar_service_account_json?: Json | null
+          google_calendar_slot_duration?: number | null
+          google_calendar_timezone?: string | null
+          google_calendar_work_end?: number | null
+          google_calendar_work_start?: number | null
           id?: string
           twilio_account_sid?: string | null
           twilio_auth_token?: string | null
@@ -1044,6 +1268,14 @@ export type Database = {
           elevenlabs_api_key_integration?: string | null
           elevenlabs_enabled?: boolean | null
           elevenlabs_voice_id_integration?: string | null
+          google_calendar_buffer?: number | null
+          google_calendar_days_ahead?: number | null
+          google_calendar_id?: string | null
+          google_calendar_service_account_json?: Json | null
+          google_calendar_slot_duration?: number | null
+          google_calendar_timezone?: string | null
+          google_calendar_work_end?: number | null
+          google_calendar_work_start?: number | null
           id?: string
           twilio_account_sid?: string | null
           twilio_auth_token?: string | null
@@ -2288,6 +2520,10 @@ export type Database = {
       }
       increment_campaign_counter: {
         Args: { p_campaign_id: string; p_counter: string }
+        Returns: undefined
+      }
+      increment_variation_counter: {
+        Args: { p_campaign_id: string; p_counter: string; p_lead_id: string }
         Returns: undefined
       }
       mark_ai_message_sent: {

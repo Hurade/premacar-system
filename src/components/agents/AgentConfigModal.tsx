@@ -23,8 +23,8 @@ type ModelMode = 'flash' | 'pro' | 'pro3' | 'adaptive';
 interface AgentConfig {
   id?: string;
   name: string;
-  description: string;
-  icon: string;
+  description: string | null;
+  icon: string | null;
   trigger_type: TriggerType;
   trigger_origin: TriggerOrigin | null;
   trigger_campaign_id: string | null;
@@ -36,7 +36,7 @@ interface AgentConfig {
   message_breaking_enabled: boolean;
   ai_activation_delay_minutes: number;
   handoff_keywords: string[];
-  handoff_message: string;
+  handoff_message: string | null;
   priority: number;
   is_active: boolean;
 }
@@ -233,7 +233,7 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                 <label className="text-xs font-medium text-slate-400 mb-1.5 block">Ícone</label>
                 <input
                   type="text"
-                  value={config.icon}
+                  value={config.icon ?? ''}
                   onChange={e => setConfig(prev => ({ ...prev, icon: e.target.value }))}
                   className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-xl text-center focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
                   maxLength={2}
@@ -257,7 +257,7 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
               <label className="text-xs font-medium text-slate-400 mb-1.5 block">Descrição</label>
               <input
                 type="text"
-                value={config.description}
+                value={config.description ?? ''}
                 onChange={e => setConfig(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Quando e para que usar este agente"
                 className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
@@ -466,7 +466,7 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                 <label className="text-xs font-medium text-slate-400 mb-1.5 block">Mensagem ao transferir</label>
                 <input
                   type="text"
-                  value={config.handoff_message}
+                  value={config.handoff_message ?? ''}
                   onChange={e => setConfig(prev => ({ ...prev, handoff_message: e.target.value }))}
                   className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 />
