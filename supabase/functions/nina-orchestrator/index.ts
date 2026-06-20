@@ -945,6 +945,7 @@ async function processQueueItem(
 
     if (aiAskedAboutTime && userGavTimePreference) {
       console.log('[Nina] 📅 SCHEDULING AUTO-TRIGGER: lead respondeu com preferência de horário, iniciando calendar flow diretamente');
+      let autoTriggered = false;
       try {
         const slotsResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
           action: 'available_slots',
@@ -957,20 +958,24 @@ async function processQueueItem(
             calendar_flow: { state: 'showing_slots', offered_slots: slots }
           }).eq('id', conversation.id);
           await queueCalendarMessage(supabase, conversation, message, formatSlotsMessage(slots), settings);
+          autoTriggered = true;
         } else {
           await queueCalendarMessage(supabase, conversation, message,
             'Perfeito! Vou confirmar os horários e te aviso em instantes 😊', settings);
+          autoTriggered = true;
         }
       } catch (err) {
-        console.error('[Nina] SCHEDULING AUTO-TRIGGER error:', err);
-        // Falha silenciosa — cai no fluxo normal da IA abaixo
+        console.error('[Nina] SCHEDULING AUTO-TRIGGER error — falling through to AI:', err);
       }
 
-      await supabase.from('messages').update({
-        processed_by_nina: true,
-        nina_response_time: Date.now() - new Date(message.sent_at).getTime()
-      }).eq('id', message.id);
-      return;
+      if (autoTriggered) {
+        await supabase.from('messages').update({
+          processed_by_nina: true,
+          nina_response_time: Date.now() - new Date(message.sent_at).getTime()
+        }).eq('id', message.id);
+        return;
+      }
+      // Se falhou, continua no fluxo normal da IA abaixo
     }
   }
 
