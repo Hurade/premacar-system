@@ -1,4 +1,4 @@
-import { serve } from "jsr:@supabase/functions-js/serve@0.5.0";
+import { serve } from "jsr:@supabase/functions-js@0.5.0/serve";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
