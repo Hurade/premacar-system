@@ -913,6 +913,62 @@ async function processQueueItem(
     return;
   }
 
+  // ═══════════════════════════════════════════
+  // SCHEDULING AUTO-TRIGGER: Lead respondeu com dia/horário após AI perguntar
+  // ═══════════════════════════════════════════
+  if (!calendarFlow) {
+    const { data: lastNinaMsgRaw } = await supabase
+      .from('messages')
+      .select('content')
+      .eq('conversation_id', conversation.id)
+      .eq('from_type', 'nina')
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const aiAskedAboutTime = lastNinaMsgRaw?.content &&
+      /agendar|agendamento|horário|que dia|qual dia|disponível para.*demo|melhor para você\?/i.test(lastNinaMsgRaw.content);
+
+    const TIME_PATTERNS = [
+      /segunda|terça|quarta|quinta|sexta|sábado|domingo/i,
+      /manhã|tarde|noite|manha/i,
+      /amanhã|hoje|semana (que vem|próxima)|próxim/i,
+      /qualquer (horário|hora|dia)/i,
+      /\b\d{1,2}h\b|\d{1,2}:\d{2}/,
+    ];
+    const userGavTimePreference = TIME_PATTERNS.some(p => p.test(message.content || ''));
+
+    if (aiAskedAboutTime && userGavTimePreference) {
+      console.log('[Nina] 📅 SCHEDULING AUTO-TRIGGER: lead respondeu com preferência de horário, iniciando calendar flow diretamente');
+      try {
+        const slotsResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
+          action: 'available_slots',
+          user_id: conversation.user_id,
+        });
+        const slots: { iso: string; label: string }[] = slotsResult?.slots || [];
+
+        if (slots.length > 0) {
+          await supabase.from('conversations').update({
+            calendar_flow: { state: 'showing_slots', offered_slots: slots }
+          }).eq('id', conversation.id);
+          await queueCalendarMessage(supabase, conversation, message, formatSlotsMessage(slots), settings);
+        } else {
+          await queueCalendarMessage(supabase, conversation, message,
+            'Perfeito! Vou confirmar os horários e te aviso em instantes 😊', settings);
+        }
+      } catch (err) {
+        console.error('[Nina] SCHEDULING AUTO-TRIGGER error:', err);
+        // Falha silenciosa — cai no fluxo normal da IA abaixo
+      }
+
+      await supabase.from('messages').update({
+        processed_by_nina: true,
+        nina_response_time: Date.now() - new Date(message.sent_at).getTime()
+      }).eq('id', message.id);
+      return;
+    }
+  }
+
   // Check if the latest message from user is the one we're processing (avoid stale processing)
   const { data: latestUserMsg } = await supabase
     .from('messages')
