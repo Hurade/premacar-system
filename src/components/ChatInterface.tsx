@@ -16,6 +16,7 @@ import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useUserRole } from '@/hooks/useUserRole';
 import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -61,6 +62,8 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
+  const { currentUserName } = useUserRole();
+  const signatureName = currentUserName || sdrName;
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(true);
@@ -337,7 +340,7 @@ const ChatInterface: React.FC = () => {
     setShowQuickRepliesPanel(false);
 
     if (isInternalMode) {
-      await sendInternalNote(activeChat.id, content, sdrName || undefined);
+      await sendInternalNote(activeChat.id, content, signatureName || undefined);
       return;
     }
 
@@ -347,8 +350,8 @@ const ChatInterface: React.FC = () => {
       return;
     }
 
-    if (signatureEnabled && sdrName) {
-      content = `${content}\n\n— ${sdrName}`;
+    if (signatureEnabled && signatureName) {
+      content = `${signatureName}:\n${content}`;
     }
 
     await sendMessage(activeChat.id, content);
@@ -1466,9 +1469,9 @@ const ChatInterface: React.FC = () => {
                       }`}
                       rows={1}
                     />
-                    {signatureEnabled && sdrName && !isInternalMode && (
+                    {signatureEnabled && signatureName && !isInternalMode && (
                       <div className="px-3.5 pb-2 text-xs text-slate-500 border-t border-slate-800/50 pt-1.5">
-                        — {sdrName}
+                        {signatureName}:
                       </div>
                     )}
                   </div>

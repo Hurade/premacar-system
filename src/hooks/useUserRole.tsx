@@ -9,6 +9,7 @@ interface UserRoleContextType {
   appRole: AppRole | null;
   teamRole: TeamRole | null;
   teamMemberId: string | null;
+  currentUserName: string | null;
   loading: boolean;
   isAdmin: boolean;
   isManager: boolean;
@@ -112,6 +113,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
   const [appRole, setAppRole] = useState<AppRole | null>(null);
   const [teamRole, setTeamRole] = useState<TeamRole | null>(null);
   const [teamMemberId, setTeamMemberId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchRoles = async () => {
@@ -119,6 +121,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
       setAppRole(null);
       setTeamRole(null);
       setTeamMemberId(null);
+      setCurrentUserName(null);
       setLoading(false);
       return;
     }
@@ -137,10 +140,10 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
         setAppRole('user');
       }
 
-      // Fetch team member info to get team role
+      // Fetch team member info to get team role and name
       const { data: teamMemberData } = await supabase
         .from('team_members')
-        .select('id, role, status')
+        .select('id, role, status, name')
         .eq('email', user.email!)
         .eq('status', 'active')
         .maybeSingle();
@@ -148,6 +151,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
       if (teamMemberData) {
         setTeamRole(teamMemberData.role as TeamRole);
         setTeamMemberId(teamMemberData.id);
+        setCurrentUserName(teamMemberData.name || null);
       } else {
         // Check if user is admin in user_roles, then treat as admin in team context too
         if (roleData?.role === 'admin') {
@@ -194,6 +198,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
         appRole,
         teamRole,
         teamMemberId,
+        currentUserName,
         loading,
         isAdmin,
         isManager,
