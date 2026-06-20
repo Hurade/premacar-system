@@ -117,6 +117,13 @@ serve(async (req) => {
   try {
     console.log('[Nina] Starting orchestration...');
 
+    // Libera itens presos em 'processing' há mais de 3 minutos (redeploy matou a execução anterior)
+    await supabase
+      .from('nina_processing_queue')
+      .update({ status: 'pending', error_message: 'Reset: stuck in processing' })
+      .eq('status', 'processing')
+      .lt('updated_at', new Date(Date.now() - 3 * 60 * 1000).toISOString());
+
     const { data: queueItems, error: claimError } = await supabase
       .rpc('claim_nina_processing_batch', { p_limit: 10 });
 
