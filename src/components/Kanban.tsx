@@ -393,10 +393,19 @@ const Kanban: React.FC = () => {
       <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
         <div className="flex h-full gap-4 min-w-max">
           {stages.map((column) => {
-            const columnDeals = filteredDeals.filter(d => d.stageId === column.id);
-            const totalValue = columnDeals.reduce((acc, curr) => acc + curr.value, 0);
+            const isFirstStage = column.position === 0;
             const isWonColumn = column.title === 'Ganho';
             const isLostColumn = column.title === 'Perdido';
+
+            // "Novos Leads" (position 0) mostra apenas deals com conversa ativa em andamento
+            const columnDeals = filteredDeals.filter(d => {
+              if (d.stageId !== column.id) return false;
+              if (isFirstStage && !isWonColumn && !isLostColumn) {
+                return d.hasActiveConversation === true;
+              }
+              return true;
+            });
+            const totalValue = columnDeals.reduce((acc, curr) => acc + curr.value, 0);
 
             return (
               <div 
@@ -438,13 +447,25 @@ const Kanban: React.FC = () => {
                           : 'bg-slate-800 text-slate-400'
                     }`}>{columnDeals.length}</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-medium">
-                     Total: <span className={isWonColumn ? 'text-emerald-300' : isLostColumn ? 'text-red-300' : 'text-slate-300'}>{formatCurrency(totalValue)}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      Total: <span className={isWonColumn ? 'text-emerald-300' : isLostColumn ? 'text-red-300' : 'text-slate-300'}>{formatCurrency(totalValue)}</span>
+                    </div>
+                    {isFirstStage && !isWonColumn && !isLostColumn && (
+                      <span className="text-[9px] text-cyan-500/70 bg-cyan-500/10 px-1.5 py-0.5 rounded-full">em andamento</span>
+                    )}
                   </div>
                 </div>
 
                 {/* Column Body */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                  {isFirstStage && !isWonColumn && !isLostColumn && columnDeals.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+                      <MessageSquare className="w-8 h-8 text-slate-700" />
+                      <p className="text-xs text-slate-500">Nenhuma conversa ativa no momento</p>
+                      <p className="text-[10px] text-slate-600">Leads sem conversa em andamento não aparecem aqui</p>
+                    </div>
+                  )}
                   {columnDeals.map((deal) => (
                     <div
                       key={deal.id}

@@ -136,6 +136,8 @@ export interface Deal {
   lostReason?: string;
   clientMemory?: ClientMemory;
   conversationId?: string | null;
+  hasActiveConversation?: boolean;
+  lastConversationAt?: string | null;
 }
 
 export interface DealActivity {
@@ -322,6 +324,8 @@ export interface UIMessage {
   fromType: MessageFromType;
   mediaUrl: string | null;
   whatsappMessageId: string | null;
+  isInternal?: boolean;
+  senderName?: string;
 }
 
 // ============= Utility Functions =============
@@ -376,7 +380,9 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     status: mapDBMessageStatus(msg.status),
     fromType: isAutoReply ? 'user' : msg.from_type,
     mediaUrl: resolveMediaUrl(msg.media_url, msg.api_source),
-    whatsappMessageId: msg.whatsapp_message_id
+    whatsappMessageId: msg.whatsapp_message_id,
+    isInternal: (msg.metadata as any)?.is_internal === true,
+    senderName: (msg.metadata as any)?.sender_name || undefined
   };
 }
 

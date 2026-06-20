@@ -42,7 +42,7 @@ const playNotificationSound = () => {
 
 // Update document title with unread count
 const updateDocumentTitle = (unreadCount: number) => {
-  const baseTitle = 'VIA - Chat';
+  const baseTitle = 'Prema - Chat';
   if (unreadCount > 0) {
     document.title = `(${unreadCount}) ${baseTitle}`;
   } else {
@@ -537,6 +537,85 @@ export function useConversations() {
     }
   }, []);
 
+  // Send internal note (saved in DB, NOT sent to WhatsApp, not visible to contact)
+  const sendInternalNote = useCallback(async (conversationId: string, content: string, senderName?: string) => {
+    if (!content.trim()) return;
+
+    const tempId = `temp-internal-${Date.now()}`;
+    const tempMessage: UIMessage = {
+      id: tempId,
+      content,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      sentAt: new Date().toISOString(),
+      direction: MessageDirection.OUTGOING,
+      type: MessageType.TEXT,
+      status: 'sent',
+      fromType: 'human',
+      mediaUrl: null,
+      whatsappMessageId: null,
+      isInternal: true,
+      senderName
+    };
+
+    setConversations(prev =>
+      prev.map(conv => {
+        if (conv.id === conversationId) {
+          return { ...conv, messages: [...conv.messages, tempMessage] };
+        }
+        return conv;
+      })
+    );
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          content,
+          type: 'text',
+          from_type: 'human',
+          status: 'sent',
+          processed_by_nina: false,
+          sent_at: new Date().toISOString(),
+          metadata: { is_internal: true, sender_name: senderName ?? null }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Replace temp with real message
+      if (data) {
+        setConversations(prev =>
+          prev.map(conv => {
+            if (conv.id === conversationId) {
+              return {
+                ...conv,
+                messages: conv.messages.map(m =>
+                  m.id === tempId
+                    ? { ...m, id: data.id, whatsappMessageId: null }
+                    : m
+                )
+              };
+            }
+            return conv;
+          })
+        );
+      }
+    } catch (err) {
+      console.error('[useConversations] Error saving internal note:', err);
+      toast.error('Erro ao salvar comentário interno');
+      setConversations(prev =>
+        prev.map(conv => {
+          if (conv.id === conversationId) {
+            return { ...conv, messages: conv.messages.filter(m => m.id !== tempId) };
+          }
+          return conv;
+        })
+      );
+    }
+  }, []);
+
   // Update conversation status
   const updateStatus = useCallback(async (
     conversationId: string, 
@@ -731,6 +810,7 @@ export function useConversations() {
     error,
     realtimeConnected,
     sendMessage,
+    sendInternalNote,
     updateStatus,
     markAsRead,
     assignConversation,

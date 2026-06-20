@@ -25,10 +25,10 @@ serve(async (req) => {
 
     // Calculate interaction count
     const interactionCount = (current_memory.interaction_summary?.total_conversations || 0) + 1;
-    
-    // Determine if full AI analysis should run (message 1, 5, 10, 15, 20...)
-    const shouldAnalyze = interactionCount === 1 || interactionCount % 5 === 0;
-    
+
+    // Full analysis on 1st, 3rd, 6th, 9th... message (every 3, plus first contact)
+    const shouldAnalyze = interactionCount === 1 || interactionCount % 3 === 0;
+
     console.log(`[Analyze] Interaction #${interactionCount}, full analysis: ${shouldAnalyze}`);
 
     if (!shouldAnalyze) {
@@ -62,23 +62,30 @@ serve(async (req) => {
       });
     }
 
-    // FULL ANALYSIS: Fetch pipeline stages and current deal
-    // Only fetch AI-managed stages with criteria (single-tenant - no user_id filter)
-    const { data: stages } = await supabase
-      .from('pipeline_stages')
-      .select('id, title, ai_trigger_criteria, position')
-      .eq('is_ai_managed', true)
-      .not('ai_trigger_criteria', 'is', null)
-      .eq('is_active', true)
-      .order('position', { ascending: true });
-
-    const { data: currentDeal } = await supabase
-      .from('deals')
-      .select('id, stage_id, stage')
-      .eq('contact_id', contact_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // FULL ANALYSIS: Fetch pipeline stages, current deal, and last messages for context
+    const [{ data: stages }, { data: currentDeal }, { data: recentMessages }] = await Promise.all([
+      supabase
+        .from('pipeline_stages')
+        .select('id, title, ai_trigger_criteria, position')
+        .eq('is_ai_managed', true)
+        .not('ai_trigger_criteria', 'is', null)
+        .eq('is_active', true)
+        .order('position', { ascending: true }),
+      supabase
+        .from('deals')
+        .select('id, stage_id, stage')
+        .eq('contact_id', contact_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('messages')
+        .select('content, from_type, sent_at')
+        .eq('conversation_id', conversation_id)
+        .neq('from_type', null)
+        .order('sent_at', { ascending: false })
+        .limit(8)
+    ]);
 
     const hasAiManagedStages = stages && stages.length > 0;
     
@@ -93,15 +100,25 @@ serve(async (req) => {
       ? stages.map(s => `- ${s.title} (ID: ${s.id}): ${s.ai_trigger_criteria}`).join('\n')
       : '';
 
+    // Build recent conversation history (oldest → newest)
+    const messageHistory = (recentMessages || [])
+      .reverse()
+      .map(m => {
+        const who = m.from_type === 'user' ? 'LEAD' : m.from_type === 'nina' ? 'IA' : 'ATENDENTE';
+        return `[${who}]: ${m.content || '(mídia)'}`;
+      })
+      .join('\n');
+
     // Prepare conversation snippet for AI analysis
     const conversationSnippet = `
-MENSAGEM DO CLIENTE:
-${user_message}
+HISTÓRICO RECENTE DA CONVERSA:
+${messageHistory || `[LEAD]: ${user_message}\n[ATENDENTE/IA]: ${ai_response}`}
 
-RESPOSTA DO ASSISTENTE:
-${ai_response}
+ÚLTIMA TROCA:
+MENSAGEM DO CLIENTE: ${user_message}
+RESPOSTA DO ASSISTENTE: ${ai_response}
 
-CONTEXTO ATUAL:
+CONTEXTO ACUMULADO:
 - Interesses conhecidos: ${current_memory.lead_profile?.interests?.join(', ') || 'Nenhum'}
 - Dores identificadas: ${current_memory.sales_intelligence?.pain_points?.join(', ') || 'Nenhuma'}
 - Score atual: ${current_memory.lead_profile?.qualification_score || 0}/100
@@ -109,7 +126,7 @@ ${hasAiManagedStages ? `
 CRITÉRIOS DOS ESTÁGIOS DO PIPELINE:
 ${stagesCriteria}
 
-ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
+ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Novos Leads'}` : ''}
     `.trim();
 
     // Build tools array - always include memory insights, conditionally include stage determination
@@ -194,11 +211,19 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
       });
     }
 
-    const systemPrompt = hasAiManagedStages 
-      ? `Você é um analista de conversas de vendas. Analise a interação e:
-1. Extraia insights estruturados para atualizar a memória do cliente
-2. Determine para qual estágio do pipeline o deal deve ir com base nos critérios fornecidos`
-      : `Você é um analista de conversas de vendas. Analise a interação e extraia insights estruturados para atualizar a memória do cliente.`;
+    const systemPrompt = hasAiManagedStages
+      ? `Você é um analista de conversas de vendas da Prema (plataforma de retenção de clientes para oficinas/centros automotivos).
+
+Analise o histórico da conversa e:
+1. Extraia insights estruturados sobre o lead (interesses, dores, qualificação, budget, timeline)
+2. Determine para qual estágio do pipeline o deal deve avançar com base nos critérios fornecidos
+
+Regras para mudança de estágio:
+- Só sugira avançar para o próximo estágio se houver sinais CLAROS na conversa
+- Não regrida estágios (nunca sugira um estágio anterior ao atual)
+- Use confidence > 70 apenas quando há evidência concreta na conversa
+- Em caso de dúvida, mantenha o estágio atual (não mude)`
+      : `Você é um analista de conversas de vendas da Prema (plataforma de retenção de clientes para oficinas/centros automotivos). Analise a interação e extraia insights estruturados para atualizar o perfil do lead.`;
 
     // Call AI to extract insights AND determine deal stage (if applicable)
     const analysisResponse = await fetch(LOVABLE_AI_URL, {
@@ -297,27 +322,34 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
       console.log('[Analyze] Memory updated successfully');
     }
 
-    // Move deal if confidence > 70% and stage is different
+    // Move deal if confidence > 70%, stage is different, and we're moving FORWARD (not regressing)
     let dealMoved = false;
     if (stageResult && currentDeal && stageResult.suggested_stage_id !== currentDeal.stage_id && stageResult.confidence > 70) {
       const newStage = stages?.find(s => s.id === stageResult.suggested_stage_id);
-      
-      if (newStage) {
+      const currentStage = stages?.find(s => s.id === currentDeal.stage_id);
+
+      // Prevent regression: only move forward (higher position)
+      const isForwardMove = !currentStage || !newStage || newStage.position > currentStage.position;
+
+      if (newStage && isForwardMove) {
         const { error: updateError } = await supabase
           .from('deals')
-          .update({ 
+          .update({
             stage_id: stageResult.suggested_stage_id,
-            stage: newStage.title
+            stage: newStage.title,
+            updated_at: new Date().toISOString()
           })
           .eq('id', currentDeal.id);
 
         if (!updateError) {
           dealMoved = true;
-          console.log(`[Analyze] Deal moved to stage: ${newStage.title} (confidence: ${stageResult.confidence}%)`);
+          console.log(`[Analyze] ✅ Deal moved: ${currentDeal.stage} → ${newStage.title} (confidence: ${stageResult.confidence}%)`);
           console.log(`[Analyze] Reasoning: ${stageResult.reasoning}`);
         } else {
           console.error('[Analyze] Error moving deal:', updateError);
         }
+      } else if (!isForwardMove) {
+        console.log(`[Analyze] ⏪ Stage regression blocked: ${currentDeal.stage} → ${newStage?.title}`);
       }
     } else if (stageResult && currentDeal) {
       console.log(`[Analyze] Deal NOT moved: same stage or low confidence (${stageResult.confidence}%)`);

@@ -392,10 +392,13 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                   </label>
                   <select
                     value={config.ai_activation_delay_minutes}
-                    onChange={e => setConfig(prev => ({ ...prev, ai_activation_delay_minutes: parseInt(e.target.value) }))}
+                    onChange={e => setConfig(prev => ({ ...prev, ai_activation_delay_minutes: parseFloat(e.target.value) }))}
                     className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
                   >
                     <option value={0}>Sem delay</option>
+                    <option value={0.33}>20 segundos</option>
+                    <option value={0.5}>30 segundos</option>
+                    <option value={1}>1 minuto</option>
                     <option value={2}>2 minutos</option>
                     <option value={5}>5 minutos (rec.)</option>
                     <option value={10}>10 minutos</option>

@@ -773,39 +773,53 @@ export const api = {
       return [];
     }
 
-    // Buscar conversation IDs para cada deal com contact_id
+    // Buscar conversations para cada deal com contact_id (incluindo status ativo e última mensagem)
     const contactIds = data?.filter(d => d.contact_id).map(d => d.contact_id) || [];
-    
+
     const { data: conversations } = await supabase
       .from('conversations')
-      .select('id, contact_id')
-      .in('contact_id', contactIds as string[]);
+      .select('id, contact_id, is_active, last_message_at')
+      .in('contact_id', contactIds as string[])
+      .order('last_message_at', { ascending: false });
 
-    const convMap = new Map(conversations?.map(c => [c.contact_id, c.id]) || []);
+    // Map contact_id → most recent conversation (active preferred)
+    const convMap = new Map<string, { id: string; isActive: boolean; lastMessageAt: string | null }>();
+    for (const c of (conversations || [])) {
+      const existing = convMap.get(c.contact_id);
+      // Prefer active conversations; among active, prefer most recent (already ordered DESC)
+      if (!existing || (!existing.isActive && c.is_active)) {
+        convMap.set(c.contact_id, { id: c.id, isActive: c.is_active, lastMessageAt: c.last_message_at });
+      }
+    }
 
-    return (data || []).map((d: any) => ({
-      id: d.id,
-      title: d.title,
-      company: d.company || d.contact?.name || d.contact?.call_name || 'Sem empresa',
-      value: Number(d.value) || 0,
-      stage: d.stage,
-      stageId: d.stage_id,
-      ownerAvatar: d.owner?.avatar || 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
-      ownerId: d.owner_id,
-      ownerName: d.owner?.name,
-      tags: d.tags || [],
-      dueDate: d.due_date,
-      priority: (d.priority || 'medium') as 'low' | 'medium' | 'high',
-      contactId: d.contact_id,
-      contactName: d.contact?.name || d.contact?.call_name,
-      contactPhone: d.contact?.phone_number,
-      contactEmail: d.contact?.email,
-      wonAt: d.won_at,
-      lostAt: d.lost_at,
-      lostReason: d.lost_reason,
-      clientMemory: d.contact?.client_memory || null,
-      conversationId: convMap.get(d.contact_id) || null,
-    }));
+    return (data || []).map((d: any) => {
+      const conv = convMap.get(d.contact_id);
+      return {
+        id: d.id,
+        title: d.title,
+        company: d.company || d.contact?.name || d.contact?.call_name || 'Sem empresa',
+        value: Number(d.value) || 0,
+        stage: d.stage,
+        stageId: d.stage_id,
+        ownerAvatar: d.owner?.avatar || 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
+        ownerId: d.owner_id,
+        ownerName: d.owner?.name,
+        tags: d.tags || [],
+        dueDate: d.due_date,
+        priority: (d.priority || 'medium') as 'low' | 'medium' | 'high',
+        contactId: d.contact_id,
+        contactName: d.contact?.name || d.contact?.call_name,
+        contactPhone: d.contact?.phone_number,
+        contactEmail: d.contact?.email,
+        wonAt: d.won_at,
+        lostAt: d.lost_at,
+        lostReason: d.lost_reason,
+        clientMemory: d.contact?.client_memory || null,
+        conversationId: conv?.id || null,
+        hasActiveConversation: conv?.isActive === true,
+        lastConversationAt: conv?.lastMessageAt || null,
+      };
+    });
   },
 
   // Pipeline Stages CRUD

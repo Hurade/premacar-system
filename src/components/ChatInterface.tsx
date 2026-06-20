@@ -5,8 +5,10 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
-  KanbanSquare, Pencil
+  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign
 } from 'lucide-react';
+import { EmojiPicker } from './chat/EmojiPicker';
+import { AiCopilotPanel } from './chat/AiCopilotPanel';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, ApiSource, formatDateSeparator } from '../types';
 import { Badge } from './ui/badge';
@@ -57,7 +59,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation } = useConversations();
+  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -108,6 +110,19 @@ const ChatInterface: React.FC = () => {
   const [isSavingContact, setIsSavingContact] = useState(false);
   // Local overrides so UI reflects saved values without waiting for hook refetch
   const [contactOverrides, setContactOverrides] = useState<Record<string, { name: string; email: string; oficina: string }>>({});
+
+  // New feature states
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [signatureEnabled, setSignatureEnabled] = useState(false);
+  const [isInternalMode, setIsInternalMode] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<{ trigger: string; text: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('prema_quick_replies') || '[]'); } catch { return []; }
+  });
+  const [showQuickRepliesPanel, setShowQuickRepliesPanel] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeChat = conversations.find(c => c.id === selectedChatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -317,17 +332,62 @@ const ChatInterface: React.FC = () => {
     e?.preventDefault();
     if (!inputText.trim() || !activeChat) return;
 
+    let content = inputText.trim();
+    setInputText('');
+    setShowQuickRepliesPanel(false);
+
+    if (isInternalMode) {
+      await sendInternalNote(activeChat.id, content, sdrName || undefined);
+      return;
+    }
+
     // Block free messages if Meta 24h window is expired
     if (activeChat.apiSource === 'meta' && !canSendFreeMessage) {
       toast.error('Janela de 24h expirada. Use um template para retomar a conversa.');
       return;
     }
 
-    const content = inputText.trim();
-    setInputText('');
-    
+    if (signatureEnabled && sdrName) {
+      content = `${content}\n\n— ${sdrName}`;
+    }
+
     await sendMessage(activeChat.id, content);
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChat) return;
+    setIsUploadingFile(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('chat-attachments')
+        .upload(`${activeChat.id}/${Date.now()}-${file.name}`, file, { upsert: false });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('chat-attachments').getPublicUrl(data.path);
+      await sendMessage(activeChat.id, `📎 ${file.name}\n${urlData.publicUrl}`);
+      toast.success('Arquivo enviado');
+    } catch (err) {
+      console.error('[ChatInterface] File upload error:', err);
+      toast.error('Erro ao enviar arquivo. Verifique se o bucket "chat-attachments" existe.');
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+    if (val.startsWith('/') && quickReplies.length > 0) {
+      setShowQuickRepliesPanel(true);
+    } else {
+      setShowQuickRepliesPanel(false);
+    }
+  };
+
+  const filteredQuickReplies = quickReplies.filter(qr =>
+    inputText === '/' || qr.trigger.toLowerCase().includes(inputText.slice(1).toLowerCase())
+  );
 
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
@@ -1125,14 +1185,23 @@ const ChatInterface: React.FC = () => {
                   <Pause className="w-5 h-5" />
                 </Button>
                 <div className="h-6 w-px bg-slate-800 mx-1"></div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`text-slate-400 hover:text-white ${showProfileInfo ? 'bg-slate-800 text-cyan-400' : ''}`} 
-                  onClick={() => setShowProfileInfo(!showProfileInfo)} 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`text-slate-400 hover:text-white ${showProfileInfo ? 'bg-slate-800 text-cyan-400' : ''}`}
+                  onClick={() => setShowProfileInfo(!showProfileInfo)}
                   title="Ver Informações"
                 >
                   <Info className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`text-slate-400 hover:text-white ${showCopilot ? 'bg-purple-500/20 text-purple-400' : ''}`}
+                  onClick={() => setShowCopilot(!showCopilot)}
+                  title="Copiloto IA"
+                >
+                  <Brain className="w-5 h-5" />
                 </Button>
                 <div className="h-6 w-px bg-slate-800 mx-1"></div>
                 <Popover>
@@ -1208,11 +1277,27 @@ const ChatInterface: React.FC = () => {
                             <span className="px-4 py-1.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-xs font-medium rounded-full shadow-sm backdrop-blur-sm">{dateSeparatorLabel}</span>
                           </div>
                         )}
+                        {msg.isInternal ? (
+                          <div className="flex justify-center group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex flex-col max-w-[80%] items-center">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Lock className="w-3 h-3 text-amber-400" />
+                                <span className="text-[10px] text-amber-400/70 font-medium">
+                                  Comentário interno{msg.senderName ? ` — ${msg.senderName}` : ''}
+                                </span>
+                              </div>
+                              <div className="px-4 py-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-100 text-sm leading-relaxed italic">
+                                {msg.content}
+                              </div>
+                              <span className="text-[10px] text-slate-500 mt-1">{msg.timestamp}</span>
+                            </div>
+                          </div>
+                        ) : (
                         <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                           <div className={`flex flex-col max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
-                            <div 
+                            <div
                               className={`px-5 py-3 rounded-2xl shadow-md relative text-sm leading-relaxed ${
-                                isOutgoing 
+                                isOutgoing
                                   ? msg.fromType === 'nina'
                                     ? 'bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm shadow-violet-900/20'
                                     : 'bg-gradient-to-br from-cyan-600 to-teal-700 text-white rounded-tr-sm shadow-cyan-900/20'
@@ -1221,7 +1306,7 @@ const ChatInterface: React.FC = () => {
                             >
                               {renderMessageContent(msg)}
                             </div>
-                            
+
                             <div className="flex items-center mt-1.5 gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity px-1">
                               {isOutgoing && msg.fromType === 'nina' && (
                                 <Bot className="w-3 h-3 text-violet-400" />
@@ -1231,13 +1316,14 @@ const ChatInterface: React.FC = () => {
                               )}
                               <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
                               {isOutgoing && (
-                                msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> : 
+                                msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> :
                                 msg.status === 'delivered' ? <CheckCheck className="w-3.5 h-3.5 text-slate-500" /> :
                                 <Check className="w-3.5 h-3.5 text-slate-500" />
                               )}
                             </div>
                           </div>
                         </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1256,72 +1342,170 @@ const ChatInterface: React.FC = () => {
                 onTemplateSent={refetchWindow}
               />
             ) : (
-              <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
+              <div className={`p-4 border-t backdrop-blur-sm z-10 relative ${isInternalMode ? 'bg-amber-950/60 border-amber-800/40' : 'bg-slate-900/90 border-slate-800'}`}>
                 {/* Warning when window is about to expire */}
-                {activeChat.apiSource === 'meta' && windowStatus === 'open' && hoursRemaining < 2 && (
+                {activeChat.apiSource === 'meta' && windowStatus === 'open' && hoursRemaining < 2 && !isInternalMode && (
                   <div className="mb-2 text-center">
                     <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
                       ⏰ Janela expira em {Math.floor(hoursRemaining * 60)} minutos
                     </span>
                   </div>
                 )}
-                <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto">
-                  <div className="flex items-center gap-1">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      disabled
-                      title="Em breve: Emoji picker"
-                      className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
-                    >
-                      <Smile className="w-5 h-5" />
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon"
-                      disabled
-                      title="Em breve: Enviar anexos"
-                      className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
-                    >
-                      <Paperclip className="w-5 h-5" />
-                    </Button>
+
+                {isInternalMode && (
+                  <div className="mb-2 flex items-center gap-1.5 text-xs text-amber-400">
+                    <Lock className="w-3 h-3" />
+                    <span>Modo comentário interno — não será enviado ao cliente</span>
                   </div>
-                  
-                  <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                )}
+
+                {/* Quick replies panel */}
+                {showQuickRepliesPanel && filteredQuickReplies.length > 0 && (
+                  <div className="absolute bottom-full left-4 right-4 mb-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-50">
+                    <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-1.5 text-xs text-slate-400">
+                      <Zap className="w-3 h-3" />
+                      Respostas rápidas
+                    </div>
+                    {filteredQuickReplies.map((qr, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setInputText(qr.text); setShowQuickRepliesPanel(false); textareaRef.current?.focus(); }}
+                        className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-slate-800 transition-colors text-left"
+                      >
+                        <span className="text-xs bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono shrink-0">/{qr.trigger}</span>
+                        <span className="text-sm text-slate-300 truncate">{qr.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="flex items-end gap-2 max-w-4xl mx-auto">
+                  <div className="flex items-center gap-1">
+                    {/* Emoji picker */}
+                    <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="ghost" size="icon" title="Emojis" className="text-slate-400 hover:text-white rounded-full">
+                          <Smile className="w-5 h-5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0 border-none bg-transparent shadow-none w-auto" align="start" side="top">
+                        <EmojiPicker onEmojiSelect={(emoji) => {
+                          setInputText(prev => prev + emoji);
+                          setShowEmojiPicker(false);
+                          textareaRef.current?.focus();
+                        }} />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* File attachment */}
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} aria-label="Enviar arquivo" title="Enviar arquivo" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Enviar arquivo"
+                      disabled={isUploadingFile}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-slate-400 hover:text-white rounded-full"
+                    >
+                      {isUploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
+                    </Button>
+
+                    {/* Internal comment toggle */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title={isInternalMode ? 'Desativar comentário interno' : 'Comentário interno (não vai ao cliente)'}
+                      onClick={() => setIsInternalMode(!isInternalMode)}
+                      className={`rounded-full transition-colors ${isInternalMode ? 'bg-amber-500/20 text-amber-400' : 'text-slate-400 hover:text-amber-400'}`}
+                    >
+                      <Lock className="w-5 h-5" />
+                    </Button>
+
+                    {/* Signature toggle */}
+                    {!isInternalMode && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title={signatureEnabled ? 'Remover assinatura' : 'Adicionar assinatura'}
+                        onClick={() => setSignatureEnabled(!signatureEnabled)}
+                        className={`rounded-full transition-colors ${signatureEnabled ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-cyan-400'}`}
+                      >
+                        <PenLine className="w-5 h-5" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className={`flex-1 rounded-2xl border transition-all shadow-inner ${
+                    isInternalMode
+                      ? 'bg-amber-950/40 border-amber-700/40 focus-within:ring-2 focus-within:ring-amber-500/30'
+                      : 'bg-slate-950 border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50'
+                  }`}>
                     <textarea
+                      ref={textareaRef}
                       value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
+                      onChange={handleInputChange}
                       onKeyDown={(e) => {
+                        if (e.key === 'Escape') { setShowQuickRepliesPanel(false); return; }
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendMessage();
                         }
                       }}
-                      placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite sua mensagem...'}
-                      className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
+                      placeholder={
+                        isInternalMode
+                          ? 'Comentário interno (visível apenas para a equipe)...'
+                          : activeChat.status === 'nina'
+                            ? `${sdrName} está respondendo automaticamente...`
+                            : 'Digite sua mensagem ou / para respostas rápidas...'
+                      }
+                      className={`w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm focus:ring-0 resize-none outline-none ${
+                        isInternalMode ? 'text-amber-100 placeholder:text-amber-800' : 'text-slate-200 placeholder:text-slate-600'
+                      }`}
                       rows={1}
                     />
+                    {signatureEnabled && sdrName && !isInternalMode && (
+                      <div className="px-3.5 pb-2 text-xs text-slate-500 border-t border-slate-800/50 pt-1.5">
+                        — {sdrName}
+                      </div>
+                    )}
                   </div>
 
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={!inputText.trim()}
-                    className={`rounded-full w-12 h-12 p-0 transition-all ${
-                      inputText.trim() 
-                        ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95' 
-                        : 'opacity-50 cursor-not-allowed'
+                    className={`rounded-full w-12 h-12 p-0 transition-all shrink-0 ${
+                      isInternalMode
+                        ? 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
+                        : inputText.trim()
+                          ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95'
+                          : 'opacity-50 cursor-not-allowed'
                     }`}
                   >
-                    <Send className="w-5 h-5 ml-0.5" />
+                    {isInternalMode ? <Lock className="w-4 h-4" /> : <Send className="w-5 h-5 ml-0.5" />}
                   </Button>
                 </form>
               </div>
             )}
           </div>
 
-          {!isMobile && <div 
+          {!isMobile && showCopilot && (
+            <div className="w-72 border-l border-slate-800 flex-shrink-0 flex flex-col overflow-hidden bg-slate-900/95">
+              <AiCopilotPanel
+                messages={activeChat.messages}
+                contactName={activeChat.contactName}
+                onUseReply={(reply) => {
+                  setInputText(reply);
+                  setIsInternalMode(false);
+                  textareaRef.current?.focus();
+                }}
+              />
+            </div>
+          )}
+
+          {!isMobile && <div
             className={`${showProfileInfo ? 'w-80 border-l border-slate-800 opacity-100' : 'w-0 opacity-0 border-none'} transition-all duration-300 ease-in-out bg-slate-900/95 flex-shrink-0 flex flex-col overflow-hidden`}
           >
             <div className="w-80 h-full flex flex-col">
@@ -1600,6 +1784,53 @@ const ChatInterface: React.FC = () => {
                       <p className="text-xs text-slate-500 italic">Nenhuma tag adicionada</p>
                     )}
                   </div>
+                </div>
+
+                {/* Quick Replies Management */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span className="flex items-center gap-2"><Zap className="w-4 h-4" />Respostas Rápidas</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trigger = window.prompt('Atalho (ex: oi, preco, demo):');
+                        if (!trigger) return;
+                        const text = window.prompt('Texto da resposta:');
+                        if (!text) return;
+                        const updated = [...quickReplies, { trigger: trigger.replace(/\s/g, '_').toLowerCase(), text }];
+                        setQuickReplies(updated);
+                        localStorage.setItem('prema_quick_replies', JSON.stringify(updated));
+                      }}
+                      className="text-cyan-500 hover:text-cyan-400 transition-colors"
+                      title="Adicionar resposta rápida"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </h4>
+                  {quickReplies.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic">Nenhuma resposta rápida. Digite / no chat para usar.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {quickReplies.map((qr, i) => (
+                        <div key={i} className="flex items-start gap-2 bg-slate-800/50 rounded-lg px-3 py-2">
+                          <span className="text-xs bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono shrink-0">/{qr.trigger}</span>
+                          <span className="text-xs text-slate-400 flex-1 truncate">{qr.text}</span>
+                          <button
+                            type="button"
+                            title="Remover resposta rápida"
+                            onClick={() => {
+                              const updated = quickReplies.filter((_, idx) => idx !== i);
+                              setQuickReplies(updated);
+                              localStorage.setItem('prema_quick_replies', JSON.stringify(updated));
+                            }}
+                            className="text-slate-600 hover:text-red-400 transition-colors shrink-0"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Notes Area */}
