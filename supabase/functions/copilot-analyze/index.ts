@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "npm:@supabase/functions-js@2.4.4/serve";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
