@@ -345,6 +345,11 @@ function validateAIResponse(response: string): { message: string; issues: string
     return { message: 'Olá! Como posso ajudar você hoje? 😊', issues };
   }
 
+  // Remove unwanted qualifiers the AI sometimes adds
+  cleaned = cleaned.replace(/\s*\(opcional\)\s*/gi, ' ').trim();
+  cleaned = cleaned.replace(/\s*\(se quiser\)\s*/gi, ' ').trim();
+  cleaned = cleaned.replace(/\s*\(não obrigatório\)\s*/gi, ' ').trim();
+
   // Check for multiple messages / excessive length
   const lines = cleaned.split('\n').filter(l => l.trim());
   if (lines.length > 8) {
@@ -1754,7 +1759,8 @@ INSTRUÇÃO CRÍTICA DE FORMATO:
 - NUNCA envie 2 perguntas ou 2 blocos de texto separados
 - Se precisar fazer uma pergunta, faça APENAS 1
 - Não use duplo Enter (parágrafo duplo) para separar ideias diferentes
-- Use Enter simples se precisar de quebra de linha`;
+- Use Enter simples se precisar de quebra de linha
+- NUNCA adicione "(opcional)", "(se quiser)" ou qualificadores entre parênteses nas mensagens`;
 
   return basePrompt + contextInfo + antiDoubleMessageInstruction;
 }
