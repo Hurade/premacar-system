@@ -35,7 +35,58 @@ export function useWhatsAppConnections() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setConnections((data || []) as unknown as WhatsAppConnection[]);
+      const list: WhatsAppConnection[] = (data || []) as unknown as WhatsAppConnection[];
+
+      // If no entries yet, check nina_settings for a legacy connection
+      if (list.length === 0) {
+        const { data: ns } = await supabase
+          .from('nina_settings')
+          .select('meta_access_token, meta_phone_number_id, meta_business_account_id, evolution_api_url, evolution_api_key, evolution_instance_name')
+          .limit(1)
+          .maybeSingle();
+
+        if (ns?.meta_access_token && ns?.meta_phone_number_id) {
+          list.push({
+            id: '__legacy_meta__',
+            name: 'API Meta Oficial',
+            phone_number: ns.meta_phone_number_id,
+            api_type: 'meta_official',
+            meta_phone_number_id: ns.meta_phone_number_id,
+            meta_access_token: ns.meta_access_token,
+            meta_business_account_id: ns.meta_business_account_id ?? null,
+            evolution_instance_name: null,
+            evolution_api_key: null,
+            evolution_base_url: null,
+            is_active: true,
+            is_connected: true,
+            last_connected_at: null,
+            user_id: null,
+            created_at: '',
+            updated_at: '',
+          });
+        } else if (ns?.evolution_api_url && ns?.evolution_api_key) {
+          list.push({
+            id: '__legacy_evolution__',
+            name: 'Evolution API',
+            phone_number: '',
+            api_type: 'evolution',
+            evolution_instance_name: ns.evolution_instance_name ?? null,
+            evolution_api_key: ns.evolution_api_key,
+            evolution_base_url: ns.evolution_api_url,
+            meta_phone_number_id: null,
+            meta_access_token: null,
+            meta_business_account_id: null,
+            is_active: true,
+            is_connected: true,
+            last_connected_at: null,
+            user_id: null,
+            created_at: '',
+            updated_at: '',
+          });
+        }
+      }
+
+      setConnections(list);
     } catch (error) {
       console.error('Erro ao carregar conexões:', error);
     } finally {

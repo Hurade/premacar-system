@@ -160,45 +160,51 @@ export function ConnectionsManager() {
                 )}
               </div>
 
-              <div className="mt-3 flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-400 hover:text-white gap-1.5 h-8"
-                  onClick={() => {
-                    setEditingConnection(conn);
-                    setModalOpen(true);
-                  }}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  Editar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-400 hover:text-cyan-400 gap-1.5 h-8"
-                  onClick={() => handleTest(conn.id)}
-                  disabled={testingId === conn.id}
-                >
-                  {testingId === conn.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : conn.is_connected ? (
-                    <Wifi className="w-3.5 h-3.5" />
-                  ) : (
-                    <WifiOff className="w-3.5 h-3.5" />
-                  )}
-                  Testar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-400 hover:text-red-400 gap-1.5 h-8 ml-auto"
-                  onClick={() => deleteConnection(conn.id)}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Remover
-                </Button>
-              </div>
+              {conn.id.startsWith('__legacy_') ? (
+                <div className="mt-3 text-xs text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                  Configurada em <strong>Configurações → APIs</strong>. Para gerenciar aqui, remova as credenciais de lá e adicione uma nova conexão.
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-white gap-1.5 h-8"
+                    onClick={() => {
+                      setEditingConnection(conn);
+                      setModalOpen(true);
+                    }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-cyan-400 gap-1.5 h-8"
+                    onClick={() => handleTest(conn.id)}
+                    disabled={testingId === conn.id}
+                  >
+                    {testingId === conn.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : conn.is_connected ? (
+                      <Wifi className="w-3.5 h-3.5" />
+                    ) : (
+                      <WifiOff className="w-3.5 h-3.5" />
+                    )}
+                    Testar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-red-400 gap-1.5 h-8 ml-auto"
+                    onClick={() => deleteConnection(conn.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Remover
+                  </Button>
+                </div>
+              )}
             </div>
           ))
         )}
