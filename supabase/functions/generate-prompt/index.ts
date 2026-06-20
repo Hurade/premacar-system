@@ -54,20 +54,72 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
-    const formData: FormData = await req.json();
-    
+    const body = await req.json();
+
+    // ── COPILOT ANALYSIS ROUTE ───────────────────────────────────────────
+    if (body.action === 'copilot-analyze') {
+      const { transcript, contactName } = body;
+      if (!transcript) {
+        return new Response(JSON.stringify({ error: 'transcript is required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const copilotPrompt = `Você é um assistente de vendas/suporte analisando uma conversa de WhatsApp da Prema (plataforma de pós-venda automotivo).
+
+Conversa recente:
+---
+${transcript}
+---
+
+Responda APENAS com JSON válido neste formato exato:
+{
+  "context_summary": "resumo do contexto em 1-2 frases",
+  "tone": "tom percebido do cliente (ex: interessado, hesitante, frustrado, neutro)",
+  "tips": ["dica 1 para melhorar a conversa", "dica 2", "dica 3"],
+  "suggested_reply": "sugestão de resposta natural para o atendente enviar agora",
+  "next_action": "próxima ação recomendada"
+}`;
+
+      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [{ role: 'user', content: copilotPrompt }],
+          max_tokens: 800,
+          temperature: 0.4,
+        }),
+      });
+
+      if (!aiResp.ok) throw new Error(`AI error: ${aiResp.status}`);
+      const aiData = await aiResp.json();
+      const text = aiData.choices?.[0]?.message?.content || '';
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Resposta inválida da IA');
+
+      return new Response(jsonMatch[0], {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    // ── END COPILOT ROUTE ────────────────────────────────────────────────
+
+    const formData: FormData = body;
+
     // Validar campos obrigatórios
     if (!formData.sdr_name || !formData.company_name || !formData.products || !formData.differentials) {
       return new Response(
         JSON.stringify({ error: 'Campos obrigatórios faltando' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     // Template do prompt que será preenchido

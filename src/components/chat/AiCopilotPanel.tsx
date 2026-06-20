@@ -36,8 +36,8 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
       .join('\n');
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('copilot-analyze', {
-        body: { transcript, contactName }
+      const { data, error: fnError } = await supabase.functions.invoke('generate-prompt', {
+        body: { action: 'copilot-analyze', transcript, contactName }
       });
 
       if (fnError) throw new Error(fnError.message);
