@@ -451,6 +451,137 @@ export type Database = {
           },
         ]
       }
+      campaign_send_rules: {
+        Row: {
+          ab_auto_winner: boolean
+          ab_winner_metric: string
+          ab_winner_min_sends: number
+          auto_pause_on_errors: boolean
+          campaign_id: string
+          created_at: string
+          error_rate_threshold: number
+          error_window_sends: number
+          id: string
+          max_interval_seconds: number
+          max_per_day: number
+          max_per_hour: number
+          min_interval_seconds: number
+          pause_duration_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          ab_auto_winner?: boolean
+          ab_winner_metric?: string
+          ab_winner_min_sends?: number
+          auto_pause_on_errors?: boolean
+          campaign_id: string
+          created_at?: string
+          error_rate_threshold?: number
+          error_window_sends?: number
+          id?: string
+          max_interval_seconds?: number
+          max_per_day?: number
+          max_per_hour?: number
+          min_interval_seconds?: number
+          pause_duration_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          ab_auto_winner?: boolean
+          ab_winner_metric?: string
+          ab_winner_min_sends?: number
+          auto_pause_on_errors?: boolean
+          campaign_id?: string
+          created_at?: string
+          error_rate_threshold?: number
+          error_window_sends?: number
+          id?: string
+          max_interval_seconds?: number
+          max_per_day?: number
+          max_per_hour?: number
+          min_interval_seconds?: number
+          pause_duration_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_send_rules_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_variations: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_winner: boolean
+          label: string
+          meta_template_id: string | null
+          name: string
+          total_delivered: number
+          total_errors: number
+          total_read: number
+          total_replied: number
+          total_sent: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_winner?: boolean
+          label: string
+          meta_template_id?: string | null
+          name?: string
+          total_delivered?: number
+          total_errors?: number
+          total_read?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_winner?: boolean
+          label?: string
+          meta_template_id?: string | null
+          name?: string
+          total_delivered?: number
+          total_errors?: number
+          total_read?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_variations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_variations_meta_template_id_fkey"
+            columns: ["meta_template_id"]
+            isOneToOne: false
+            referencedRelation: "meta_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           anti_ban_enabled: boolean
@@ -2389,6 +2520,10 @@ export type Database = {
       }
       increment_campaign_counter: {
         Args: { p_campaign_id: string; p_counter: string }
+        Returns: undefined
+      }
+      increment_variation_counter: {
+        Args: { p_campaign_id: string; p_counter: string; p_lead_id: string }
         Returns: undefined
       }
       mark_ai_message_sent: {
