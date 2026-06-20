@@ -23,8 +23,8 @@ type ModelMode = 'flash' | 'pro' | 'pro3' | 'adaptive';
 interface AgentConfig {
   id?: string;
   name: string;
-  description: string;
-  icon: string;
+  description: string | null;
+  icon: string | null;
   trigger_type: TriggerType;
   trigger_origin: TriggerOrigin | null;
   trigger_campaign_id: string | null;
@@ -36,7 +36,7 @@ interface AgentConfig {
   message_breaking_enabled: boolean;
   ai_activation_delay_minutes: number;
   handoff_keywords: string[];
-  handoff_message: string;
+  handoff_message: string | null;
   priority: number;
   is_active: boolean;
 }

@@ -8,8 +8,8 @@ import AgentConfigModal from '@/components/agents/AgentConfigModal';
 interface AgentConfig {
   id: string;
   name: string;
-  description: string;
-  icon: string;
+  description: string | null;
+  icon: string | null;
   trigger_type: string;
   trigger_origin: string | null;
   trigger_campaign_id: string | null;

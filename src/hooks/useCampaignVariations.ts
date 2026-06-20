@@ -107,7 +107,7 @@ export function useCampaignSendRules(campaignId: string | null) {
 export function useUpsertVariation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (variation: Partial<CampaignVariation> & { campaign_id: string }) => {
+    mutationFn: async (variation: Partial<CampaignVariation> & { campaign_id: string; label: string }) => {
       const payload = { ...variation, updated_at: new Date().toISOString() };
       if (variation.id) {
         const { data, error } = await supabase
@@ -121,7 +121,7 @@ export function useUpsertVariation() {
       }
       const { data, error } = await supabase
         .from('campaign_variations')
-        .insert(payload)
+        .insert([payload])
         .select()
         .single();
       if (error) throw error;
