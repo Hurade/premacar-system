@@ -38,13 +38,13 @@ const handoffToHumanTool = {
   type: "function",
   function: {
     name: "request_demo_handoff",
-    description: "Acionar quando o lead qualificado aceita agendar demonstração. Encerra a IA e notifica a equipe comercial.",
+    description: "Acionar APENAS quando o lead pede explicitamente para falar com um humano/atendente real, ou quando há um problema complexo que a IA não consegue resolver. NÃO usar para agendamento de demonstração — para agendar demo, inclua o marcador [AGENDAR_DEMO] na resposta.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
-          description: "Contexto do lead: ERP usado, porte da oficina, dores mencionadas, urgência"
+          description: "Motivo da transferência: por que o lead precisa falar com um humano agora"
         },
         preferred_time: {
           type: "string",
@@ -787,7 +787,7 @@ async function processQueueItem(
 
   if (recentAIMessage) {
     const timeSinceLastAI = Date.now() - new Date(recentAIMessage.sent_at).getTime();
-    if (timeSinceLastAI < 15000) { // 15 seconds
+    if (timeSinceLastAI < 5000) { // 5 seconds
       console.log(`[Nina] ❌ DOUBLE-CHECK: AI sent message ${timeSinceLastAI}ms ago, skipping`);
       await supabase.from('messages').update({ processed_by_nina: true }).eq('id', message.id);
       return;
@@ -1157,9 +1157,9 @@ async function processQueueItem(
         const handoffResult = await handoffToHuman(supabase, conversation, args);
 
         if (handoffResult.success) {
-          aiContent = (aiContent || '') + '\n\nPerfeito! Nossa equipe comercial vai entrar em contato em breve para agendar sua demo. Obrigada pelo interesse! 😊';
+          aiContent = (aiContent || 'Vou te conectar com um de nossos consultores agora. Eles vão te atender em breve! 😊');
         } else {
-          aiContent = (aiContent || '') + '\n\nVou te passar para nossa equipe. Eles entrarão em contato em breve!';
+          aiContent = (aiContent || 'Vou te passar para nossa equipe. Eles entrarão em contato em breve!');
         }
         handoffDone = true;
       } catch (parseError) {

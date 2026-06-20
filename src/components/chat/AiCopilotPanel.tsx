@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Bot, RefreshCw, Copy, ChevronRight, Lightbulb, MessageSquare, TrendingUp } from 'lucide-react';
 import { UIMessage } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CopilotAnalysis {
   context_summary: string;
@@ -15,8 +16,6 @@ interface AiCopilotPanelProps {
   contactName: string;
   onUseReply: (reply: string) => void;
 }
-
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotPanelProps) {
   const [analysis, setAnalysis] = useState<CopilotAnalysis | null>(null);
@@ -36,48 +35,15 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
       })
       .join('\n');
 
-    const prompt = `Você é um assistente de vendas/suporte analisando uma conversa de WhatsApp.
-
-Conversa recente (últimas mensagens):
----
-${transcript}
----
-
-Responda APENAS com JSON válido neste formato exato:
-{
-  "context_summary": "resumo do contexto em 1-2 frases",
-  "tone": "tom percebido do cliente (ex: interessado, hesitante, frustrado, neutro)",
-  "tips": ["dica 1", "dica 2", "dica 3"],
-  "suggested_reply": "sugestão de resposta para o atendente enviar agora",
-  "next_action": "próxima ação recomendada"
-}`;
-
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 800,
-          messages: [{ role: 'user', content: prompt }]
-        })
+      const { data, error: fnError } = await supabase.functions.invoke('copilot-analyze', {
+        body: { transcript, contactName }
       });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+      if (fnError) throw new Error(fnError.message);
+      if (data?.error) throw new Error(data.error);
 
-      const data = await response.json();
-      const text = data.content?.[0]?.text || '';
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('Resposta inválida da IA');
-      const parsed: CopilotAnalysis = JSON.parse(jsonMatch[0]);
-      setAnalysis(parsed);
+      setAnalysis(data as CopilotAnalysis);
     } catch (err) {
       console.error('[AiCopilot] Error:', err);
       setError('Erro ao analisar conversa. Tente novamente.');
@@ -121,7 +87,6 @@ Responda APENAS com JSON válido neste formato exato:
 
         {analysis && (
           <>
-            {/* Context */}
             <div className="bg-white/5 rounded-lg p-3 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-white/50 mb-1">
                 <MessageSquare className="w-3 h-3" />
@@ -133,7 +98,6 @@ Responda APENAS com JSON válido neste formato exato:
               </span>
             </div>
 
-            {/* Tips */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs text-white/50">
                 <Lightbulb className="w-3 h-3" />
@@ -147,7 +111,6 @@ Responda APENAS com JSON válido neste formato exato:
               ))}
             </div>
 
-            {/* Suggested reply */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs text-white/50">
                 <TrendingUp className="w-3 h-3" />
@@ -173,7 +136,6 @@ Responda APENAS com JSON válido neste formato exato:
               </div>
             </div>
 
-            {/* Next action */}
             <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
               <p className="text-xs text-white/50 mb-0.5">Próxima ação</p>
               <p className="text-sm text-green-300">{analysis.next_action}</p>
