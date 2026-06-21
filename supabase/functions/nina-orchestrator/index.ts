@@ -195,20 +195,21 @@ Deno.serve(async (req) => {
         }
 
         // Get conversation context for agent selection
-        const { data: conversation } = await supabase
+        const { data: conversation, error: convQueryError } = await supabase
           .from('conversations')
-          .select('user_id, origin, campaign_id')
+          .select('*')
           .eq('id', item.conversation_id)
           .single();
 
         if (!conversation) {
-          console.log('[Nina] Conversation not found:', item.conversation_id);
+          const errDetail = convQueryError ? `${convQueryError.code}: ${convQueryError.message}` : 'no data';
+          console.error('[Nina] Conversation not found:', item.conversation_id, '— query error:', errDetail);
           await supabase
             .from('nina_processing_queue')
-            .update({ 
-              status: 'failed', 
+            .update({
+              status: 'failed',
               processed_at: new Date().toISOString(),
-              error_message: 'Conversation not found'
+              error_message: `Conversation not found: ${errDetail}`
             })
             .eq('id', item.id);
           continue;
