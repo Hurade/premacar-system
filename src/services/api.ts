@@ -837,7 +837,7 @@ export const api = {
     if (orphanConvs.length > 0) {
       const { data: firstStage } = await supabase
         .from('pipeline_stages')
-        .select('id, name')
+        .select('id, title')
         .order('position', { ascending: true })
         .limit(1)
         .maybeSingle();
