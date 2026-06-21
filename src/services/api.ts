@@ -778,21 +778,25 @@ export const api = {
 
     const { data: conversations } = await supabase
       .from('conversations')
-      .select('id, contact_id, is_active, last_message_at')
+      .select('id, contact_id, is_active, status, last_message_at')
       .in('contact_id', contactIds as string[])
       .order('last_message_at', { ascending: false });
 
     // Map contact_id → most recent conversation (active preferred)
-    const convMap = new Map<string, { id: string; isActive: boolean; lastMessageAt: string | null }>();
+    // "active" = is_active=true OU status nina/human (corrige is_active NULL em registros antigos)
+    const convMap = new Map<string, { id: string; isActive: boolean; status: string; lastMessageAt: string | null }>();
     for (const c of (conversations || [])) {
       const existing = convMap.get(c.contact_id);
-      // Prefer active conversations; among active, prefer most recent (already ordered DESC)
-      if (!existing || (!existing.isActive && c.is_active)) {
-        convMap.set(c.contact_id, { id: c.id, isActive: c.is_active, lastMessageAt: c.last_message_at });
+      const cIsActive = c.is_active === true || c.status === 'nina' || c.status === 'human';
+      const existingIsActive = existing?.isActive ?? false;
+      if (!existing || (!existingIsActive && cIsActive)) {
+        convMap.set(c.contact_id, { id: c.id, isActive: cIsActive, status: c.status, lastMessageAt: c.last_message_at });
       }
     }
 
-    return (data || []).map((d: any) => {
+    const dealContactIds = new Set((data || []).map((d: any) => d.contact_id).filter(Boolean));
+
+    const mappedDeals = (data || []).map((d: any) => {
       const conv = convMap.get(d.contact_id);
       return {
         id: d.id,
@@ -820,6 +824,55 @@ export const api = {
         lastConversationAt: conv?.lastMessageAt || null,
       };
     });
+
+    // Incluir contatos com conversa ativa (nina/human) que ainda não têm deal
+    // Não filtra is_active pois registros antigos podem ter is_active = NULL
+    const { data: activeConvsOrphan } = await supabase
+      .from('conversations')
+      .select('id, contact_id, status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
+      .in('status', ['nina', 'human']);
+
+    const orphanConvs = (activeConvsOrphan || []).filter(c => c.contact_id && !dealContactIds.has(c.contact_id));
+
+    if (orphanConvs.length > 0) {
+      const { data: firstStage } = await supabase
+        .from('pipeline_stages')
+        .select('id, name')
+        .order('position', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      for (const conv of orphanConvs) {
+        const contact = conv.contact as any;
+        mappedDeals.push({
+          id: `__conv_${conv.id}`,
+          title: contact?.name || contact?.call_name || 'Lead em atendimento',
+          company: contact?.name || contact?.call_name || 'Sem empresa',
+          value: 0,
+          stage: 'new',
+          stageId: firstStage?.id,
+          ownerAvatar: 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
+          ownerId: undefined,
+          ownerName: undefined,
+          tags: [],
+          dueDate: undefined,
+          priority: 'medium' as const,
+          contactId: conv.contact_id,
+          contactName: contact?.name || contact?.call_name,
+          contactPhone: contact?.phone_number,
+          contactEmail: contact?.email,
+          wonAt: undefined,
+          lostAt: undefined,
+          lostReason: undefined,
+          clientMemory: contact?.client_memory || null,
+          conversationId: conv.id,
+          hasActiveConversation: true,
+          lastConversationAt: conv.last_message_at || null,
+        });
+      }
+    }
+
+    return mappedDeals;
   },
 
   // Pipeline Stages CRUD
