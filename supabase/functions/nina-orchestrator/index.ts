@@ -1,4 +1,3 @@
-import { serve } from "npm:@supabase/functions-js@2.4.4/serve";
 import { createClient } from "npm:@supabase/supabase-js@2.47.10";
 
 const corsHeaders = {
@@ -104,7 +103,7 @@ async function selectAgentConfig(
   return data ?? null;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
