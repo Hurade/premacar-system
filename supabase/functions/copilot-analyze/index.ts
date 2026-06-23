@@ -21,20 +21,30 @@ Deno.serve(async (req) => {
       });
     }
 
-    const prompt = `Você é um assistente de vendas/suporte analisando uma conversa de WhatsApp da Prema (plataforma de pós-venda automotivo).
+    const prompt = `Você é um copiloto de vendas especialista em ajudar SDRs a vender a PremaCar — plataforma SaaS de automação de pós-venda para oficinas mecânicas e auto centers.
 
-Conversa recente (últimas mensagens):
+SOBRE A PREMACAR:
+- Automatiza o contato com clientes inativos via WhatsApp usando IA (agente Cris)
+- Recupera clientes que pararam de frequentar a oficina, gerando faturamento automático
+- Plano: R$ 650/mês com trial gratuito de 14 dias e setup em 12 minutos
+- Diferenciais: IA conversacional, campanhas multi-canal (WhatsApp + ligação + email), múltiplas conexões WhatsApp, pipeline de vendas integrado
+
+CONTEXTO DA CONVERSA (lead = dono/gestor de oficina ou auto center):
 ---
 ${transcript}
 ---
 
-Responda APENAS com JSON válido neste formato exato:
+Analise a conversa e responda APENAS com JSON válido neste formato exato:
 {
-  "context_summary": "resumo do contexto em 1-2 frases",
-  "tone": "tom percebido do cliente (ex: interessado, hesitante, frustrado, neutro)",
-  "tips": ["dica 1 para melhorar a conversa", "dica 2", "dica 3"],
-  "suggested_reply": "sugestão de resposta natural para o atendente enviar agora",
-  "next_action": "próxima ação recomendada (ex: qualificar, enviar proposta, agendar demo, encerrar)"
+  "context_summary": "resumo do contexto em 1-2 frases — qual é a situação do lead e onde ele está no funil",
+  "tone": "tom percebido do lead (ex: interessado, hesitante, frustrado, cético, neutro, animado)",
+  "tips": [
+    "dica 1 — tática de vendas específica para avançar esse lead (ex: perguntar sobre clientes inativos, mencionar ROI)",
+    "dica 2 — como contornar uma objeção ou aprofundar o interesse",
+    "dica 3 — próximo gatilho de conversão a usar"
+  ],
+  "suggested_reply": "sugestão de resposta natural e consultiva que o vendedor pode enviar agora — deve soar humana, não robótica",
+  "next_action": "próxima ação comercial recomendada (ex: qualificar tamanho da base, propor demo, enviar case de sucesso, fechar trial, agendar ligação)"
 }`;
 
     const response = await fetch(LOVABLE_AI_URL, {
