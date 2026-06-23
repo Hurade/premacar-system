@@ -45,12 +45,16 @@ const FolderManager: React.FC<FolderManagerProps> = ({
     
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('contact_folders')
-        .insert({
-          name: newFolderName.trim(),
-          color: newFolderColor
-        });
+      const { data: { user } } = await supabase.auth.getUser();
+if (!user) throw new Error('Usuário não autenticado');
+
+const { error } = await supabase
+  .from('contact_folders')
+  .insert({
+    name: newFolderName.trim(),
+    color: newFolderColor,
+    user_id: user.id
+  });
 
       if (error) throw error;
       
