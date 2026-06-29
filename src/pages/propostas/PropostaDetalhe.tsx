@@ -2,16 +2,18 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Send, Eye, Check, X, Clock, Copy, ExternalLink,
-  MessageCircle, FileText, TrendingUp, AlertCircle, Pencil, Trash2, History,
+  MessageCircle, FileText, TrendingUp, AlertCircle, Pencil, Trash2, History, UserCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProposta, useUpdatePropostaStatus, useDeleteProposta, useUpdateProposta } from '@/hooks/usePropostas'
 import { StatusBadge } from '@/components/propostas/StatusBadge'
 import { FollowUpModal } from '@/components/propostas/FollowUpModal'
-import { PLANOS_PADRAO, DOR_LABELS, formatarMoeda, STATUS_LABELS, type StatusProposta } from '@/types/propostas'
+import { PLANOS_PADRAO, DOR_LABELS, formatarMoeda, STATUS_LABELS, type StatusProposta, type AssinaturaVendedor } from '@/types/propostas'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -60,6 +62,8 @@ export default function PropostaDetalhe() {
   const [newStatus, setNewStatus] = useState<StatusProposta>('enviada')
   const [editingNotes, setEditingNotes] = useState(false)
   const [notes, setNotes] = useState('')
+  const [editingAssinatura, setEditingAssinatura] = useState(false)
+  const [assinatura, setAssinatura] = useState<AssinaturaVendedor>({ nome: '', cargo: '', telefone: '', email: '' })
 
   if (isLoading) {
     return (
@@ -107,6 +111,12 @@ export default function PropostaDetalhe() {
     await updateProposta.mutateAsync({ id: proposta!.id, notas_vendedor: notes })
     setEditingNotes(false)
     toast.success('Notas salvas!')
+  }
+
+  async function handleSaveAssinatura() {
+    await updateProposta.mutateAsync({ id: proposta!.id, assinatura_vendedor: assinatura })
+    setEditingAssinatura(false)
+    toast.success('Assinatura salva!')
   }
 
   const diag = proposta.diagnostico
@@ -344,6 +354,59 @@ export default function PropostaDetalhe() {
                 <p className="text-xs text-muted-foreground whitespace-pre-wrap">
                   {proposta.notas_vendedor || 'Nenhuma nota adicionada.'}
                 </p>
+              )}
+            </div>
+
+            {/* Assinatura do Vendedor */}
+            <div className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Minha Assinatura</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAssinatura(proposta.assinatura_vendedor ?? { nome: '', cargo: '', telefone: '', email: '' })
+                    setEditingAssinatura(true)
+                  }}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {editingAssinatura ? (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nome</Label>
+                    <Input value={assinatura.nome} onChange={e => setAssinatura(a => ({ ...a, nome: e.target.value }))} className="bg-muted/20 border-border/40 h-8 text-xs" placeholder="Marco Silva" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Cargo</Label>
+                    <Input value={assinatura.cargo} onChange={e => setAssinatura(a => ({ ...a, cargo: e.target.value }))} className="bg-muted/20 border-border/40 h-8 text-xs" placeholder="Consultor Comercial" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Telefone</Label>
+                    <Input value={assinatura.telefone} onChange={e => setAssinatura(a => ({ ...a, telefone: e.target.value }))} className="bg-muted/20 border-border/40 h-8 text-xs" placeholder="(11) 99999-9999" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">E-mail</Label>
+                    <Input value={assinatura.email} onChange={e => setAssinatura(a => ({ ...a, email: e.target.value }))} className="bg-muted/20 border-border/40 h-8 text-xs" placeholder="marco@premacar.com.br" />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={handleSaveAssinatura} disabled={updateProposta.isPending} className="flex-1 bg-primary/80 hover:bg-primary text-white text-xs">Salvar</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingAssinatura(false)} className="text-xs">Cancelar</Button>
+                  </div>
+                </div>
+              ) : proposta.assinatura_vendedor ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">{proposta.assinatura_vendedor.nome}</p>
+                  <p className="text-xs text-muted-foreground">{proposta.assinatura_vendedor.cargo}</p>
+                  <p className="text-xs text-muted-foreground">{proposta.assinatura_vendedor.telefone}</p>
+                  <p className="text-xs text-muted-foreground">{proposta.assinatura_vendedor.email}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhuma assinatura configurada. Clique no lápis para adicionar.</p>
               )}
             </div>
 

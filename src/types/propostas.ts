@@ -76,6 +76,7 @@ export interface Proposta {
   slug: string
   notas_vendedor: string | null
   motivo_recusa: string | null
+  assinatura_vendedor: AssinaturaVendedor | null
   vendedor_id: string | null
   enviada_at: string | null
   visualizada_at: string | null
@@ -84,6 +85,13 @@ export interface Proposta {
   created_at: string
   updated_at: string
   historico?: PropostaHistorico[]
+}
+
+export interface AssinaturaVendedor {
+  nome: string
+  cargo: string
+  telefone: string
+  email: string
 }
 
 export interface PropostaHistorico {

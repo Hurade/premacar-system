@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { Check, AlertCircle, Loader2, ChevronRight, TrendingUp, Shield, Star, Zap } from 'lucide-react'
+import { Check, AlertCircle, Loader2, ChevronRight, TrendingUp, Shield, Star, Zap, Phone, Mail } from 'lucide-react'
 import { usePropostaBySlug, useUpdatePropostaStatus } from '@/hooks/usePropostas'
 import { PLANOS_PADRAO, formatarMoeda, type PlanoTipo, DOR_LABELS } from '@/types/propostas'
 
@@ -105,6 +105,11 @@ export default function PropostaPublica() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full opacity-20 blur-[80px]" style={{ backgroundColor: '#9B5ABE' }} />
 
         <div className="relative z-10 max-w-2xl mx-auto">
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <img src="/prema-logo.png" alt="Prema Car" className="h-10 w-auto opacity-95" />
+          </div>
+
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6 text-sm font-medium" style={{ borderColor: '#7B3A9E', color: '#9B5ABE' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
             Proposta Comercial
@@ -302,8 +307,42 @@ export default function PropostaPublica() {
           )}
         </section>
 
+        {/* Assinatura do Consultor */}
+        {proposta.assinatura_vendedor && (
+          <section className="pb-2">
+            <div className="flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl" style={{ backgroundColor: '#3A1750', border: '1px solid #5D267A' }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#5D267A' }}>
+                <span className="text-lg font-bold text-white">
+                  {proposta.assinatura_vendedor.nome.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="text-center sm:text-left flex-1">
+                <p className="font-semibold text-white">{proposta.assinatura_vendedor.nome}</p>
+                <p className="text-sm" style={{ color: '#9B5ABE' }}>{proposta.assinatura_vendedor.cargo}</p>
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm" style={{ color: '#C8C4CE' }}>
+                {proposta.assinatura_vendedor.telefone && (
+                  <a href={`tel:${proposta.assinatura_vendedor.telefone}`} className="flex items-center gap-2 hover:text-white transition-colors">
+                    <Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9B5ABE' }} />
+                    {proposta.assinatura_vendedor.telefone}
+                  </a>
+                )}
+                {proposta.assinatura_vendedor.email && (
+                  <a href={`mailto:${proposta.assinatura_vendedor.email}`} className="flex items-center gap-2 hover:text-white transition-colors">
+                    <Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9B5ABE' }} />
+                    {proposta.assinatura_vendedor.email}
+                  </a>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Footer */}
         <footer className="text-center text-xs pb-8" style={{ color: 'rgba(200, 196, 206, 0.5)' }}>
+          <div className="flex justify-center mb-4">
+            <img src="/prema-logo.png" alt="Prema Car" className="h-6 w-auto opacity-40" />
+          </div>
           <p>Prema Car — Pós-venda inteligente para autocenters</p>
           <p className="mt-1">comercial@premacar.com.br</p>
         </footer>
