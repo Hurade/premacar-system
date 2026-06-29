@@ -397,14 +397,7 @@ const Kanban: React.FC = () => {
             const isWonColumn = column.title === 'Ganho';
             const isLostColumn = column.title === 'Perdido';
 
-            // "Novos Leads" (position 0) mostra apenas deals com conversa ativa em andamento
-            const columnDeals = filteredDeals.filter(d => {
-              if (d.stageId !== column.id) return false;
-              if (isFirstStage && !isWonColumn && !isLostColumn) {
-                return d.hasActiveConversation === true;
-              }
-              return true;
-            });
+            const columnDeals = filteredDeals.filter(d => d.stageId === column.id);
             const totalValue = columnDeals.reduce((acc, curr) => acc + curr.value, 0);
 
             return (
@@ -459,11 +452,10 @@ const Kanban: React.FC = () => {
 
                 {/* Column Body */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                  {isFirstStage && !isWonColumn && !isLostColumn && columnDeals.length === 0 && (
+                  {columnDeals.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
                       <MessageSquare className="w-8 h-8 text-slate-700" />
-                      <p className="text-xs text-slate-500">Nenhuma conversa ativa no momento</p>
-                      <p className="text-[10px] text-slate-600">Leads sem conversa em andamento não aparecem aqui</p>
+                      <p className="text-xs text-slate-500">Nenhum lead nesta etapa</p>
                     </div>
                   )}
                   {columnDeals.map((deal) => (

@@ -787,7 +787,7 @@ export const api = {
     const convMap = new Map<string, { id: string; isActive: boolean; status: string; lastMessageAt: string | null }>();
     for (const c of (conversations || [])) {
       const existing = convMap.get(c.contact_id);
-      const cIsActive = c.is_active === true || c.status === 'nina' || c.status === 'human';
+      const cIsActive = c.is_active === true || c.status === 'nina' || c.status === 'human' || c.status === 'paused';
       const existingIsActive = existing?.isActive ?? false;
       if (!existing || (!existingIsActive && cIsActive)) {
         convMap.set(c.contact_id, { id: c.id, isActive: cIsActive, status: c.status, lastMessageAt: c.last_message_at });
@@ -825,12 +825,12 @@ export const api = {
       };
     });
 
-    // Incluir contatos com conversa ativa (nina/human) que ainda não têm deal
-    // Não filtra is_active pois registros antigos podem ter is_active = NULL
+    // Incluir contatos com conversa em aberto que ainda não têm deal.
+    // Inclui todos os status (nina, human, paused) pois não existe status "fechado".
     const { data: activeConvsOrphan } = await supabase
       .from('conversations')
       .select('id, contact_id, status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
-      .in('status', ['nina', 'human']);
+      .in('status', ['nina', 'human', 'paused']);
 
     const orphanConvs = (activeConvsOrphan || []).filter(c => c.contact_id && !dealContactIds.has(c.contact_id));
 
