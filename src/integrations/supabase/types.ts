@@ -1288,6 +1288,66 @@ export type Database = {
         }
         Relationships: []
       }
+      leads_comerciais: {
+        Row: {
+          cidade: string | null
+          clientes_base: number | null
+          clientes_mes: number | null
+          created_at: string
+          dor_principal: string
+          email: string | null
+          empresa: string
+          erp_utilizado: string | null
+          estado: string | null
+          id: string
+          observacoes: string | null
+          origem: string
+          responsavel: string
+          telefone: string
+          tipo_negocio: string
+          updated_at: string
+          vendedor_id: string | null
+        }
+        Insert: {
+          cidade?: string | null
+          clientes_base?: number | null
+          clientes_mes?: number | null
+          created_at?: string
+          dor_principal: string
+          email?: string | null
+          empresa: string
+          erp_utilizado?: string | null
+          estado?: string | null
+          id?: string
+          observacoes?: string | null
+          origem: string
+          responsavel: string
+          telefone: string
+          tipo_negocio: string
+          updated_at?: string
+          vendedor_id?: string | null
+        }
+        Update: {
+          cidade?: string | null
+          clientes_base?: number | null
+          clientes_mes?: number | null
+          created_at?: string
+          dor_principal?: string
+          email?: string | null
+          empresa?: string
+          erp_utilizado?: string | null
+          estado?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string
+          responsavel?: string
+          telefone?: string
+          tipo_negocio?: string
+          updated_at?: string
+          vendedor_id?: string | null
+        }
+        Relationships: []
+      }
       message_grouping_queue: {
         Row: {
           contacts_data: Json | null
@@ -1853,6 +1913,39 @@ export type Database = {
         }
         Relationships: []
       }
+      planos_propostas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          preco_mensal: number
+          recursos: Json | null
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          preco_mensal: number
+          recursos?: Json | null
+          tipo: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          preco_mensal?: number
+          recursos?: Json | null
+          tipo?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1879,6 +1972,125 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      propostas_comerciais: {
+        Row: {
+          aceita_at: string | null
+          condicao_especial: string | null
+          created_at: string
+          desconto_percentual: number
+          diagnostico: Json | null
+          enviada_at: string | null
+          id: string
+          lead_id: string
+          motivo_recusa: string | null
+          notas_vendedor: string | null
+          plano_id: string | null
+          recusada_at: string | null
+          slug: string
+          status: string
+          updated_at: string
+          validade_ate: string | null
+          validade_dias: number
+          valor_mensal: number
+          vendedor_id: string | null
+          visualizada_at: string | null
+        }
+        Insert: {
+          aceita_at?: string | null
+          condicao_especial?: string | null
+          created_at?: string
+          desconto_percentual?: number
+          diagnostico?: Json | null
+          enviada_at?: string | null
+          id?: string
+          lead_id: string
+          motivo_recusa?: string | null
+          notas_vendedor?: string | null
+          plano_id?: string | null
+          recusada_at?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+          validade_ate?: string | null
+          validade_dias?: number
+          valor_mensal?: number
+          vendedor_id?: string | null
+          visualizada_at?: string | null
+        }
+        Update: {
+          aceita_at?: string | null
+          condicao_especial?: string | null
+          created_at?: string
+          desconto_percentual?: number
+          diagnostico?: Json | null
+          enviada_at?: string | null
+          id?: string
+          lead_id?: string
+          motivo_recusa?: string | null
+          notas_vendedor?: string | null
+          plano_id?: string | null
+          recusada_at?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+          validade_ate?: string | null
+          validade_dias?: number
+          valor_mensal?: number
+          vendedor_id?: string | null
+          visualizada_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propostas_comerciais_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads_comerciais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_comerciais_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos_propostas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      propostas_historico: {
+        Row: {
+          acao: string
+          created_at: string
+          descricao: string | null
+          id: string
+          proposta_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          proposta_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          proposta_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propostas_historico_proposta_id_fkey"
+            columns: ["proposta_id"]
+            isOneToOne: false
+            referencedRelation: "propostas_comerciais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recurring_campaigns: {
         Row: {
