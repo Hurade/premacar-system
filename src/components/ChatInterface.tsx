@@ -60,7 +60,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation } = useConversations();
+  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName } = useUserRole();
   const signatureName = currentUserName || sdrName;
@@ -102,6 +102,7 @@ const ChatInterface: React.FC = () => {
   const [audioDurations, setAudioDurations] = useState<Record<string, number>>({});
   const [audioProgress, setAudioProgress] = useState<Record<string, number>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
+  const refetchedForConvParam = useRef<string | null>(null);
   
   // Pipeline Drawer
   const [showPipelineDrawer, setShowPipelineDrawer] = useState(false);
@@ -182,11 +183,17 @@ const ChatInterface: React.FC = () => {
     const conversationParam = searchParams.get('conversation');
     const newContactParam = searchParams.get('newContact');
     
-    if (conversationParam && conversations.some(c => c.id === conversationParam)) {
-      setSelectedChatId(conversationParam);
-      // Limpar o parâmetro da URL após selecionar
-      searchParams.delete('conversation');
-      setSearchParams(searchParams, { replace: true });
+    if (conversationParam) {
+      if (conversations.some(c => c.id === conversationParam)) {
+        setSelectedChatId(conversationParam);
+        refetchedForConvParam.current = null;
+        searchParams.delete('conversation');
+        setSearchParams(searchParams, { replace: true });
+      } else if (!loading && refetchedForConvParam.current !== conversationParam) {
+        // Conversa não está na lista ainda (ex: acabou de ser reaberta) — refetch uma vez
+        refetchedForConvParam.current = conversationParam;
+        refetch();
+      }
     } else if (newContactParam && !isCreatingConversation) {
       // Criar nova conversa para o contato
       setIsCreatingConversation(true);
@@ -205,7 +212,7 @@ const ChatInterface: React.FC = () => {
       });
     }
     // Removido: auto-seleção do primeiro chat ao entrar na página
-  }, [conversations, selectedChatId, searchParams, createConversation, setSearchParams, isCreatingConversation]);
+  }, [conversations, loading, selectedChatId, searchParams, createConversation, setSearchParams, isCreatingConversation, refetch]);
 
   // Mark as read when selecting conversation
   useEffect(() => {
