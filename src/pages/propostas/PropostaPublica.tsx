@@ -29,6 +29,15 @@ export default function PropostaPublica() {
   const [accepted, setAccepted] = useState(false)
   const trackedRef = useRef(false)
 
+  // DEVE estar antes de qualquer return condicional (Regras dos Hooks)
+  useEffect(() => {
+    if (proposta?.status === 'enviada' && !trackedRef.current) {
+      trackedRef.current = true
+      updateStatus.mutate({ id: proposta.id, status: 'visualizada' })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposta?.id, proposta?.status])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#2A1038' }}>
@@ -86,15 +95,6 @@ export default function PropostaPublica() {
     if (!diag.tem_equipe_followup) problemas.push('Sem equipe dedicada para acompanhamento')
     if (diag.quer_recuperar) problemas.push('Clientes parados sem estratégia de reativação')
   }
-
-  // Track visualização — executa uma única vez quando a proposta carrega
-  useEffect(() => {
-    if (proposta && proposta.status === 'enviada' && !trackedRef.current) {
-      trackedRef.current = true
-      updateStatus.mutate({ id: proposta.id, status: 'visualizada' })
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposta?.id, proposta?.status])
 
   async function handleAccept() {
     if (accepted) return

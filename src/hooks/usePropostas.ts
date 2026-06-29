@@ -208,6 +208,40 @@ export function useUpdatePropostaStatus() {
       if (status === 'aceita') updates.aceita_at = now
       if (status === 'recusada') { updates.recusada_at = now; updates.motivo_recusa = motivo_recusa }
 
+      // Para 'visualizada': atualiza SOMENTE se o status atual for 'enviada'.
+      // Isso evita duplicatas no histórico quando o link é aberto várias vezes.
+      if (status === 'visualizada') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: updated } = await (supabase as any)
+          .from('propostas_comerciais')
+          .update(updates)
+          .eq('id', id)
+          .eq('status', 'enviada')
+          .select()
+          .maybeSingle()
+
+        if (!updated) {
+          // Já estava visualizada — busca o estado atual sem gravar histórico
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: current } = await (supabase as any)
+            .from('propostas_comerciais')
+            .select('*')
+            .eq('id', id)
+            .single()
+          return current as Proposta
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from('propostas_historico').insert({
+          proposta_id: id,
+          usuario_id: user?.id ?? null,
+          acao: 'visualizada',
+          descricao: 'Proposta visualizada pelo cliente',
+        })
+        return updated as Proposta
+      }
+
+      // Para todos os outros status: comportamento padrão
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from('propostas_comerciais')
