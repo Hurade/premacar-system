@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useProposta, useUpdatePropostaStatus, useDeleteProposta, useUpdateProposta } from '@/hooks/usePropostas'
 import { StatusBadge } from '@/components/propostas/StatusBadge'
 import { FollowUpModal } from '@/components/propostas/FollowUpModal'
+import { EnviarPropostaModal } from '@/components/propostas/EnviarPropostaModal'
 import { PLANOS_PADRAO, DOR_LABELS, formatarMoeda, STATUS_LABELS, type StatusProposta, type AssinaturaVendedor } from '@/types/propostas'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -56,6 +57,7 @@ export default function PropostaDetalhe() {
   const deleteProposta = useDeleteProposta()
 
   const [showFollowUp, setShowFollowUp] = useState(false)
+  const [showEnviar, setShowEnviar] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [motivoRecusa, setMotivoRecusa] = useState('')
@@ -147,6 +149,14 @@ export default function PropostaDetalhe() {
             <Button variant="outline" size="sm" onClick={() => window.open(publicLink, '_blank')} className="gap-1.5">
               <ExternalLink className="w-3.5 h-3.5" />
               Ver Proposta
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setShowEnviar(true)}
+              className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Enviar
             </Button>
             <Button variant="outline" size="sm" onClick={() => { setShowFollowUp(true) }} className="gap-1.5">
               <MessageCircle className="w-3.5 h-3.5" />
@@ -440,6 +450,14 @@ export default function PropostaDetalhe() {
           </div>
         </div>
       </div>
+
+      {/* Enviar Modal */}
+      <EnviarPropostaModal
+        open={showEnviar}
+        onClose={() => setShowEnviar(false)}
+        proposta={proposta}
+        publicLink={publicLink}
+      />
 
       {/* Follow-up Modal */}
       {showFollowUp && (
