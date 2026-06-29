@@ -77,6 +77,9 @@ export interface Proposta {
   notas_vendedor: string | null
   motivo_recusa: string | null
   assinatura_vendedor: AssinaturaVendedor | null
+  unidades: number
+  fidelidade_meses: number
+  extras: ExtraItem[] | null
   vendedor_id: string | null
   enviada_at: string | null
   visualizada_at: string | null
@@ -85,6 +88,11 @@ export interface Proposta {
   created_at: string
   updated_at: string
   historico?: PropostaHistorico[]
+}
+
+export interface ExtraItem {
+  nome: string
+  valor: number
 }
 
 export interface AssinaturaVendedor {
@@ -227,6 +235,28 @@ export function recomendarPlano(d: DiagnosticoRespostas): PlanoTipo {
   if (score.recuperar >= score.fidelizar && score.recuperar >= score.mensurar) return 'recuperar'
   if (score.fidelizar >= score.mensurar) return 'fidelizar'
   return 'mensurar'
+}
+
+export function descFidelidadePct(fidelidade_meses: number, planoTipo?: PlanoTipo | null): number {
+  if (planoTipo !== 'fidelizar' && planoTipo !== 'recuperar') return 0
+  if (fidelidade_meses === 3) return 10
+  if (fidelidade_meses === 6) return 20
+  if (fidelidade_meses === 12) return 30
+  return 0
+}
+
+export function calcularTotal(
+  valorMensal: number,
+  unidades: number,
+  fidelidade_meses: number,
+  descontoPercentual: number,
+  planoTipo: PlanoTipo | null | undefined,
+  extras: ExtraItem[],
+): number {
+  const valorBase = valorMensal * unidades
+  const pctFid = descFidelidadePct(fidelidade_meses, planoTipo)
+  const aposDescontos = valorBase * (1 - pctFid / 100) * (1 - descontoPercentual / 100)
+  return aposDescontos + extras.reduce((acc, e) => acc + e.valor, 0)
 }
 
 export function formatarMoeda(valor: number): string {

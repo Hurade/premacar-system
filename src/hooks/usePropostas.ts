@@ -119,6 +119,9 @@ export function useCreateProposta() {
       condicao_especial: string | null
       validade_dias: number
       notas_vendedor: string | null
+      unidades?: number
+      fidelidade_meses?: number
+      extras?: import('@/types/propostas').ExtraItem[] | null
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const slug = generateSlug(params.empresa)
@@ -137,6 +140,9 @@ export function useCreateProposta() {
           condicao_especial: params.condicao_especial,
           validade_dias: params.validade_dias,
           notas_vendedor: params.notas_vendedor,
+          unidades: params.unidades ?? 1,
+          fidelidade_meses: params.fidelidade_meses ?? 0,
+          extras: params.extras ?? [],
           slug,
           status: 'rascunho',
           validade_ate: validade.toISOString().split('T')[0],

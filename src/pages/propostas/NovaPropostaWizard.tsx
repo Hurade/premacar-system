@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   ArrowLeft, ArrowRight, Check, Building2, ClipboardList,
-  Sparkles, FileText, Plus, Search,
+  Sparkles, FileText, Plus, Search, Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,10 +14,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCRMContacts, useLeadFromContact, useCreateLead, type CRMContact } from '@/hooks/useLeads'
 import { useCreateProposta, usePlanos } from '@/hooks/usePropostas'
-import type { Lead, DiagnosticoRespostas, PlanoTipo, TipoNegocio, OrigemLead, DorPrincipal } from '@/types/propostas'
+import type { Lead, DiagnosticoRespostas, PlanoTipo, TipoNegocio, OrigemLead, DorPrincipal, ExtraItem } from '@/types/propostas'
 import {
   PLANOS_PADRAO, TIPO_NEGOCIO_LABELS, ORIGEM_LABELS, DOR_LABELS,
-  recomendarPlano, formatarMoeda,
+  recomendarPlano, formatarMoeda, descFidelidadePct, calcularTotal,
 } from '@/types/propostas'
 import { cn } from '@/lib/utils'
 
@@ -377,10 +377,13 @@ function Step2Diagnostico({ diagnostico, onChange }: {
   )
 }
 
+const EXTRAS_SUGERIDOS = ['Rastreamento', 'Telefone Digital', 'Setup', 'Treinamento', 'Outro']
+
 // ─── Step 3: Plano ────────────────────────────────────────────────────────────
 function Step3Plano({
   planoSelecionado, desconto, condicaoEspecial, validadeDias,
-  onPlano, onDesconto, onCondicao, onValidade,
+  fidelidade, unidades, extras,
+  onPlano, onDesconto, onCondicao, onValidade, onFidelidade, onUnidades, onExtras,
   recomendado,
 }: {
   planoSelecionado: PlanoTipo
@@ -388,11 +391,29 @@ function Step3Plano({
   desconto: number
   condicaoEspecial: string
   validadeDias: number
+  fidelidade: number
+  unidades: number
+  extras: ExtraItem[]
   onPlano: (p: PlanoTipo) => void
   onDesconto: (d: number) => void
   onCondicao: (c: string) => void
   onValidade: (v: number) => void
+  onFidelidade: (f: number) => void
+  onUnidades: (u: number) => void
+  onExtras: (e: ExtraItem[]) => void
 }) {
+  const planoPrecisa = planoSelecionado === 'fidelizar' || planoSelecionado === 'recuperar'
+
+  function addExtra() {
+    onExtras([...extras, { nome: '', valor: 0 }])
+  }
+  function updateExtra(i: number, field: keyof ExtraItem, value: string | number) {
+    onExtras(extras.map((e, idx) => idx === i ? { ...e, [field]: value } : e))
+  }
+  function removeExtra(i: number) {
+    onExtras(extras.filter((_, idx) => idx !== i))
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm bg-primary/10 border border-primary/20 rounded-xl px-3 py-2">
@@ -403,6 +424,7 @@ function Step3Plano({
         </span>
       </div>
 
+      {/* Planos */}
       <div className="grid grid-cols-1 gap-3">
         {(Object.keys(PLANOS_PADRAO) as PlanoTipo[]).map(tipo => {
           const plano = PLANOS_PADRAO[tipo]
@@ -411,21 +433,18 @@ function Step3Plano({
           return (
             <button
               key={tipo}
+              type="button"
               onClick={() => onPlano(tipo)}
               className={cn(
                 'text-left p-4 rounded-2xl border transition-all',
-                isSelected
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border/40 hover:border-primary/30',
+                isSelected ? 'border-primary bg-primary/10' : 'border-border/40 hover:border-primary/30',
               )}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-foreground text-sm">{plano.nome}</p>
                   {isRec && (
-                    <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-semibold">
-                      Recomendado
-                    </span>
+                    <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-semibold">Recomendado</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -437,14 +456,10 @@ function Step3Plano({
               <p className="text-xs text-muted-foreground mb-2">{plano.descricao}</p>
               <div className="flex flex-wrap gap-1">
                 {plano.recursos.slice(0, 3).map(r => (
-                  <span key={r} className="text-[10px] bg-muted/30 text-muted-foreground px-1.5 py-0.5 rounded">
-                    {r}
-                  </span>
+                  <span key={r} className="text-[10px] bg-muted/30 text-muted-foreground px-1.5 py-0.5 rounded">{r}</span>
                 ))}
                 {plano.recursos.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground px-1 py-0.5">
-                    +{plano.recursos.length - 3} mais
-                  </span>
+                  <span className="text-[10px] text-muted-foreground px-1 py-0.5">+{plano.recursos.length - 3} mais</span>
                 )}
               </div>
             </button>
@@ -452,9 +467,51 @@ function Step3Plano({
         })}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/40">
+      {/* Fidelidade — apenas Fidelizar e Recuperar */}
+      {planoPrecisa && (
+        <div className="space-y-2 pt-2 border-t border-border/40">
+          <Label>Fidelidade de contrato</Label>
+          <p className="text-xs text-muted-foreground">Desconto progressivo para contratos com fidelidade</p>
+          <div className="grid grid-cols-4 gap-2">
+            {([0, 3, 6, 12] as const).map(m => {
+              const pct = descFidelidadePct(m, planoSelecionado)
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onFidelidade(m)}
+                  className={cn(
+                    'p-2.5 rounded-xl border text-center transition-all text-sm font-medium',
+                    fidelidade === m
+                      ? 'border-primary bg-primary/15 text-primary'
+                      : 'border-border/40 text-muted-foreground hover:border-primary/30',
+                  )}
+                >
+                  {m === 0 ? 'Sem' : `${m} m.`}
+                  {pct > 0 && (
+                    <span className="block text-[10px] font-semibold text-green-400">-{pct}%</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Unidades + Desconto + Validade */}
+      <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/40">
         <div className="space-y-1.5">
-          <Label>Desconto (%)</Label>
+          <Label>Unidades / Lojas</Label>
+          <Input
+            type="number"
+            min={1}
+            value={unidades}
+            onChange={e => onUnidades(Math.max(1, Number(e.target.value)))}
+            className="bg-muted/20 border-border/40"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Desconto extra (%)</Label>
           <Input
             type="number"
             min={0}
@@ -475,14 +532,62 @@ function Step3Plano({
             className="bg-muted/20 border-border/40"
           />
         </div>
-        <div className="col-span-2 space-y-1.5">
+        <div className="col-span-3 space-y-1.5">
           <Label>Condição Especial</Label>
           <Input
             value={condicaoEspecial}
             onChange={e => onCondicao(e.target.value)}
-            placeholder="Ex: 1º mês grátis, setup incluso, desconto por fidelidade..."
+            placeholder="Ex: 1º mês grátis, setup incluso..."
             className="bg-muted/20 border-border/40"
           />
+        </div>
+      </div>
+
+      {/* Custos extras */}
+      <div className="space-y-2 pt-2 border-t border-border/40">
+        <div className="flex items-center justify-between">
+          <Label>Custos adicionais</Label>
+          <button type="button" onClick={addExtra} className="flex items-center gap-1 text-xs text-primary hover:text-primary/80">
+            <Plus className="w-3.5 h-3.5" />
+            Adicionar item
+          </button>
+        </div>
+        {extras.length === 0 && (
+          <p className="text-xs text-muted-foreground">Nenhum custo adicional. Ex: Rastreamento, Telefone Digital...</p>
+        )}
+        <div className="space-y-2">
+          {extras.map((extra, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Select
+                value={EXTRAS_SUGERIDOS.includes(extra.nome) ? extra.nome : (extra.nome ? 'Outro' : '')}
+                onValueChange={v => updateExtra(i, 'nome', v === 'Outro' ? '' : v)}
+              >
+                <SelectTrigger className="bg-muted/20 border-border/40 flex-1 h-8 text-xs">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXTRAS_SUGERIDOS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Nome do item"
+                value={extra.nome}
+                onChange={e => updateExtra(i, 'nome', e.target.value)}
+                className="bg-muted/20 border-border/40 flex-1 h-8 text-xs"
+              />
+              <Input
+                type="number"
+                min={0}
+                placeholder="R$ valor"
+                value={extra.valor || ''}
+                onChange={e => updateExtra(i, 'valor', Number(e.target.value))}
+                className="bg-muted/20 border-border/40 w-28 h-8 text-xs"
+              />
+              <button type="button" aria-label="Remover item" onClick={() => removeExtra(i)} className="text-muted-foreground hover:text-red-400 flex-shrink-0">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -490,19 +595,28 @@ function Step3Plano({
 }
 
 // ─── Step 4: Preview ──────────────────────────────────────────────────────────
-function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNotas }: {
+function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNotas, fidelidade, unidades, extras }: {
   lead: Lead
   plano: PlanoTipo
   desconto: number
   condicao: string
   validade: number
   notas: string
+  fidelidade: number
+  unidades: number
+  extras: ExtraItem[]
   onNotas: (n: string) => void
 }) {
   const info = PLANOS_PADRAO[plano]
-  const valorFinal = info.preco * (1 - desconto / 100)
   const validadeDate = new Date()
   validadeDate.setDate(validadeDate.getDate() + validade)
+
+  const valorBase = info.preco * unidades
+  const pctFid = descFidelidadePct(fidelidade, plano)
+  const aposF = valorBase * (1 - pctFid / 100)
+  const aposD = aposF * (1 - desconto / 100)
+  const totalExtras = extras.reduce((a, e) => a + e.valor, 0)
+  const total = aposD + totalExtras
 
   return (
     <div className="space-y-4">
@@ -517,37 +631,41 @@ function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNota
           </div>
         </div>
 
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Plano Selecionado</p>
-          <div className="flex items-center justify-between">
-            <span
-              className="text-sm font-bold px-3 py-1 rounded-xl text-white"
-              style={{ backgroundColor: info.cor }}
-            >
-              {info.nome}
-            </span>
-            <div className="text-right">
-              {desconto > 0 && (
-                <p className="text-xs text-muted-foreground line-through">{formatarMoeda(info.preco)}/mês</p>
-              )}
-              <p className="font-bold text-foreground">{formatarMoeda(valorFinal)}/mês</p>
-              {desconto > 0 && (
-                <p className="text-xs text-green-400">-{desconto}% aplicado</p>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Breakdown de preço */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Composição do Valor</p>
 
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Recursos Inclusos</p>
-          <ul className="space-y-1">
-            {info.recursos.map(r => (
-              <li key={r} className="flex items-center gap-2 text-sm text-foreground">
-                <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                {r}
-              </li>
-            ))}
-          </ul>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-foreground flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-lg text-white text-xs font-bold" style={{ backgroundColor: info.cor }}>{info.nome}</span>
+              {unidades > 1 && <span className="text-muted-foreground text-xs">× {unidades} unidades</span>}
+            </span>
+            <span className="font-medium text-foreground">{formatarMoeda(valorBase)}/mês</span>
+          </div>
+
+          {pctFid > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-green-400">Desconto fidelidade {fidelidade} meses (-{pctFid}%)</span>
+              <span className="text-green-400">-{formatarMoeda(valorBase * pctFid / 100)}/mês</span>
+            </div>
+          )}
+          {desconto > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-green-400">Desconto adicional (-{desconto}%)</span>
+              <span className="text-green-400">-{formatarMoeda(aposF * desconto / 100)}/mês</span>
+            </div>
+          )}
+          {extras.map((e, i) => e.nome && (
+            <div key={i} className="flex justify-between items-center text-sm">
+              <span className="text-foreground">{e.nome}</span>
+              <span className="text-foreground">{formatarMoeda(e.valor)}/mês</span>
+            </div>
+          ))}
+
+          <div className="flex justify-between items-center pt-2 border-t border-border/50">
+            <span className="font-semibold text-foreground">Total mensal</span>
+            <span className="text-xl font-bold text-primary">{formatarMoeda(total)}/mês</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
@@ -592,6 +710,9 @@ export default function NovaPropostaWizard() {
   const [condicaoEspecial, setCondicaoEspecial] = useState('')
   const [validadeDias, setValidadeDias] = useState(15)
   const [notas, setNotas] = useState('')
+  const [fidelidade, setFidelidade] = useState(0)
+  const [unidades, setUnidades] = useState(1)
+  const [extras, setExtras] = useState<ExtraItem[]>([])
 
   const recomendado = recomendarPlano(diagnostico)
 
@@ -619,6 +740,9 @@ export default function NovaPropostaWizard() {
       condicao_especial: condicaoEspecial || null,
       validade_dias: validadeDias,
       notas_vendedor: notas || null,
+      unidades,
+      fidelidade_meses: fidelidade,
+      extras: extras.length > 0 ? extras : null,
     })
 
     navigate(`/propostas/${proposta.id}`)
@@ -688,10 +812,16 @@ export default function NovaPropostaWizard() {
               desconto={desconto}
               condicaoEspecial={condicaoEspecial}
               validadeDias={validadeDias}
+              fidelidade={fidelidade}
+              unidades={unidades}
+              extras={extras}
               onPlano={setPlanoSelecionado}
               onDesconto={setDesconto}
               onCondicao={setCondicaoEspecial}
               onValidade={setValidadeDias}
+              onFidelidade={setFidelidade}
+              onUnidades={setUnidades}
+              onExtras={setExtras}
             />
           )}
           {step === 4 && selectedLead && (
@@ -702,6 +832,9 @@ export default function NovaPropostaWizard() {
               condicao={condicaoEspecial}
               validade={validadeDias}
               notas={notas}
+              fidelidade={fidelidade}
+              unidades={unidades}
+              extras={extras}
               onNotas={setNotas}
             />
           )}

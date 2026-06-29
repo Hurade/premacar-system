@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Check, AlertCircle, Loader2, ChevronRight, TrendingUp, Shield, Star, Zap, Phone, Mail } from 'lucide-react'
 import { usePropostaBySlug, useUpdatePropostaStatus } from '@/hooks/usePropostas'
-import { PLANOS_PADRAO, formatarMoeda, type PlanoTipo, DOR_LABELS } from '@/types/propostas'
+import { PLANOS_PADRAO, formatarMoeda, calcularTotal, descFidelidadePct, type PlanoTipo, DOR_LABELS } from '@/types/propostas'
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -62,7 +62,15 @@ export default function PropostaPublica() {
   const lead = proposta.lead
   const planoTipo = proposta.plano?.tipo as PlanoTipo | undefined
   const planoInfo = planoTipo ? PLANOS_PADRAO[planoTipo] : null
-  const valorLiquido = proposta.valor_mensal * (1 - proposta.desconto_percentual / 100)
+  const unidades = proposta.unidades ?? 1
+  const fidelidade = proposta.fidelidade_meses ?? 0
+  const extras = proposta.extras ?? []
+  const pctFid = descFidelidadePct(fidelidade, planoTipo)
+  const valorBase = proposta.valor_mensal * unidades
+  const aposF = valorBase * (1 - pctFid / 100)
+  const aposD = aposF * (1 - proposta.desconto_percentual / 100)
+  const totalExtras = extras.reduce((a, e) => a + e.valor, 0)
+  const valorTotal = calcularTotal(proposta.valor_mensal, unidades, fidelidade, proposta.desconto_percentual, planoTipo, extras)
   const validade = proposta.validade_ate
     ? new Date(proposta.validade_ate).toLocaleDateString('pt-BR')
     : null
@@ -125,17 +133,19 @@ export default function PropostaPublica() {
           <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl text-white font-bold text-xl" style={{ backgroundColor: '#5D267A' }}>
             {planoInfo ? (
               <>
-                <span>{planoInfo.nome}</span>
+                <span>{planoInfo.nome}{unidades > 1 ? ` × ${unidades}` : ''}</span>
                 <span style={{ color: '#C8C4CE' }}>—</span>
-                <span>{formatarMoeda(valorLiquido)}/mês</span>
+                <span>{formatarMoeda(valorTotal)}/mês</span>
               </>
             ) : (
-              <span>{formatarMoeda(valorLiquido)}/mês</span>
+              <span>{formatarMoeda(valorTotal)}/mês</span>
             )}
           </div>
-          {proposta.desconto_percentual > 0 && (
+          {(pctFid > 0 || proposta.desconto_percentual > 0) && (
             <p className="mt-2 text-sm" style={{ color: '#9B5ABE' }}>
-              Você tem {proposta.desconto_percentual}% de desconto especial aplicado
+              {pctFid > 0 && `Desconto fidelidade ${fidelidade} meses: -${pctFid}%`}
+              {pctFid > 0 && proposta.desconto_percentual > 0 && ' · '}
+              {proposta.desconto_percentual > 0 && `Desconto adicional: -${proposta.desconto_percentual}%`}
             </p>
           )}
         </div>
@@ -219,23 +229,67 @@ export default function PropostaPublica() {
         {/* Investimento */}
         <section>
           <SectionTitle>Investimento</SectionTitle>
-          <div className="p-6 rounded-2xl text-center" style={{ background: 'linear-gradient(135deg, #3A1750, #5D267A)', border: '1px solid #7B3A9E' }}>
-            <p className="text-sm mb-1" style={{ color: '#C8C4CE' }}>Valor mensal</p>
-            {proposta.desconto_percentual > 0 && (
-              <p className="text-lg line-through" style={{ color: '#C8C4CE' }}>{formatarMoeda(proposta.valor_mensal)}/mês</p>
-            )}
-            <p className="text-4xl font-extrabold text-white mb-1">{formatarMoeda(valorLiquido)}</p>
-            <p style={{ color: '#C8C4CE' }} className="text-sm">por mês</p>
-            {proposta.condicao_especial && (
-              <div className="mt-3 px-4 py-2 rounded-xl inline-block" style={{ backgroundColor: 'rgba(155, 90, 190, 0.2)', border: '1px solid rgba(155, 90, 190, 0.4)' }}>
-                <p className="text-sm font-medium" style={{ color: '#9B5ABE' }}>🎁 {proposta.condicao_especial}</p>
+          <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #5D267A' }}>
+            {/* Breakdown */}
+            <div className="p-5 space-y-3" style={{ backgroundColor: '#3A1750' }}>
+              {/* Plano base */}
+              <div className="flex items-center justify-between text-sm">
+                <span style={{ color: '#C8C4CE' }}>
+                  {planoInfo?.nome ?? 'Plano'}
+                  {unidades > 1 && <span className="ml-1" style={{ color: '#9B5ABE' }}>× {unidades} unidades</span>}
+                </span>
+                <span className="font-medium text-white">{formatarMoeda(valorBase)}/mês</span>
               </div>
-            )}
-            {validade && (
-              <p className="text-xs mt-4" style={{ color: '#C8C4CE' }}>
-                Proposta válida até <strong className="text-white">{validade}</strong>
-              </p>
-            )}
+
+              {/* Desconto fidelidade */}
+              {pctFid > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span style={{ color: '#4ade80' }}>
+                    Fidelidade {fidelidade} meses (-{pctFid}%)
+                  </span>
+                  <span style={{ color: '#4ade80' }}>-{formatarMoeda(valorBase * pctFid / 100)}/mês</span>
+                </div>
+              )}
+
+              {/* Desconto manual */}
+              {proposta.desconto_percentual > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span style={{ color: '#4ade80' }}>Desconto adicional (-{proposta.desconto_percentual}%)</span>
+                  <span style={{ color: '#4ade80' }}>-{formatarMoeda(aposF * proposta.desconto_percentual / 100)}/mês</span>
+                </div>
+              )}
+
+              {/* Extras */}
+              {extras.length > 0 && (
+                <>
+                  <div className="border-t my-1" style={{ borderColor: '#5D267A' }} />
+                  {extras.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span style={{ color: '#C8C4CE' }}>{e.nome || 'Item adicional'}</span>
+                      <span className="text-white">{formatarMoeda(e.valor)}/mês</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Total */}
+              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid #7B3A9E' }}>
+                <span className="font-semibold text-white">Total mensal</span>
+                <span className="text-3xl font-extrabold text-white">{formatarMoeda(valorTotal)}</span>
+              </div>
+            </div>
+
+            {/* Rodapé do card */}
+            <div className="px-5 py-3 space-y-2 text-center" style={{ background: 'linear-gradient(135deg, #5D267A, #7B3A9E)' }}>
+              {proposta.condicao_especial && (
+                <p className="text-sm font-medium" style={{ color: '#EDE8F4' }}>🎁 {proposta.condicao_especial}</p>
+              )}
+              {validade && (
+                <p className="text-xs" style={{ color: 'rgba(237,232,244,0.7)' }}>
+                  Proposta válida até <strong className="text-white">{validade}</strong>
+                </p>
+              )}
+            </div>
           </div>
         </section>
 
