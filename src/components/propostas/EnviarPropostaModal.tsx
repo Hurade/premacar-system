@@ -120,7 +120,8 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
         if (convs?.[0]) {
           const conv = convs[0]
           setChatConvId(conv.id)
-          setChatConvActive(conv.status === 'nina' || conv.status === 'human')
+          // Ativa = is_active:true E status ativo (não paused)
+          setChatConvActive(conv.is_active === true && conv.status !== 'paused')
         }
       } finally {
         setLookingUpConv(false)
@@ -138,11 +139,20 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
       // Navigate to existing conversation or create new one
       if (chatConvId) {
         if (!chatConvActive) {
-          // Reopen closed/paused conversation
-          await (supabase as any)
+          const { data: reopened, error: reopenErr } = await (supabase as any)
             .from('conversations')
             .update({ status: 'human', is_active: true })
             .eq('id', chatConvId)
+            .select('id')
+
+          if (reopenErr) {
+            toast.error('Erro ao reabrir conversa: ' + reopenErr.message)
+            return
+          }
+          if (!reopened?.length) {
+            toast.error('Não foi possível reabrir a conversa')
+            return
+          }
         }
         navigate(`/chat?conversation=${chatConvId}`)
       } else if (chatContactId) {
