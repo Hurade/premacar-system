@@ -825,12 +825,12 @@ export const api = {
       };
     });
 
-    // Incluir contatos com conversa em aberto que ainda não têm deal.
-    // Inclui todos os status (nina, human, paused) pois não existe status "fechado".
+    // Incluir contatos com conversa em aberto (nina = IA em atendimento, human = humano em atendimento)
+    // que ainda não têm deal. 'paused' é considerado encerrado e não entra aqui.
     const { data: activeConvsOrphan } = await supabase
       .from('conversations')
       .select('id, contact_id, status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
-      .in('status', ['nina', 'human', 'paused']);
+      .in('status', ['nina', 'human']);
 
     const orphanConvs = (activeConvsOrphan || []).filter(c => c.contact_id && !dealContactIds.has(c.contact_id));
 
