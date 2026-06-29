@@ -167,9 +167,28 @@ const Kanban: React.FC = () => {
       )
       .subscribe();
 
+    // Recarregar pipeline quando uma conversa muda de status (ex: cliente responde)
+    const convsChannel = supabase
+      .channel('pipeline-conversations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: 'status=in.(nina,human)'
+        },
+        async () => {
+          const data = await api.fetchPipeline();
+          setDeals(data);
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(dealsChannel);
       supabase.removeChannel(stagesChannel);
+      supabase.removeChannel(convsChannel);
     };
   }, []);
 

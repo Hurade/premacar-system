@@ -825,19 +825,23 @@ export const api = {
       };
     });
 
-    // Incluir contatos com conversa em aberto (nina = IA em atendimento, human = humano em atendimento)
-    // que ainda não têm deal. 'paused' é considerado encerrado e não entra aqui.
-    const { data: activeConvsOrphan } = await supabase
+    // Incluir contatos com conversa em aberto que ainda não têm deal.
+    // Considera "em aberto": status nina/human OU window_status='open' (cliente com mensagem recente).
+    const { data: activeConvsOrphan, error: orphanError } = await supabase
       .from('conversations')
-      .select('id, contact_id, status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
-      .in('status', ['nina', 'human']);
+      .select('id, contact_id, status, window_status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
+      .or('status.in.(nina,human),window_status.eq.open');
+
+    if (orphanError) console.error('[Pipeline] Error fetching orphan conversations:', orphanError);
 
     const orphanConvs = (activeConvsOrphan || []).filter(c => c.contact_id && !dealContactIds.has(c.contact_id));
 
     if (orphanConvs.length > 0) {
+      // Filtrar is_active=true para garantir que o ID corresponde ao primeiro stage ativo do Kanban
       const { data: firstStage } = await supabase
         .from('pipeline_stages')
         .select('id, title')
+        .eq('is_active', true)
         .order('position', { ascending: true })
         .limit(1)
         .maybeSingle();
