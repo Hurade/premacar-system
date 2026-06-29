@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Filter, TrendingUp, TrendingDown, FileText,
@@ -10,10 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { usePropostas, usePropostaMetrics } from '@/hooks/usePropostas'
+import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/integrations/supabase/client'
 import { PropostaCard } from '@/components/propostas/PropostaCard'
 import { StatusBadge } from '@/components/propostas/StatusBadge'
 import { formatarMoeda, STATUS_LABELS, type StatusProposta } from '@/types/propostas'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 function MetricCard({
   label, value, sub, icon: Icon, trend, color = 'primary',
@@ -74,10 +77,44 @@ const STATUS_OPTIONS: StatusProposta[] = [
 
 export default function PropostasDashboard() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: propostas = [], isLoading } = usePropostas()
   const { data: metrics } = usePropostaMetrics()
 
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const channel = (supabase as any)
+      .channel('propostas_status_alerts')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'propostas_comerciais' },
+        (payload: { new: { status: string; id: string }; old: { status: string } }) => {
+          const { new: updated, old: previous } = payload
+          if (updated.status === previous.status) return
+
+          if (updated.status === 'aceita') {
+            toast.success('Proposta aceita pelo cliente!', {
+              description: 'Um cliente acabou de aceitar uma proposta.',
+              action: { label: 'Ver', onClick: () => navigate(`/propostas/${updated.id}`) },
+              duration: 8000,
+            })
+            queryClient.invalidateQueries({ queryKey: ['propostas_comerciais'] })
+          } else if (updated.status === 'revisao') {
+            toast.warning('Revisão solicitada', {
+              description: 'Um cliente pediu alterações em uma proposta.',
+              action: { label: 'Ver', onClick: () => navigate(`/propostas/${updated.id}`) },
+              duration: 8000,
+            })
+            queryClient.invalidateQueries({ queryKey: ['propostas_comerciais'] })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [navigate, queryClient])
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [planoFilter, setPlanoFilter] = useState<string>('todos')
 

@@ -91,6 +91,13 @@ ALTER TABLE planos_propostas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE propostas_comerciais ENABLE ROW LEVEL SECURITY;
 ALTER TABLE propostas_historico ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "leads_all" ON leads_comerciais;
+DROP POLICY IF EXISTS "planos_select" ON planos_propostas;
+DROP POLICY IF EXISTS "planos_write" ON planos_propostas;
+DROP POLICY IF EXISTS "propostas_all" ON propostas_comerciais;
+DROP POLICY IF EXISTS "propostas_public" ON propostas_comerciais;
+DROP POLICY IF EXISTS "historico_all" ON propostas_historico;
+
 CREATE POLICY "leads_all" ON leads_comerciais FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "planos_select" ON planos_propostas FOR SELECT TO authenticated USING (true);
 CREATE POLICY "planos_write" ON planos_propostas FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -111,7 +118,7 @@ INSERT INTO planos_propostas (tipo, nome, preco_mensal, recursos, descricao) VAL
 ),
 (
   'recuperar', 'Plano Recuperar', 997.00,
-  '["Tudo do Plano Fidelizar","Recuperação de clientes inativos","IA de conversação (Cris)","Campanhas multicanal","Integração com ERP","Gerente de sucesso dedicado"]'::jsonb,
-  'Para quem quer recuperar clientes parados e reativar a base completa com automação inteligente.'
+  '["Tudo do Plano Fidelizar","Recuperação de clientes inativos","Integração com ERP","Onboarding dedicado"]'::jsonb,
+  'Para recuperar clientes parados e reativar a base completa com automação inteligente.'
 )
 ON CONFLICT DO NOTHING;

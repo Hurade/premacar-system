@@ -89,11 +89,6 @@ export default function PropostaPublica() {
     updateStatus.mutate({ id: proposta.id, status: 'visualizada' })
   }
 
-  const roiClientes = lead?.clientes_base ?? 1000
-  const roiRecuperados = Math.round(roiClientes * 0.05)
-  const roiTicket = 350
-  const roiReceita = roiRecuperados * roiTicket
-
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: '#2A1038', color: '#FFFFFF' }}>
       {/* Cover */}
@@ -208,29 +203,6 @@ export default function PropostaPublica() {
                 {planoInfo.recursos.map(r => <CheckItem key={r}>{r}</CheckItem>)}
               </ul>
             </div>
-          </section>
-        )}
-
-        {/* ROI */}
-        {lead?.clientes_base && (
-          <section>
-            <SectionTitle>Projeção de Retorno</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { label: 'Base de Clientes', value: roiClientes.toLocaleString('pt-BR'), unit: 'inativos', color: '#9B5ABE' },
-                { label: 'Estimativa de Recuperação', value: roiRecuperados.toLocaleString('pt-BR'), unit: '5% reativados', color: '#22c55e' },
-                { label: 'Receita Adicional Est.', value: formatarMoeda(roiReceita), unit: 'por mês', color: '#f59e0b' },
-              ].map(({ label, value, unit, color }) => (
-                <div key={label} className="p-4 rounded-2xl text-center" style={{ backgroundColor: '#3A1750', border: `1px solid ${color}30` }}>
-                  <p className="text-2xl font-bold" style={{ color }}>{value}</p>
-                  <p className="text-xs mt-1" style={{ color: '#C8C4CE' }}>{unit}</p>
-                  <p className="text-xs mt-1 text-white font-medium">{label}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs mt-3" style={{ color: '#C8C4CE' }}>
-              * Estimativas baseadas em médias do setor automotivo. Resultados reais podem variar.
-            </p>
           </section>
         )}
 

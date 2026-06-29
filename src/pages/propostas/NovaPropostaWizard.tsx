@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useLeads, useCreateLead } from '@/hooks/useLeads'
+import { useCRMContacts, useLeadFromContact, useCreateLead, type CRMContact } from '@/hooks/useLeads'
 import { useCreateProposta, usePlanos } from '@/hooks/usePropostas'
 import type { Lead, DiagnosticoRespostas, PlanoTipo, TipoNegocio, OrigemLead, DorPrincipal } from '@/types/propostas'
 import {
@@ -62,10 +62,13 @@ function Step1Lead({
 }: { selectedLead: Lead | null; onSelectLead: (l: Lead) => void }) {
   const location = useLocation()
   const preselectedId = (location.state as { leadId?: string })?.leadId
-  const { data: leads = [] } = useLeads()
-  const createLead = useCreateLead()
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
+  const [loadingContactId, setLoadingContactId] = useState<string | null>(null)
+
+  const { data: contacts = [], isLoading: contactsLoading } = useCRMContacts(search)
+  const leadFromContact = useLeadFromContact()
+  const createLead = useCreateLead()
 
   const form = useForm<LeadForm>({
     resolver: zodResolver(leadSchema),
@@ -73,13 +76,20 @@ function Step1Lead({
   })
   const F = form.register
 
-  // Auto-select if pre-selected from Leads page
-  if (preselectedId && !selectedLead) {
-    const found = leads.find(l => l.id === preselectedId)
-    if (found) onSelectLead(found)
+  async function handleSelectContact(contact: CRMContact) {
+    setLoadingContactId(contact.id)
+    try {
+      const lead = await leadFromContact.mutateAsync(contact)
+      // Auto-select if pre-selected from Leads page
+      if (preselectedId && lead.id === preselectedId) {
+        onSelectLead(lead)
+        return
+      }
+      onSelectLead(lead)
+    } finally {
+      setLoadingContactId(null)
+    }
   }
-
-  const filtered = leads.filter(l => l.empresa.toLowerCase().includes(search.toLowerCase()))
 
   async function handleCreate(values: LeadForm) {
     const lead = await createLead.mutateAsync({
@@ -179,43 +189,51 @@ function Step1Lead({
     <div className="space-y-4">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar lead..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-muted/20 border-border/40" />
+        <Input placeholder="Buscar contato..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-muted/20 border-border/40" />
       </div>
 
       <div className="space-y-2 max-h-64 overflow-y-auto">
-        {filtered.map(lead => (
-          <button
-            key={lead.id}
-            onClick={() => onSelectLead(lead)}
-            className={cn(
-              'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all',
-              selectedLead?.id === lead.id
-                ? 'border-primary bg-primary/10'
-                : 'border-border/40 hover:border-primary/30 hover:bg-muted/20',
-            )}
-          >
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Building2 className="w-4 h-4 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground truncate">{lead.empresa}</p>
-              <p className="text-xs text-muted-foreground">{lead.responsavel} — {TIPO_NEGOCIO_LABELS[lead.tipo_negocio]}</p>
-            </div>
-            {selectedLead?.id === lead.id && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
-          </button>
-        ))}
+        {contactsLoading && (
+          <p className="text-sm text-muted-foreground text-center py-4">Carregando contatos...</p>
+        )}
+        {!contactsLoading && contacts.map(contact => {
+          const label = contact.oficina || contact.name || contact.phone_number
+          const sub = contact.name && contact.oficina ? contact.name : contact.phone_number
+          const isLoading = loadingContactId === contact.id
+          return (
+            <button
+              key={contact.id}
+              onClick={() => handleSelectContact(contact)}
+              disabled={isLoading || leadFromContact.isPending}
+              className={cn(
+                'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all disabled:opacity-60',
+                'border-border/40 hover:border-primary/30 hover:bg-muted/20',
+              )}
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-4 h-4 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground truncate">{label}</p>
+                <p className="text-xs text-muted-foreground">{sub}</p>
+              </div>
+              {isLoading && <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin flex-shrink-0" />}
+            </button>
+          )
+        })}
+        {!contactsLoading && contacts.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            {search ? 'Nenhum contato encontrado' : 'Nenhum contato cadastrado no CRM'}
+          </p>
+        )}
       </div>
-
-      {leads.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">Nenhum lead cadastrado ainda</p>
-      )}
 
       <button
         onClick={() => setShowNew(true)}
         className="w-full flex items-center gap-2 p-3 rounded-xl border border-dashed border-border/50 hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all text-sm"
       >
         <Plus className="w-4 h-4" />
-        Cadastrar novo lead
+        Cadastrar novo lead (não está no CRM)
       </button>
     </div>
   )
@@ -613,7 +631,7 @@ export default function NovaPropostaWizard() {
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/propostas')} className="p-2 rounded-xl hover:bg-muted/50">
+          <button type="button" aria-label="Voltar" onClick={() => navigate('/propostas')} className="p-2 rounded-xl hover:bg-muted/50">
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>

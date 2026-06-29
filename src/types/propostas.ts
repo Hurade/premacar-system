@@ -145,10 +145,8 @@ export const PLANOS_PADRAO: Record<PlanoTipo, { nome: string; preco: number; rec
     recursos: [
       'Tudo do Plano Fidelizar',
       'Recuperação de clientes inativos',
-      'IA de conversação (Cris)',
-      'Campanhas multicanal',
       'Integração com ERP',
-      'Gerente de sucesso dedicado',
+      'Onboarding dedicado',
     ],
   },
 }
