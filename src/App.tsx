@@ -20,6 +20,12 @@ import BroadcastDetails from './pages/BroadcastDetails';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
+import PropostasDashboard from './pages/propostas/PropostasDashboard';
+import Leads from './pages/propostas/Leads';
+import NovaPropostaWizard from './pages/propostas/NovaPropostaWizard';
+import PropostaDetalhe from './pages/propostas/PropostaDetalhe';
+import PropostaPublica from './pages/propostas/PropostaPublica';
+import Biblioteca from './pages/propostas/Biblioteca';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider } from './hooks/useAuth';
@@ -45,6 +51,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/followup': 'PremaCar - Follow-up',
   '/agentes': 'PremaCar - Agentes de IA',
   '/auth': 'PremaCar - Login',
+  '/propostas': 'PremaCar - Propostas',
+  '/propostas/leads': 'PremaCar - Leads',
+  '/propostas/nova': 'PremaCar - Nova Proposta',
+  '/propostas/biblioteca': 'PremaCar - Biblioteca Comercial',
 };
 
 const PageTitle: React.FC = () => {
@@ -158,8 +168,17 @@ const App: React.FC = () => {
                       <Agentes />
                     </RoleGate>
                   } />
+                  {/* Propostas */}
+                  <Route path="/propostas" element={<PropostasDashboard />} />
+                  <Route path="/propostas/leads" element={<Leads />} />
+                  <Route path="/propostas/nova" element={<NovaPropostaWizard />} />
+                  <Route path="/propostas/biblioteca" element={<Biblioteca />} />
+                  <Route path="/propostas/:id" element={<PropostaDetalhe />} />
                 </Route>
-                
+
+                {/* Proposta pública — sem autenticação */}
+                <Route path="/p/:slug" element={<PropostaPublica />} />
+
                 {/* Catch all - redirect to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
