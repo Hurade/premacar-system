@@ -928,7 +928,7 @@ async function processQueueItem(
   // ═══════════════════════════════════════════
   // SCHEDULING AUTO-TRIGGER: Lead respondeu com dia/horário após AI perguntar
   // ═══════════════════════════════════════════
-  if (!calendarFlow) {
+  if (!calendarFlow && aiSettings.ai_scheduling_enabled !== false) {
     const { data: lastNinaMsgRaw } = await supabase
       .from('messages')
       .select('content')
@@ -1274,9 +1274,14 @@ async function processQueueItem(
   // ═══════════════════════════════════════════
   let startCalendarFlow = false;
   if (aiContent.includes('[AGENDAR_DEMO]')) {
+    // Remove o marcador do conteúdo sempre, mesmo que scheduling esteja desativado
     aiContent = aiContent.replace(/\[AGENDAR_DEMO\]/gi, '').trim();
-    startCalendarFlow = true;
-    console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected — will fetch Google Calendar slots');
+    if (aiSettings.ai_scheduling_enabled !== false) {
+      startCalendarFlow = true;
+      console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected — will fetch Google Calendar slots');
+    } else {
+      console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected but ai_scheduling_enabled=false — skipping calendar flow');
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -1359,17 +1364,9 @@ async function processQueueItem(
           calendar_flow: { state: 'showing_slots', offered_slots: slots }
         }).eq('id', conversation.id);
 
-        await supabase.from('send_queue').insert({
-          conversation_id: conversation.id,
-          contact_id: conversation.contact_id,
-          content: formatSlotsMessage(slots),
-          from_type: 'nina',
-          message_type: 'text',
-          priority: 1,
-          scheduled_at: new Date(Date.now() + senderTriggerDelay + 3000).toISOString(),
-          metadata: { response_to_message_id: message.id, calendar_flow: true }
-        });
-        console.log('[Nina] 📅 Calendar slots queued, state: showing_slots');
+        // Use queueCalendarMessage so whatsapp-sender is triggered after the AI text is sent
+        await queueCalendarMessage(supabase, conversation, message, formatSlotsMessage(slots), settings);
+        console.log('[Nina] 📅 Calendar slots queued and sender triggered, state: showing_slots');
       } else {
         console.warn('[Nina] 📅 No available calendar slots — flow aborted');
       }
