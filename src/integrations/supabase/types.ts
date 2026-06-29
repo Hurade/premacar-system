@@ -1976,11 +1976,14 @@ export type Database = {
       propostas_comerciais: {
         Row: {
           aceita_at: string | null
+          assinatura_vendedor: Json | null
           condicao_especial: string | null
           created_at: string
           desconto_percentual: number
           diagnostico: Json | null
           enviada_at: string | null
+          extras: Json | null
+          fidelidade_meses: number
           id: string
           lead_id: string
           motivo_recusa: string | null
@@ -1989,6 +1992,7 @@ export type Database = {
           recusada_at: string | null
           slug: string
           status: string
+          unidades: number
           updated_at: string
           validade_ate: string | null
           validade_dias: number
@@ -1998,11 +2002,14 @@ export type Database = {
         }
         Insert: {
           aceita_at?: string | null
+          assinatura_vendedor?: Json | null
           condicao_especial?: string | null
           created_at?: string
           desconto_percentual?: number
           diagnostico?: Json | null
           enviada_at?: string | null
+          extras?: Json | null
+          fidelidade_meses?: number
           id?: string
           lead_id: string
           motivo_recusa?: string | null
@@ -2011,6 +2018,7 @@ export type Database = {
           recusada_at?: string | null
           slug: string
           status?: string
+          unidades?: number
           updated_at?: string
           validade_ate?: string | null
           validade_dias?: number
@@ -2020,11 +2028,14 @@ export type Database = {
         }
         Update: {
           aceita_at?: string | null
+          assinatura_vendedor?: Json | null
           condicao_especial?: string | null
           created_at?: string
           desconto_percentual?: number
           diagnostico?: Json | null
           enviada_at?: string | null
+          extras?: Json | null
+          fidelidade_meses?: number
           id?: string
           lead_id?: string
           motivo_recusa?: string | null
@@ -2033,6 +2044,7 @@ export type Database = {
           recusada_at?: string | null
           slug?: string
           status?: string
+          unidades?: number
           updated_at?: string
           validade_ate?: string | null
           validade_dias?: number
