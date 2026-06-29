@@ -91,26 +91,45 @@ async function loadCalendarConfig(supabase: ReturnType<typeof createClient>, use
 
 interface Slot { iso: string; label: string }
 
+// Returns a Date representing `hour:minute:00` on the same calendar day as `ref` in timezone `tz`.
+// Fixes setHours() which operates in server-UTC, not in the configured timezone.
+function setTzHours(ref: Date, hour: number, minute: number, tz: string): Date {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric'
+  }).formatToParts(ref);
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value);
+  const [y, m, d] = [get('year'), get('month'), get('day')];
+
+  // Approximate: treat local hour:minute as UTC
+  const approx = new Date(Date.UTC(y, m - 1, d, hour, minute, 0));
+
+  // Find what local time approx actually maps to in tz
+  const localParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(approx);
+  const getL = (t: string) => parseInt(localParts.find(p => p.type === t)!.value);
+  const [lh, lm, ls] = [getL('hour') % 24, getL('minute'), getL('second')];
+
+  const desired = hour * 3_600_000 + minute * 60_000;
+  const actual  = lh   * 3_600_000 + lm    * 60_000 + ls * 1_000;
+  return new Date(approx.getTime() + (desired - actual));
+}
+
 function nextWorkdays(count: number, tz: string, workStart: number, workEnd: number): { start: Date; end: Date }[] {
   const days: { start: Date; end: Date }[] = [];
   const d = new Date();
   d.setMinutes(0, 0, 0);
-  d.setHours(d.getHours() + 1); // start from next full hour
+  d.setTime(d.getTime() + 3_600_000); // start from next full hour
 
   while (days.length < count) {
     const locale = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(d);
-    const isSat  = locale === 'Sat';
-    const isSun  = locale === 'Sun';
-
-    if (!isSat && !isSun) {
-      const dayStart = new Date(d);
-      dayStart.setHours(workStart, 0, 0, 0);
-      const dayEnd = new Date(d);
-      dayEnd.setHours(workEnd, 0, 0, 0);
-      days.push({ start: dayStart, end: dayEnd });
+    if (locale !== 'Sat' && locale !== 'Sun') {
+      days.push({
+        start: setTzHours(d, workStart, 0, tz),
+        end:   setTzHours(d, workEnd,   0, tz),
+      });
     }
-    d.setDate(d.getDate() + 1);
-    d.setHours(workStart, 0, 0, 0);
+    d.setTime(d.getTime() + 24 * 3_600_000); // advance exactly 24h
   }
   return days;
 }

@@ -40,6 +40,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
 
   // Conversation lookup state
   const [chatConvId, setChatConvId] = useState<string | null>(null)
+  const [chatConvActive, setChatConvActive] = useState(false)
   const [chatContactId, setChatContactId] = useState<string | null>(null)
   const [lookingUpConv, setLookingUpConv] = useState(false)
   const [sendingEmail, setSendingEmail] = useState(false)
@@ -87,6 +88,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
     }
 
     setChatConvId(null)
+    setChatConvActive(false)
     setChatContactId(null)
     setLookingUpConv(true)
 
@@ -110,12 +112,16 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
         // Find most recent conversation for this contact
         const { data: convs } = await (supabase as any)
           .from('conversations')
-          .select('id')
+          .select('id, status, is_active')
           .eq('contact_id', contact.id)
           .order('last_message_at', { ascending: false })
           .limit(1)
 
-        if (convs?.[0]) setChatConvId(convs[0].id)
+        if (convs?.[0]) {
+          const conv = convs[0]
+          setChatConvId(conv.id)
+          setChatConvActive(conv.status === 'nina' || conv.status === 'human')
+        }
       } finally {
         setLookingUpConv(false)
       }
@@ -131,6 +137,13 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
 
       // Navigate to existing conversation or create new one
       if (chatConvId) {
+        if (!chatConvActive) {
+          // Reopen closed/paused conversation
+          await (supabase as any)
+            .from('conversations')
+            .update({ status: 'human', is_active: true })
+            .eq('id', chatConvId)
+        }
         navigate(`/chat?conversation=${chatConvId}`)
       } else if (chatContactId) {
         navigate(`/chat?newContact=${chatContactId}`)
@@ -171,7 +184,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
   const waStatus = lookingUpConv
     ? 'buscando...'
     : chatConvId
-      ? 'conversa em andamento'
+      ? chatConvActive ? 'conversa em andamento' : 'conversa encerrada'
       : chatContactId
         ? 'contato no sistema'
         : lead?.telefone
@@ -179,7 +192,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
           : 'sem telefone'
 
   const waStatusColor = chatConvId
-    ? 'text-emerald-400'
+    ? chatConvActive ? 'text-emerald-400' : 'text-amber-400'
     : chatContactId
       ? 'text-cyan-400'
       : 'text-muted-foreground'
@@ -250,13 +263,17 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
             <div className={cn(
               'flex items-center gap-2 px-3 py-2 rounded-lg text-xs',
               chatConvId
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                ? chatConvActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                 : chatContactId
                   ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                   : 'bg-muted/30 text-muted-foreground border border-border/30',
             )}>
               {chatConvId ? (
-                <><MessagesSquare className="w-3.5 h-3.5 shrink-0" /> Conversa em andamento encontrada — será aberta no Chat</>
+                chatConvActive
+                  ? <><MessagesSquare className="w-3.5 h-3.5 shrink-0" /> Conversa em andamento encontrada — será aberta no Chat</>
+                  : <><MessagesSquare className="w-3.5 h-3.5 shrink-0" /> Conversa encerrada encontrada — será reaberta no Chat</>
               ) : chatContactId ? (
                 <><UserPlus className="w-3.5 h-3.5 shrink-0" /> Contato encontrado — nova conversa será iniciada no Chat</>
               ) : (
@@ -342,7 +359,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
               <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
             ) : channel === 'whatsapp' ? (
               chatConvId
-                ? <><MessagesSquare className="w-4 h-4" /> Abrir Conversa</>
+                ? <><MessagesSquare className="w-4 h-4" /> {chatConvActive ? 'Abrir Conversa' : 'Reabrir Conversa'}</>
                 : chatContactId
                   ? <><UserPlus className="w-4 h-4" /> Iniciar Conversa</>
                   : <><MessageCircle className="w-4 h-4" /> Abrir no WhatsApp</>
