@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Check, AlertCircle, Loader2, ChevronRight, TrendingUp, Shield, Star, Zap } from 'lucide-react'
 import { usePropostaBySlug, useUpdatePropostaStatus } from '@/hooks/usePropostas'
@@ -27,6 +27,7 @@ export default function PropostaPublica() {
   const { data: proposta, isLoading } = usePropostaBySlug(slug)
   const updateStatus = useUpdatePropostaStatus()
   const [accepted, setAccepted] = useState(false)
+  const trackedRef = useRef(false)
 
   if (isLoading) {
     return (
@@ -78,15 +79,19 @@ export default function PropostaPublica() {
     if (diag.quer_recuperar) problemas.push('Clientes parados sem estratégia de reativação')
   }
 
+  // Track visualização — executa uma única vez quando a proposta carrega
+  useEffect(() => {
+    if (proposta && proposta.status === 'enviada' && !trackedRef.current) {
+      trackedRef.current = true
+      updateStatus.mutate({ id: proposta.id, status: 'visualizada' })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposta?.id, proposta?.status])
+
   async function handleAccept() {
     if (accepted) return
     await updateStatus.mutateAsync({ id: proposta!.id, status: 'aceita' })
     setAccepted(true)
-  }
-
-  // Track visualização
-  if (proposta.status === 'enviada' && !accepted) {
-    updateStatus.mutate({ id: proposta.id, status: 'visualizada' })
   }
 
   return (
