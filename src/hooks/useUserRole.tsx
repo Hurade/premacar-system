@@ -141,13 +141,24 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
         setAppRole('user');
       }
 
-      // Fetch team member info to get team role and name
-      const { data: teamMemberData } = await supabase
+      // Fetch team member info — try user_id first (reliable), fall back to email
+      const { data: teamByUserId } = await supabase
         .from('team_members')
         .select('id, role, status, name')
-        .eq('email', user.email!)
+        .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
+
+      const { data: teamByEmail } = teamByUserId
+        ? { data: null }
+        : await supabase
+            .from('team_members')
+            .select('id, role, status, name')
+            .eq('email', user.email!)
+            .eq('status', 'active')
+            .maybeSingle();
+
+      const teamMemberData = teamByUserId ?? teamByEmail;
 
       if (teamMemberData) {
         setTeamRole(teamMemberData.role as TeamRole);

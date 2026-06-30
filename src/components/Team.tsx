@@ -106,7 +106,9 @@ const Team: React.FC = () => {
 
       const userId = data?.user?.id;
       if (userId) {
-        await supabase.from('team_members').insert({
+        // Upsert: o trigger handle_new_user já pode ter criado o registro por email;
+        // garantimos que os dados do formulário (nome, role, time, função) prevaleçam.
+        const { error: upsertError } = await supabase.from('team_members').upsert({
           user_id: userId,
           name: formData.name,
           email: formData.email,
@@ -115,7 +117,8 @@ const Team: React.FC = () => {
           function_id: formData.function_id || null,
           weight: formData.weight || 1,
           status: 'active' as const,
-        });
+        }, { onConflict: 'email' });
+        if (upsertError) throw upsertError;
       }
 
       toast.success('Usuário criado com sucesso!');
