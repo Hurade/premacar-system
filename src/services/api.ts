@@ -759,14 +759,33 @@ export const api = {
    * Fetch pipeline/deals with real data
    */
   fetchPipeline: async (): Promise<Deal[]> => {
-    const { data, error } = await supabase
+    // Buscar primeiro estágio para excluir leads auto-criados que nunca foram trabalhados
+    const { data: firstStage } = await supabase
+      .from('pipeline_stages')
+      .select('id')
+      .eq('is_active', true)
+      .order('position', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    // Mostrar apenas deals que evoluíram: saíram do primeiro estágio OU têm valor OU
+    // têm responsável OU foram ganhos/perdidos. Exclui leads auto-criados por trigger
+    // que nunca receberam nenhuma interação manual.
+    let dealsQuery = supabase
       .from('deals')
       .select(`
         *,
         contact:contacts(name, call_name, phone_number, email, client_memory),
         owner:team_members(name, avatar)
-      `)
-      .order('created_at', { ascending: false });
+      `);
+
+    if (firstStage?.id) {
+      dealsQuery = dealsQuery.or(
+        `stage_id.neq.${firstStage.id},value.gt.0,owner_id.not.is.null,won_at.not.is.null,lost_at.not.is.null`
+      );
+    }
+
+    const { data, error } = await dealsQuery.order('created_at', { ascending: false });
 
     if (error) {
       console.error('[API] Error fetching pipeline:', error);
