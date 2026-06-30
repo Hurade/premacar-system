@@ -841,6 +841,26 @@ export const api = {
       return deal.value > 0 || deal.ownerId || deal.wonAt || deal.lostAt || deal.hasActiveConversation;
     });
 
+    // Deduplicar por contact_id: manter o deal mais avançado no pipeline.
+    // O trigger de criação automática pode gerar duplicatas por race condition.
+    const dealScore = (d: typeof mappedDeals[0]) =>
+      (firstStage?.id && d.stageId !== firstStage.id ? 100 : 0) +
+      (d.wonAt ? 75 : 0) +
+      (d.value > 0 ? 50 : 0) +
+      (d.ownerId ? 25 : 0) +
+      (d.hasActiveConversation ? 10 : 0);
+
+    const deduplicatedDeals = new Map<string, typeof mappedDeals[0]>();
+    const dealsWithoutContact: typeof mappedDeals = [];
+    for (const deal of mappedDeals) {
+      if (!deal.contactId) { dealsWithoutContact.push(deal); continue; }
+      const existing = deduplicatedDeals.get(deal.contactId);
+      if (!existing || dealScore(deal) > dealScore(existing)) {
+        deduplicatedDeals.set(deal.contactId, deal);
+      }
+    }
+    const finalDeals = [...deduplicatedDeals.values(), ...dealsWithoutContact];
+
     // Incluir contatos com conversa em aberto que ainda não têm deal.
     // Considera "em aberto": status nina/human OU window_status='open' (cliente com mensagem recente).
     const { data: activeConvsOrphan, error: orphanError } = await supabase
@@ -850,7 +870,14 @@ export const api = {
 
     if (orphanError) console.error('[Pipeline] Error fetching orphan conversations:', orphanError);
 
-    const orphanConvs = (activeConvsOrphan || []).filter(c => c.contact_id && !dealContactIds.has(c.contact_id));
+    // Deduplicar orphans por contact_id (um contato pode ter várias conversas abertas)
+    const seenOrphanContacts = new Set<string>();
+    const orphanConvs = (activeConvsOrphan || []).filter(c => {
+      if (!c.contact_id || dealContactIds.has(c.contact_id)) return false;
+      if (seenOrphanContacts.has(c.contact_id)) return false;
+      seenOrphanContacts.add(c.contact_id);
+      return true;
+    });
 
     if (orphanConvs.length > 0) {
       // Filtrar is_active=true para garantir que o ID corresponde ao primeiro stage ativo do Kanban
@@ -864,7 +891,7 @@ export const api = {
 
       for (const conv of orphanConvs) {
         const contact = conv.contact as any;
-        mappedDeals.push({
+        finalDeals.push({
           id: `__conv_${conv.id}`,
           title: contact?.name || contact?.call_name || 'Lead em atendimento',
           company: contact?.name || contact?.call_name || 'Sem empresa',
@@ -892,7 +919,7 @@ export const api = {
       }
     }
 
-    return mappedDeals;
+    return finalDeals;
   },
 
   // Pipeline Stages CRUD
