@@ -759,7 +759,7 @@ export const api = {
    * Fetch pipeline/deals with real data
    */
   fetchPipeline: async (): Promise<Deal[]> => {
-    // Buscar primeiro estágio para excluir leads auto-criados que nunca foram trabalhados
+    // Buscar primeiro estágio (usado no filtro JS abaixo)
     const { data: firstStage } = await supabase
       .from('pipeline_stages')
       .select('id')
@@ -768,24 +768,14 @@ export const api = {
       .limit(1)
       .maybeSingle();
 
-    // Mostrar apenas deals que evoluíram: saíram do primeiro estágio OU têm valor OU
-    // têm responsável OU foram ganhos/perdidos. Exclui leads auto-criados por trigger
-    // que nunca receberam nenhuma interação manual.
-    let dealsQuery = supabase
+    const { data, error } = await supabase
       .from('deals')
       .select(`
         *,
         contact:contacts(name, call_name, phone_number, email, client_memory),
         owner:team_members(name, avatar)
-      `);
-
-    if (firstStage?.id) {
-      dealsQuery = dealsQuery.or(
-        `stage_id.neq.${firstStage.id},value.gt.0,owner_id.not.is.null,won_at.not.is.null,lost_at.not.is.null`
-      );
-    }
-
-    const { data, error } = await dealsQuery.order('created_at', { ascending: false });
+      `)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('[API] Error fetching pipeline:', error);
@@ -842,6 +832,13 @@ export const api = {
         hasActiveConversation: conv?.isActive === true,
         lastConversationAt: conv?.lastMessageAt || null,
       };
+    }).filter(deal => {
+      // Ocultar deals auto-criados pelo trigger que nunca foram trabalhados:
+      // só aparecem se saíram do primeiro estágio, têm valor, responsável,
+      // foram ganhos/perdidos OU têm conversa ativa no momento.
+      const inFirstStage = firstStage?.id ? deal.stageId === firstStage.id : false;
+      if (!inFirstStage) return true;
+      return deal.value > 0 || deal.ownerId || deal.wonAt || deal.lostAt || deal.hasActiveConversation;
     });
 
     // Incluir contatos com conversa em aberto que ainda não têm deal.
