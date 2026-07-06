@@ -121,6 +121,7 @@ export default function Logs() {
             <SelectItem value="whatsapp-sender">whatsapp-sender</SelectItem>
             <SelectItem value="nina-orchestrator">nina-orchestrator</SelectItem>
             <SelectItem value="make-voice-call">make-voice-call</SelectItem>
+            <SelectItem value="twilio-call">twilio-call</SelectItem>
             <SelectItem value="recurring-campaign-processor">recurring-campaign-processor</SelectItem>
           </SelectContent>
         </Select>

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { downloadMediaWithType } from "../_shared/media.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +15,7 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const mediaId = url.searchParams.get('id');
-    
+
     if (!mediaId) {
       return new Response(JSON.stringify({ error: 'Missing media id' }), {
         status: 400,
@@ -26,61 +27,36 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get Meta access token from settings
+    // Busca credenciais Meta + Evolution — o helper compartilhado tenta Meta
+    // primeiro e cai para Evolution automaticamente, cobrindo os dois provedores
+    // sem o frontend precisar saber qual API originou a mensagem.
     const { data: settings } = await supabase
       .from('nina_settings')
-      .select('meta_access_token')
+      .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
       .limit(1)
       .maybeSingle();
 
-    if (!settings?.meta_access_token) {
-      return new Response(JSON.stringify({ error: 'Meta access token not configured' }), {
+    if (!settings) {
+      return new Response(JSON.stringify({ error: 'Nenhuma configuração de WhatsApp encontrada' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Step 1: Get media URL from Meta
-    const mediaInfoRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
-      headers: { 'Authorization': `Bearer ${settings.meta_access_token}` }
-    });
+    const media = await downloadMediaWithType(settings, mediaId);
 
-    if (!mediaInfoRes.ok) {
-      return new Response(JSON.stringify({ error: 'Failed to get media info' }), {
+    if (!media) {
+      return new Response(JSON.stringify({ error: 'Falha ao baixar mídia (Meta e Evolution)' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const mediaInfo = await mediaInfoRes.json();
-    
-    if (!mediaInfo.url) {
-      return new Response(JSON.stringify({ error: 'No media URL returned' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Step 2: Download the actual media file from Meta
-    const mediaRes = await fetch(mediaInfo.url, {
-      headers: { 'Authorization': `Bearer ${settings.meta_access_token}` }
-    });
-
-    if (!mediaRes.ok) {
-      return new Response(JSON.stringify({ error: 'Failed to download media' }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const contentType = mediaRes.headers.get('content-type') || 'application/octet-stream';
-    const mediaData = await mediaRes.arrayBuffer();
-
-    return new Response(mediaData, {
+    return new Response(media.buffer, {
       status: 200,
       headers: {
         ...corsHeaders,
-        'Content-Type': contentType,
+        'Content-Type': media.contentType || 'application/octet-stream',
         'Cache-Control': 'public, max-age=86400',
       }
     });

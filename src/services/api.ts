@@ -1164,17 +1164,23 @@ export const api = {
    */
   moveDealStage: async (id: string, newStageId: string): Promise<void> => {
     const { ganhoId, perdidoId } = await getSystemStageIds();
-    
+
+    const { data: currentDeal } = await supabase
+      .from('deals')
+      .select('contact_id, stage_id')
+      .eq('id', id)
+      .maybeSingle();
+
     // Build update object - clear won_at/lost_at if moving away from those stages
     const updates: Record<string, any> = { stage_id: newStageId };
-    
+
     if (newStageId !== ganhoId && newStageId !== perdidoId) {
       updates.won_at = null;
       updates.lost_at = null;
       updates.lost_reason = null;
       updates.stage = 'in_progress';
     }
-    
+
     const { error } = await supabase
       .from('deals')
       .update(updates)
@@ -1183,6 +1189,19 @@ export const api = {
     if (error) {
       console.error('[API] Error moving deal stage:', error);
       throw error;
+    }
+
+    // Dispara o motor de automação (gatilho 'stage_changed') sem bloquear a UI
+    if (currentDeal?.stage_id !== newStageId) {
+      supabase.functions.invoke('automation-executor', {
+        body: {
+          event_type: 'stage_changed',
+          deal_id: id,
+          contact_id: currentDeal?.contact_id,
+          from_stage_id: currentDeal?.stage_id,
+          to_stage_id: newStageId,
+        },
+      }).catch((err) => console.error('[API] Error triggering automation-executor:', err));
     }
   },
 

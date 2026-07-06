@@ -21,5 +21,8 @@ verify_jwt = false
 [functions.voice-call-twiml]
 verify_jwt = false
 
-[functions.make-voice-call]
-verify_jwt = false
+# make-voice-call: verify_jwt removido (Fase 3.2) — a função estava pública
+# sem autenticação, permitindo disparar ligações reais no Twilio sem login.
+# O único chamador legítimo (recurring-campaign-processor) já envia
+# Authorization: Bearer <service_role_key>, um JWT válido, e o frontend usa
+# supabase.functions.invoke() que injeta o JWT do usuário automaticamente.

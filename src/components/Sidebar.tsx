@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, ScrollText, MessageSquarePlus, Bot, FileText } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, ScrollText, MessageSquarePlus, Bot, FileText, Zap } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,6 +58,10 @@ const menuItems = [{
   id: 'agentes',
   label: 'Agentes de IA',
   icon: Bot
+}, {
+  id: 'automacoes',
+  label: 'Automações',
+  icon: Zap
 }, {
   id: 'propostas',
   label: 'Propostas',

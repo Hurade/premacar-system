@@ -215,9 +215,13 @@ const Contacts: React.FC = () => {
             .update({ tags: [...currentTags, tagKey] })
             .eq('id', contact.id);
           if (error) throw error;
+
+          supabase.functions.invoke('automation-executor', {
+            body: { event_type: 'tag_applied', contact_id: contact.id, tags: [tagKey] },
+          }).catch((err) => console.error('[Contacts] Error triggering automation-executor:', err));
         }
       }
-      
+
       toast.success(`Tag adicionada a ${selectedIds.size} contato(s)!`);
       setSelectedIds(new Set());
       loadContacts();

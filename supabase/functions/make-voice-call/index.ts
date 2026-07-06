@@ -17,7 +17,8 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   try {
-    const { contactId, campaignId, message } = await req.json()
+    const { contactId, campaignId, message, callType, initiatedBy } = await req.json()
+    const resolvedMessage = message || 'Olá, esta é uma ligação da PremaCar.'
 
     // LOG 1: Call initiated
     await saveLog(supabase, {
@@ -62,7 +63,7 @@ serve(async (req) => {
 
     // 3. Personalizar mensagem com nome
     const contactName = contact.name || contact.call_name || 'Cliente'
-    const personalizedMessage = message.replace(/\{\{nome\}\}/g, contactName)
+    const personalizedMessage = resolvedMessage.replace(/\{\{nome\}\}/g, contactName)
 
     // 4. URL do TwiML — passa mensagem direto via query param (TTS no Twilio)
     const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?message=${encodeURIComponent(personalizedMessage)}&contact=${contactId}`
@@ -137,7 +138,9 @@ serve(async (req) => {
       contact_id: contactId,
       campaign_id: campaignId || null,
       call_sid: callData.sid,
-      status: 'initiated'
+      status: 'initiated',
+      call_type: callType === 'manual' ? 'manual' : 'campaign',
+      initiated_by: initiatedBy || null
     })
 
     // LOG 6: Call created

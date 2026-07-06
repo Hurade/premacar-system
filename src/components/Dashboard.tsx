@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
+import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight, Radio, UserCheck } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { StatMetric } from '../types';
 import { api } from '../services/api';
 import { OnboardingBanner } from './OnboardingBanner';
 import { useOutletContext } from 'react-router-dom';
+import { useOperationalMetrics } from '@/hooks/useOperationalMetrics';
+import { useOnlinePresence } from '@/hooks/useOnlinePresence';
+import { useAuth } from '@/hooks/useAuth';
+
+const STATUS_LABELS: Record<string, string> = { nina: 'IA (Nina)', human: 'Humano', paused: 'Pausado' };
+const STATUS_COLORS: Record<string, string> = {
+  nina: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
+  human: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  paused: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+};
+const TEAM_LABELS: Record<string, string> = {
+  mateus: 'Mateus', igor: 'Igor', fe: 'Fê', vendas: 'Vendas', suporte: 'Suporte', sem_equipe: 'Sem equipe',
+};
 
 interface OutletContext {
   showOnboarding: boolean;
@@ -31,6 +44,9 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodFilter>('today');
   const { setShowOnboarding } = useOutletContext<OutletContext>();
+  const operationalMetrics = useOperationalMetrics();
+  const { user } = useAuth();
+  const onlineAgents = useOnlinePresence(user);
 
   useEffect(() => {
     const loadData = async () => {
@@ -117,6 +133,72 @@ const Dashboard: React.FC = () => {
               {periodLabels[p]}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Painel Operacional (sempre ao vivo, independe do filtro de período) */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Atendimentos abertos por status */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Radio className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-semibold text-white">Atendimentos Abertos</h3>
+            <span className="ml-auto text-xs text-slate-500">{operationalMetrics.loading ? '…' : operationalMetrics.total}</span>
+          </div>
+          <div className="space-y-2">
+            {(['nina', 'human', 'paused'] as const).map((status) => (
+              <div key={status} className="flex items-center justify-between">
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[status]}`}>
+                  {STATUS_LABELS[status]}
+                </span>
+                <span className="text-sm font-semibold text-slate-200">
+                  {operationalMetrics.loading ? '…' : operationalMetrics.byStatus[status]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Atendimentos por equipe */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-4 h-4 text-violet-400" />
+            <h3 className="text-sm font-semibold text-white">Por Equipe</h3>
+          </div>
+          <div className="space-y-2">
+            {(Object.keys(TEAM_LABELS) as Array<keyof typeof TEAM_LABELS>).map((team) => (
+              <div key={team} className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">{TEAM_LABELS[team]}</span>
+                <span className="text-sm font-semibold text-slate-200">
+                  {operationalMetrics.loading ? '…' : operationalMetrics.byTeam[team]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Atendentes online */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <UserCheck className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-semibold text-white">Atendentes Online</h3>
+            <span className="ml-auto text-xs text-slate-500">{onlineAgents.length}</span>
+          </div>
+          {onlineAgents.length === 0 ? (
+            <p className="text-xs text-slate-500">Nenhum atendente online agora.</p>
+          ) : (
+            <div className="space-y-2">
+              {onlineAgents.map((agent) => (
+                <div key={agent.user_id} className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-sm text-slate-300">{agent.full_name}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

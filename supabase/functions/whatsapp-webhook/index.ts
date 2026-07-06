@@ -446,9 +446,13 @@ serve(async (req) => {
           from_type: 'user',
           status: 'sent',
           media_type: mediaType,
+          // media_url guarda o whatsapp_message_id (não o mediaKey de criptografia
+          // do Baileys) — é esse o identificador que getBase64FromMediaMessage
+          // da Evolution API espera para baixar a mídia depois (transcrição/análise).
+          media_url: mediaType ? messageId : null,
           api_source: 'evolution', // Mark as Evolution API message
           sent_at: new Date(messageTimestamp * 1000).toISOString(),
-          metadata: { 
+          metadata: {
             original_type: messageType,
             media_id: mediaId,
             evolution_instance: instanceName

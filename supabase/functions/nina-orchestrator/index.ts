@@ -1,4 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.47.10";
+import { downloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
+import { generateEmbedding } from "../_shared/embeddings.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1013,12 +1015,15 @@ async function processQueueItem(
   }
 
   // ═══════════════════════════════════════════
-  // AUDIO TRANSCRIPTION: Resolve before sending to AI
+  // MEDIA RESOLUTION: transcreve áudio / analisa imagem / extrai texto de
+  // documento antes de enviar para a IA. Caminho primário é o
+  // message-grouper (roda em background); este bloco é o fallback de
+  // segurança, igual ao padrão que já existia só para áudio.
   // ═══════════════════════════════════════════
-  if (message.type === 'audio') {
-    console.log('[Nina] Audio message detected, attempting transcription...');
+  if (['audio', 'image', 'document'].includes(message.type)) {
+    console.log(`[Nina] Media message detected (${message.type}), checking resolution...`);
 
-    // Wait 2s in case the message-grouper is already transcribing
+    // Wait 2s in case the message-grouper is already resolving
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Re-fetch — grouper may have updated the content
@@ -1029,109 +1034,53 @@ async function processQueueItem(
       .single();
 
     const currentContent = refreshedMsg?.content || message.content || '';
-    const isAlreadyTranscribed =
-      currentContent.length > 5 &&
-      !currentContent.includes('[áudio') &&
-      !currentContent.includes('[audio') &&
-      currentContent !== '[áudio recebido]';
+    const placeholderMarkers = ['[áudio', '[audio', '[imagem recebida]', '[documento recebido]', '[vídeo recebido]'];
+    const isAlreadyResolved =
+      currentContent.length > 5 && !placeholderMarkers.some((marker) => currentContent.includes(marker));
 
-    if (isAlreadyTranscribed) {
+    const fallbackTextByType: Record<string, string> = {
+      audio: '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]',
+      image: '[O cliente enviou uma imagem que não foi possível analisar. Responda de forma natural perguntando o que ela mostra, sem mencionar problemas técnicos.]',
+      document: '[O cliente enviou um documento que não foi possível processar. Responda de forma natural perguntando o conteúdo, sem mencionar problemas técnicos.]',
+    };
+
+    if (isAlreadyResolved) {
       message.content = currentContent;
-      console.log('[Nina] Grouper already transcribed:', currentContent.substring(0, 50));
+      console.log('[Nina] Grouper already resolved media:', currentContent.substring(0, 50));
     } else {
       const mediaId = refreshedMsg?.media_url || message.media_url;
+      let resolvedContent: string | null = null;
 
       if (mediaId) {
         try {
-          const { data: audioSettings } = await supabase
+          const { data: mediaSettings } = await supabase
             .from('nina_settings')
             .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
             .limit(1)
             .single();
 
-          let audioBuffer: ArrayBuffer | null = null;
+          const mediaBuffer = await downloadMedia(mediaSettings || {}, mediaId);
 
-          // Try Meta API first
-          if (audioSettings?.meta_access_token) {
-            try {
-              const mediaResp = await fetch(
-                `https://graph.facebook.com/v21.0/${mediaId}`,
-                { headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` } }
-              );
-              if (mediaResp.ok) {
-                const mediaData = await mediaResp.json();
-                if (mediaData.url) {
-                  const audioResp = await fetch(mediaData.url, {
-                    headers: { 'Authorization': `Bearer ${audioSettings.meta_access_token}` }
-                  });
-                  if (audioResp.ok) {
-                    audioBuffer = await audioResp.arrayBuffer();
-                    console.log('[Nina] Audio downloaded via Meta API, size:', audioBuffer.byteLength);
-                  }
-                }
-              }
-            } catch (metaErr) {
-              console.error('[Nina] Meta API download failed:', metaErr);
+          if (mediaBuffer && mediaBuffer.byteLength > 0) {
+            if (message.type === 'audio') {
+              resolvedContent = await transcribeAudio(mediaBuffer, lovableApiKey);
+            } else if (message.type === 'image') {
+              resolvedContent = await describeImage(mediaBuffer, 'image/jpeg', lovableApiKey, message.content);
+            } else if (message.type === 'document') {
+              resolvedContent = await extractPdfText(mediaBuffer);
             }
-          }
-
-          // Fallback: Evolution API
-          if (!audioBuffer && audioSettings?.evolution_api_url && audioSettings?.evolution_api_key) {
-            try {
-              const evoResp = await fetch(
-                `${audioSettings.evolution_api_url}/chat/getBase64FromMediaMessage/${audioSettings.evolution_instance_name}`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'apikey': audioSettings.evolution_api_key },
-                  body: JSON.stringify({ message: { key: { id: mediaId } } })
-                }
-              );
-              if (evoResp.ok) {
-                const evoData = await evoResp.json();
-                if (evoData.base64) {
-                  const binaryStr = atob(evoData.base64);
-                  const bytes = new Uint8Array(binaryStr.length);
-                  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                  audioBuffer = bytes.buffer;
-                  console.log('[Nina] Audio downloaded via Evolution API');
-                }
-              }
-            } catch (evoErr) {
-              console.error('[Nina] Evolution API download failed:', evoErr);
-            }
-          }
-
-          // Transcribe with Whisper
-          if (audioBuffer && audioBuffer.byteLength > 0) {
-            const formData = new FormData();
-            formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
-            formData.append('model', 'whisper-1');
-
-            const transcribeResp = await fetch(
-              'https://ai.gateway.lovable.dev/v1/audio/transcriptions',
-              { method: 'POST', headers: { 'Authorization': `Bearer ${lovableApiKey}` }, body: formData }
-            );
-
-            if (transcribeResp.ok) {
-              const result = await transcribeResp.json();
-              if (result.text) {
-                message.content = result.text;
-                await supabase.from('messages').update({ content: result.text }).eq('id', message.id);
-                console.log('[Nina] Audio transcribed:', result.text.substring(0, 80));
-              }
-            } else {
-              console.error('[Nina] Whisper error:', transcribeResp.status);
-              message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
-            }
-          } else {
-            message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
           }
         } catch (err) {
-          console.error('[Nina] Audio transcription error:', err);
-          message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
+          console.error(`[Nina] Media resolution error (${message.type}):`, err);
         }
+      }
+
+      if (resolvedContent) {
+        message.content = resolvedContent;
+        await supabase.from('messages').update({ content: resolvedContent }).eq('id', message.id);
+        console.log(`[Nina] Media resolved (${message.type}):`, resolvedContent.substring(0, 80));
       } else {
-        message.content = '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]';
+        message.content = fallbackTextByType[message.type];
       }
     }
   }
@@ -1157,7 +1106,47 @@ async function processQueueItem(
   const origemConversa = await detectarOrigemConversa(supabase, conversation.contact_id, conversation.id, recentMessages || []);
   console.log('[Nina] Origem da conversa:', origemConversa);
 
-  const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa, message.content || '');
+  // ═══════════════════════════════════════════
+  // BASE DE CONHECIMENTO (RAG): busca chunks relevantes para a mensagem atual
+  // ═══════════════════════════════════════════
+  let knowledgeChunks: string[] = [];
+  if (settings?.rag_enabled && message.content) {
+    try {
+      const queryEmbedding = await generateEmbedding(message.content, lovableApiKey);
+      if (queryEmbedding) {
+        const { data: matches, error: matchError } = await supabase.rpc('match_documents', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.72,
+          match_count: 4,
+        });
+        if (matchError) {
+          console.error('[Nina] Erro buscando base de conhecimento:', matchError);
+        } else if (matches?.length) {
+          knowledgeChunks = matches.map((m: any) => m.content);
+          console.log(`[Nina] ${knowledgeChunks.length} chunks relevantes encontrados na base de conhecimento`);
+        }
+      }
+    } catch (ragError) {
+      // Falha no RAG não deve travar a resposta ao cliente — segue sem contexto extra
+      console.error('[Nina] Erro no fluxo de RAG:', ragError);
+    }
+  }
+
+  const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa, message.content || '', knowledgeChunks);
+
+  // Dispara o motor de automação (gatilho 'new_message') em background — a
+  // mensagem já está resolvida (mídia/RAG), então condições sobre o conteúdo
+  // avaliam o texto real, não um placeholder.
+  fetch(`${supabaseUrl}/functions/v1/automation-executor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+    body: JSON.stringify({
+      event_type: 'new_message',
+      contact_id: conversation.contact_id,
+      conversation_id: conversation.id,
+      message_content: message.content,
+    }),
+  }).catch((err) => console.error('[Nina] Error triggering automation-executor:', err));
 
   // Fetch deal data
   let dealData: any = null;
@@ -1701,7 +1690,7 @@ function detectExplicitIntent(msg: string): { has: boolean; desc: string } {
   return { has: false, desc: '' };
 }
 
-function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any, origemConversa?: { origem: string; detalhes: string }, latestUserMessage = ''): string {
+function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any, origemConversa?: { origem: string; detalhes: string }, latestUserMessage = '', knowledgeChunks: string[] = []): string {
   const intent = detectExplicitIntent(latestUserMessage);
   let contextInfo = '';
 
@@ -1761,6 +1750,14 @@ ATENÇÃO: O lead acabou de expressar intenção explícita: "${intent.desc}".
 </intencao_explicita>`;
   }
 
+  let knowledgeBaseInfo = '';
+  if (knowledgeChunks.length > 0) {
+    knowledgeBaseInfo = `\n\n<base_de_conhecimento>
+Use as informações abaixo SOMENTE se forem relevantes para a pergunta do cliente. Não invente informações fora daqui e não mencione que está consultando uma "base de conhecimento".
+${knowledgeChunks.map((chunk, i) => `[${i + 1}] ${chunk}`).join('\n\n')}
+</base_de_conhecimento>`;
+  }
+
   const antiDoubleMessageInstruction = `
 
 INSTRUÇÃO CRÍTICA DE FORMATO:
@@ -1771,7 +1768,7 @@ INSTRUÇÃO CRÍTICA DE FORMATO:
 - Use Enter simples se precisar de quebra de linha
 - NUNCA adicione "(opcional)", "(se quiser)" ou qualificadores entre parênteses nas mensagens`;
 
-  return basePrompt + contextInfo + antiDoubleMessageInstruction;
+  return basePrompt + contextInfo + knowledgeBaseInfo + antiDoubleMessageInstruction;
 }
 
 function breakMessageIntoChunks(content: string): string[] {

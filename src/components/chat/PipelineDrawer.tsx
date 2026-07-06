@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { KanbanSquare, Loader2 } from 'lucide-react';
 import { CreateDealModal } from '@/components/CreateDealModal';
+import { DealProductsPanel } from '@/components/deals/DealProductsPanel';
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 const dealSchema = z.object({
@@ -32,7 +33,7 @@ interface PipelineDrawerProps {
   onClose: () => void;
   contactId: string;
   contactName: string;
-  teamMembers: { id: string; name: string; role: string }[];
+  teamMembers: { id: string; name: string; role: string; status?: string }[];
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -189,11 +190,17 @@ export function PipelineDrawer({
               <div className="space-y-1.5">
                 <Label className="text-xs text-slate-400">Responsável</Label>
                 <select className={selectClass} {...register('owner_id')}>
-                  <option value="">Não atribuído</option>
-                  {teamMembers.map((m) => (
+                  <option value="">Automático (Round-Robin)</option>
+                  {teamMembers
+                    .filter((m) => !m.status || m.status === 'active')
+                    .map((m) => (
                     <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-1.5 border-t border-slate-800 pt-4">
+                <DealProductsPanel dealId={deal.id} />
               </div>
 
               <div className="space-y-1.5">

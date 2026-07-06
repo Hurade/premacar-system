@@ -1,12 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { downloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/audio/transcriptions";
+// Placeholders salvos pelos webhooks (Meta/Evolution) enquanto a mídia não é resolvida
+const MEDIA_PLACEHOLDERS = [
+  '[áudio - processando transcrição...]',
+  '[áudio recebido]',
+  '[imagem recebida]',
+  '[documento recebido]',
+  '[vídeo recebido]',
+];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -179,14 +187,14 @@ serve(async (req) => {
             .eq('id', lastDbMessage.id);
           
           console.log(`[MessageGrouper] Updated last message with combined content`);
-        } else if (dbMessages[0].type === 'audio' && combinedContent !== dbMessages[0].content) {
-          // Update single audio message with transcription
+        } else if (['audio', 'image', 'document'].includes(dbMessages[0].type) && combinedContent !== dbMessages[0].content) {
+          // Update single media message with the resolved content (transcrição/descrição/texto extraído)
           await supabase
             .from('messages')
             .update({ content: combinedContent })
             .eq('id', dbMessages[0].id);
-          
-          console.log(`[MessageGrouper] Updated audio message with transcription`);
+
+          console.log(`[MessageGrouper] Updated ${dbMessages[0].type} message with resolved content`);
         }
 
         // If conversation is handled by Nina, queue for AI processing
@@ -261,7 +269,7 @@ serve(async (req) => {
   }
 });
 
-// Combine content from multiple messages and transcribe audio
+// Combine content from multiple messages, resolvendo mídia (áudio/imagem/documento)
 async function combineAndTranscribeMessages(
   supabase: any,
   queueMessages: any[],
@@ -271,126 +279,51 @@ async function combineAndTranscribeMessages(
 ): Promise<string> {
   const contentParts: string[] = [];
 
+  // Aceita tanto meta_access_token quanto whatsapp_access_token (nomes usados
+  // em diferentes pontos do schema para a mesma credencial da Meta API).
+  const accessToken = settings?.meta_access_token || settings?.whatsapp_access_token;
+  const mediaSettings = { ...settings, meta_access_token: accessToken };
+
   for (let i = 0; i < queueMessages.length; i++) {
     const queueMsg = queueMessages[i];
     const dbMsg = dbMessages.find(m => m.id === queueMsg.message_id);
-    const messageData = queueMsg.message_data;
-    
+
     if (!dbMsg) continue;
 
     let content = dbMsg.content || '';
 
-    // Handle audio transcription
-    if (messageData.type === 'audio') {
-      const audioMediaId = messageData.audio?.id;
-      const accessToken = settings?.meta_access_token || settings?.whatsapp_access_token;
-      if (audioMediaId && accessToken && lovableApiKey) {
-        console.log('[MessageGrouper] Transcribing audio:', audioMediaId);
-        const audioBuffer = await downloadWhatsAppMedia({ ...settings, whatsapp_access_token: accessToken }, audioMediaId);
-        if (audioBuffer) {
-          const transcription = await transcribeAudio(audioBuffer, lovableApiKey);
-          if (transcription) {
-            content = transcription;
-            // Update the message in database with transcription
-            await supabase
-              .from('messages')
-              .update({ content: transcription })
-              .eq('id', dbMsg.id);
-          }
+    // Resolve mídia com base na própria mensagem salva (media_url + type),
+    // não no payload do webhook — funciona igual para Meta e Evolution.
+    if (dbMsg.media_url && ['audio', 'image', 'document'].includes(dbMsg.type) && lovableApiKey) {
+      console.log(`[MessageGrouper] Resolvendo mídia (${dbMsg.type}):`, dbMsg.media_url);
+      const mediaBuffer = await downloadMedia(mediaSettings, dbMsg.media_url);
+
+      if (mediaBuffer && mediaBuffer.byteLength > 0) {
+        let resolved: string | null = null;
+        if (dbMsg.type === 'audio') {
+          resolved = await transcribeAudio(mediaBuffer, lovableApiKey);
+        } else if (dbMsg.type === 'image') {
+          resolved = await describeImage(mediaBuffer, 'image/jpeg', lovableApiKey, dbMsg.content);
+        } else if (dbMsg.type === 'document') {
+          resolved = await extractPdfText(mediaBuffer);
+        }
+
+        if (resolved) {
+          content = resolved;
+          await supabase
+            .from('messages')
+            .update({ content: resolved })
+            .eq('id', dbMsg.id);
         }
       }
     }
 
-    if (content && content !== '[áudio - processando transcrição...]') {
+    if (content && !MEDIA_PLACEHOLDERS.includes(content)) {
       contentParts.push(content);
     }
   }
 
   return contentParts.join('\n');
-}
-
-// Download media from WhatsApp API
-async function downloadWhatsAppMedia(settings: any, mediaId: string): Promise<ArrayBuffer | null> {
-  if (!settings?.whatsapp_access_token) {
-    console.error('[MessageGrouper] No WhatsApp access token configured');
-    return null;
-  }
-
-  try {
-    const mediaInfoResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${mediaId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${settings.whatsapp_access_token}`
-        }
-      }
-    );
-
-    if (!mediaInfoResponse.ok) {
-      console.error('[MessageGrouper] Failed to get media info:', await mediaInfoResponse.text());
-      return null;
-    }
-
-    const mediaInfo = await mediaInfoResponse.json();
-    const mediaUrl = mediaInfo.url;
-
-    if (!mediaUrl) {
-      console.error('[MessageGrouper] No media URL in response');
-      return null;
-    }
-
-    const mediaResponse = await fetch(mediaUrl, {
-      headers: {
-        'Authorization': `Bearer ${settings.whatsapp_access_token}`
-      }
-    });
-
-    if (!mediaResponse.ok) {
-      console.error('[MessageGrouper] Failed to download media:', await mediaResponse.text());
-      return null;
-    }
-
-    return await mediaResponse.arrayBuffer();
-  } catch (error) {
-    console.error('[MessageGrouper] Error downloading media:', error);
-    return null;
-  }
-}
-
-// Transcribe audio using Lovable AI Gateway (Whisper)
-async function transcribeAudio(audioBuffer: ArrayBuffer, lovableApiKey: string): Promise<string | null> {
-  try {
-    console.log('[MessageGrouper] Transcribing audio, size:', audioBuffer.byteLength, 'bytes');
-
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg' });
-    formData.append('file', audioBlob, 'audio.ogg');
-    formData.append('model', 'whisper-1');
-    formData.append('language', 'pt');
-
-    const response = await fetch(LOVABLE_AI_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`
-      },
-      body: formData
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[MessageGrouper] Transcription error:', response.status, errorText);
-      return null;
-    }
-
-    const result = await response.json();
-    const transcription = result.text;
-    
-    console.log('[MessageGrouper] Transcription result:', transcription);
-    return transcription || null;
-  } catch (error) {
-    console.error('[MessageGrouper] Error transcribing audio:', error);
-    return null;
-  }
 }
 
 // Schedule next processing if there are pending messages with future process_after

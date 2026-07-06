@@ -44,6 +44,7 @@ import { useConversationWindow } from '@/hooks/useConversationWindow';
 import { WindowStatusBadge } from './chat/WindowStatusBadge';
 import { WindowExpiredAlert } from './chat/WindowExpiredAlert';
 import { PipelineDrawer } from './chat/PipelineDrawer';
+import { VoiceCallsPanel } from './chat/VoiceCallsPanel';
 import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -583,7 +584,8 @@ const ChatInterface: React.FC = () => {
     return (
       chat.contactName.toLowerCase().includes(query) ||
       chat.contactPhone.includes(query) ||
-      chat.lastMessage.toLowerCase().includes(query)
+      chat.lastMessage.toLowerCase().includes(query) ||
+      (chat.protocolNumber?.toLowerCase().includes(query) ?? false)
     );
   });
 
@@ -1171,6 +1173,9 @@ const ChatInterface: React.FC = () => {
                       )}
                     </h2>
                     <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
+                    {activeChat.protocolNumber && (
+                      <p className="text-[10px] text-slate-500 font-mono">Protocolo {activeChat.protocolNumber}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1727,6 +1732,10 @@ const ChatInterface: React.FC = () => {
                     Total de conversas: {activeChat.clientMemory.interaction_summary.total_conversations}
                   </div>
                 </div>
+
+                <div className="h-px bg-slate-800/50 w-full"></div>
+
+                <VoiceCallsPanel contactId={activeChat.contactId} />
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
 

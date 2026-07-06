@@ -412,7 +412,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 }`}
               >
                 <span className="text-lg">⚡</span>
-                <span className="text-xs font-medium">Flash</span>
+                <span className="text-xs font-medium">Gemini 2.5 Flash</span>
                 <span className="text-[10px] text-center opacity-70">Rápido</span>
               </button>
               <button
@@ -425,7 +425,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 }`}
               >
                 <span className="text-lg">🧠</span>
-                <span className="text-xs font-medium">Pro 2.5</span>
+                <span className="text-xs font-medium">Gemini 2.5 Pro</span>
                 <span className="text-[10px] text-center opacity-70">Inteligente</span>
               </button>
               <button
@@ -438,7 +438,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 }`}
               >
                 <span className="text-lg">🚀</span>
-                <span className="text-xs font-medium">Pro 3</span>
+                <span className="text-xs font-medium">Gemini 3 Pro</span>
                 <span className="text-[10px] text-center opacity-70">Mais Recente</span>
               </button>
               <button
@@ -452,14 +452,14 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
               >
                 <span className="text-lg">🎯</span>
                 <span className="text-xs font-medium">Adaptativo</span>
-                <span className="text-[10px] text-center opacity-70">Contexto</span>
+                <span className="text-[10px] text-center opacity-70">Por contexto</span>
               </button>
             </div>
             <p className="text-xs text-slate-500 mt-2">
               {settings.ai_model_mode === 'flash' && 'Gemini 2.5 Flash: respostas rápidas e econômicas'}
               {settings.ai_model_mode === 'pro' && 'Gemini 2.5 Pro: respostas elaboradas e inteligentes'}
               {settings.ai_model_mode === 'pro3' && 'Gemini 3 Pro: modelo mais recente e avançado'}
-              {settings.ai_model_mode === 'adaptive' && 'Alterna automaticamente baseado no contexto da conversa'}
+              {settings.ai_model_mode === 'adaptive' && 'Escolhe automaticamente entre Flash/Pro/Pro 3 conforme a complexidade da conversa'}
             </p>
           </div>
 

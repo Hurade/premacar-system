@@ -243,6 +243,7 @@ export interface DBConversation {
   is_active: boolean;
   assigned_user_id: string | null;
   assigned_team: string | null;
+  protocol_number?: string | null;
   tags: string[];
   metadata: Record<string, any>;
   nina_context: Record<string, any>;
@@ -277,13 +278,13 @@ export interface DBMessage {
   api_source?: string | null;
 }
 
-// Resolve media URL: Meta media IDs need to go through our proxy
+// Resolve media URL: Meta media IDs e Evolution whatsapp_message_ids precisam
+// passar pelo media-proxy (que tenta Meta e cai para Evolution automaticamente).
 function resolveMediaUrl(mediaUrl: string | null, apiSource?: string | null): string | null {
   if (!mediaUrl) return null;
   // If it's already a full URL, return as-is
   if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) return mediaUrl;
-  // If it's a Meta media ID, use the proxy edge function
-  if (apiSource === 'meta') {
+  if (apiSource === 'meta' || apiSource === 'evolution') {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     return `${supabaseUrl}/functions/v1/media-proxy?id=${encodeURIComponent(mediaUrl)}`;
   }
@@ -303,6 +304,7 @@ export interface UIConversation {
   assignedTeam: string | null;
   assignedUserId: string | null;
   assignedUserName: string | null;
+  protocolNumber: string | null;
   apiSource: ApiSource;
   lastMessage: string;
   lastMessageTime: string;
@@ -354,6 +356,7 @@ export function transformDBToUIConversation(
     assignedTeam: conv.assigned_team,
     assignedUserId: conv.assigned_user_id,
     assignedUserName: null, // Will be populated if needed
+    protocolNumber: conv.protocol_number || null,
     apiSource: (conv.api_source as ApiSource) || 'evolution',
     lastMessage: lastMsg?.content || '',
     lastMessageTime: formatRelativeTime(conv.last_message_at),

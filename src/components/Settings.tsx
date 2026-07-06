@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
@@ -8,6 +8,8 @@ import IntegrationSettings from './integrations/IntegrationSettings';
 import { ConnectionsManager } from './connections/ConnectionsManager';
 import { MetaTemplatesManager } from './broadcasts/MetaTemplates';
 import QuickRepliesSettings from './settings/QuickRepliesSettings';
+import KnowledgeBaseSettings from './settings/KnowledgeBaseSettings';
+import CustomFieldsSettings from './settings/CustomFieldsSettings';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
 import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
@@ -117,13 +119,21 @@ const Settings: React.FC = () => {
               <Zap className="w-4 h-4" />
               Resp. Rápidas
             </TabsTrigger>
+            <TabsTrigger value="knowledge" className="gap-2">
+              <Database className="w-4 h-4" />
+              Base de Conhecimento
+            </TabsTrigger>
+            <TabsTrigger value="custom-fields" className="gap-2">
+              <ListPlus className="w-4 h-4" />
+              Campos Personalizados
+            </TabsTrigger>
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
             </TabsTrigger>
           </TabsList>
 
-          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'quick-replies' && isAdmin && (
+          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'quick-replies' && activeTab !== 'knowledge' && activeTab !== 'custom-fields' && isAdmin && (
             <div className="flex gap-3">
               <Button
                 variant="ghost"
@@ -153,7 +163,7 @@ const Settings: React.FC = () => {
             </div>
           )}
           
-          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && !isAdmin && (
+          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'knowledge' && activeTab !== 'custom-fields' && !isAdmin && (
             <div className="flex items-center gap-2 text-sm text-amber-400">
               <Lock className="w-4 h-4" />
               Apenas administradores podem editar
@@ -181,6 +191,12 @@ const Settings: React.FC = () => {
         </TabsContent>
         <TabsContent value="quick-replies">
           <QuickRepliesSettings />
+        </TabsContent>
+        <TabsContent value="knowledge">
+          <KnowledgeBaseSettings />
+        </TabsContent>
+        <TabsContent value="custom-fields">
+          <CustomFieldsSettings />
         </TabsContent>
         <TabsContent value="docs">
           <SystemRoadmap />

@@ -12,6 +12,7 @@ import { supabase } from '../integrations/supabase/client';
 import { CreateDealModal } from './CreateDealModal';
 import { LostReasonModal } from './LostReasonModal';
 import { PipelineSettingsModal } from './PipelineSettingsModal';
+import { DealProductsPanel } from './deals/DealProductsPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -575,7 +576,9 @@ const Kanban: React.FC = () => {
                                     </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {teamMembers.map(member => (
+                                    {teamMembers
+                                      .filter(member => member.status === 'active')
+                                      .map(member => (
                                       <SelectItem key={member.id} value={member.id}>
                                         {member.name}
                                       </SelectItem>
@@ -796,6 +799,11 @@ const Kanban: React.FC = () => {
                               </p>
                             )}
                           </div>
+                        </div>
+
+                        {/* Produtos */}
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                          <DealProductsPanel dealId={selectedDeal.id} />
                         </div>
 
                         {/* Tags */}

@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ContactFolder } from './FolderManager';
 import { TagDefinition } from './TagManager';
+import { CustomFieldsSection } from './CustomFieldsSection';
 
 interface EditContactModalProps {
   isOpen: boolean;
@@ -104,6 +105,8 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
         }
       }
 
+      const newlyAddedTags = selectedTags.filter((t) => !(contact.tags || []).includes(t));
+
       const { error } = await supabase
         .from('contacts')
         .update({
@@ -117,6 +120,12 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
         .eq('id', contact.id);
 
       if (error) throw error;
+
+      if (newlyAddedTags.length > 0) {
+        supabase.functions.invoke('automation-executor', {
+          body: { event_type: 'tag_applied', contact_id: contact.id, tags: newlyAddedTags },
+        }).catch((err) => console.error('[EditContactModal] Error triggering automation-executor:', err));
+      }
 
       toast.success('Contato atualizado com sucesso!');
       onContactUpdated();
@@ -256,6 +265,8 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
               </p>
             )}
           </div>
+
+          <CustomFieldsSection contactId={contact.id} />
 
           <div className="flex gap-3 pt-2">
             <Button

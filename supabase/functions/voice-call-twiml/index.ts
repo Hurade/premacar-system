@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { saveLog } from "../_shared/logger.ts"
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -23,6 +24,13 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     }).eq('call_sid', callSid)
 
+    await saveLog(supabase, {
+      source: 'twilio-call',
+      level: callStatus === 'failed' || callStatus === 'busy' || callStatus === 'no-answer' ? 'warning' : 'info',
+      message: 'Call status callback',
+      metadata: { call_sid: callSid, status: callStatus, duration_seconds: duration }
+    })
+
     return new Response('<Response/>', { headers: { 'Content-Type': 'text/xml' } })
   }
 
@@ -36,6 +44,13 @@ serve(async (req) => {
       dtmf_response: digit,
       updated_at: new Date().toISOString()
     }).eq('call_sid', callSid)
+
+    await saveLog(supabase, {
+      source: 'twilio-call',
+      level: 'info',
+      message: 'DTMF response received',
+      metadata: { call_sid: callSid, digit, contact_id: contactId }
+    })
 
     if (digit === '1' && contactId) {
       const { data: contact } = await supabase

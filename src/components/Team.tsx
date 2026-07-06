@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, ShieldCheck, Crown, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, ShieldCheck, Crown, KeyRound, Eye, EyeOff, Clock } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
 import { TeamMember, type Team as TeamType, type TeamFunction } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import TeamConfigModal from './TeamConfigModal';
+import { MemberScheduleModal } from './team/MemberScheduleModal';
 import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import { RoleGate } from './RoleGate';
@@ -14,6 +15,8 @@ const Team: React.FC = () => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teams, setTeams] = useState<TeamType[]>([]);
   const [functions, setFunctions] = useState<TeamFunction[]>([]);
+  const [openDealsByOwner, setOpenDealsByOwner] = useState<Record<string, number>>({});
+  const [scheduleMember, setScheduleMember] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -60,11 +63,32 @@ const Team: React.FC = () => {
       setMembers(membersData);
       setTeams(teamsData);
       setFunctions(functionsData);
+      await loadOpenDealsByOwner();
     } catch (error) {
       console.error("Erro ao carregar dados da equipe", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadOpenDealsByOwner = async () => {
+    const { data, error } = await supabase
+      .from('deals')
+      .select('owner_id')
+      .is('won_at', null)
+      .is('lost_at', null)
+      .not('owner_id', 'is', null);
+
+    if (error) {
+      console.error('Erro ao carregar carga de deals por responsável', error);
+      return;
+    }
+
+    const counts: Record<string, number> = {};
+    (data || []).forEach((row) => {
+      if (row.owner_id) counts[row.owner_id] = (counts[row.owner_id] || 0) + 1;
+    });
+    setOpenDealsByOwner(counts);
   };
 
   const setupRealtime = () => {
@@ -380,6 +404,7 @@ const Team: React.FC = () => {
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Time</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Função</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Peso</th>
+                            <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center" title="Deals abertos atribuídos a este membro (round-robin)">Carga atual</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center">Status</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center">Ações</th>
                         </tr>
@@ -481,6 +506,13 @@ const Team: React.FC = () => {
                                     )}
                                 </td>
 
+                                {/* Open deals load */}
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                    <span className="text-sm text-slate-400">
+                                      {openDealsByOwner[member.id] || 0}
+                                    </span>
+                                </td>
+
                                 {/* Status */}
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                     {getStatusBadge(member.status)}
@@ -491,7 +523,14 @@ const Team: React.FC = () => {
                                     <div className="flex items-center justify-center gap-1">
                                         {isAdmin && (
                                           <>
-                                            <button 
+                                            <button
+                                                onClick={() => setScheduleMember(member)}
+                                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                                                title="Configurar horário de trabalho"
+                                            >
+                                                <Clock className="w-4 h-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => handleEditClick(member)}
                                                 className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
                                                 title="Editar membro"
@@ -657,11 +696,20 @@ const Team: React.FC = () => {
       )}
 
       {/* Config Modal */}
-      <TeamConfigModal 
-        isOpen={showConfigModal} 
-        onClose={() => setShowConfigModal(false)} 
+      <TeamConfigModal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
         onUpdate={loadAllData}
       />
+
+      {/* Member Schedule Modal */}
+      {scheduleMember && (
+        <MemberScheduleModal
+          teamMemberId={scheduleMember.id}
+          memberName={scheduleMember.name}
+          onClose={() => setScheduleMember(null)}
+        />
+      )}
 
       {/* Edit Member Modal */}
       {showEditModal && editingMember && (

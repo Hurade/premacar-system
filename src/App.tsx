@@ -16,6 +16,7 @@ import CampaignDetails from './pages/CampaignDetails';
 import Logs from './pages/Logs';
 import Followup from './pages/Followup';
 import Agentes from './pages/Agentes';
+import Automacoes from './pages/Automacoes';
 import BroadcastDetails from './pages/BroadcastDetails';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -28,10 +29,19 @@ import PropostaPublica from './pages/propostas/PropostaPublica';
 import Biblioteca from './pages/propostas/Biblioteca';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 import { UserRoleProvider } from './hooks/useUserRole';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
+import { useOnlinePresence } from './hooks/useOnlinePresence';
+
+// Sem UI própria — só mantém a sessão do usuário logado marcada como "online"
+// via Presence API do Supabase Realtime enquanto o app estiver aberto.
+const PresenceTracker: React.FC = () => {
+  const { user } = useAuth();
+  useOnlinePresence(user);
+  return null;
+};
 
 
 const queryClient = new QueryClient();
@@ -50,6 +60,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/logs': 'PremaCar - Logs',
   '/followup': 'PremaCar - Follow-up',
   '/agentes': 'PremaCar - Agentes de IA',
+  '/automacoes': 'PremaCar - Automações',
   '/auth': 'PremaCar - Login',
   '/propostas': 'PremaCar - Propostas',
   '/propostas/leads': 'PremaCar - Leads',
@@ -71,6 +82,7 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
+      <PresenceTracker />
       {/* Background Ambient Glows */}
       <div className="fixed top-0 left-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[128px] pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0"></div>
       <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[128px] pointer-events-none translate-x-1/2 translate-y-1/2 z-0"></div>
@@ -161,6 +173,11 @@ const App: React.FC = () => {
                   <Route path="/broadcasts/:id" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
                       <BroadcastDetails />
+                    </RoleGate>
+                  } />
+                  <Route path="/automacoes" element={
+                    <RoleGate allowedRoles={['admin', 'manager']}>
+                      <Automacoes />
                     </RoleGate>
                   } />
                   <Route path="/agentes" element={

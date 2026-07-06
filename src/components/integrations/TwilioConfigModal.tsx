@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { Eye, EyeOff, ExternalLink, CheckCircle, Copy, Loader2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { IntegrationSettingsData } from '@/hooks/useIntegrationSettings';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TwilioConfigModalProps {
   open: boolean;
@@ -17,7 +18,7 @@ interface TwilioConfigModalProps {
 const TwilioConfigModal: React.FC<TwilioConfigModalProps> = ({ open, onClose, currentConfig, onSave }) => {
   const [showToken, setShowToken] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string; friendly_name?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState({
     account_sid: currentConfig?.twilio_account_sid || '',
@@ -33,11 +34,18 @@ const TwilioConfigModal: React.FC<TwilioConfigModalProps> = ({ open, onClose, cu
       return;
     }
     setTesting(true);
-    // Simulate test (actual test would need edge function)
-    setTimeout(() => {
-      setTestResult({ success: true });
+    setTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('test-twilio-connection', {
+        body: { account_sid: config.account_sid, auth_token: config.auth_token },
+      });
+      if (error) throw error;
+      setTestResult(data);
+    } catch (err: any) {
+      setTestResult({ success: false, error: err.message || 'Erro ao testar conexão' });
+    } finally {
       setTesting(false);
-    }, 1500);
+    }
   };
 
   const handleSave = async () => {
@@ -129,7 +137,7 @@ const TwilioConfigModal: React.FC<TwilioConfigModalProps> = ({ open, onClose, cu
           {testResult && (
             <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${testResult.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               {testResult.success ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-              {testResult.success ? 'Conexão testada com sucesso!' : `Erro: ${testResult.error}`}
+              {testResult.success ? `Conexão testada com sucesso! (${testResult.friendly_name || 'conta válida'})` : `Erro: ${testResult.error}`}
             </div>
           )}
 

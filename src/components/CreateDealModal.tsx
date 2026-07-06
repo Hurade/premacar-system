@@ -533,13 +533,15 @@ export const CreateDealModal: React.FC<CreateDealModalProps> = ({
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200 focus:ring-cyan-500 focus:border-cyan-500">
-                            <SelectValue placeholder="Selecione" />
+                            <SelectValue placeholder="Automático (Round-Robin)" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="bg-slate-800 border-slate-600">
-                          {teamMembers.map((member) => (
-                            <SelectItem 
-                              key={member.id} 
+                          {teamMembers
+                            .filter((member) => member.status === 'active')
+                            .map((member) => (
+                            <SelectItem
+                              key={member.id}
                               value={member.id}
                               className="text-slate-200 focus:bg-cyan-600 focus:text-white"
                             >
@@ -548,6 +550,9 @@ export const CreateDealModal: React.FC<CreateDealModalProps> = ({
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormDescription className="text-slate-500">
+                        Deixe vazio para atribuição automática por round-robin
+                      </FormDescription>
                       <FormMessage className="text-red-400" />
                     </FormItem>
                   )}
