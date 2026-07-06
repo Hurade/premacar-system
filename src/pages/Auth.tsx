@@ -36,18 +36,18 @@ const Auth: React.FC = () => {
     
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
-      newErrors.email = emailResult.error.errors[0].message;
+      newErrors.email = emailResult.error.issues[0].message;
     }
     
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
-      newErrors.password = passwordResult.error.errors[0].message;
+      newErrors.password = passwordResult.error.issues[0].message;
     }
     
     if (!isLogin) {
       const nameResult = nameSchema.safeParse(fullName);
       if (!nameResult.success) {
-        newErrors.fullName = nameResult.error.errors[0].message;
+        newErrors.fullName = nameResult.error.issues[0].message;
       }
     }
     
