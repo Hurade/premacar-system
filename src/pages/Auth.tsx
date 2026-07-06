@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
@@ -23,31 +23,36 @@ const Auth: React.FC = () => {
   
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Same-origin relative path only, must start with '/' and not '//'
+  const rawNext = searchParams.get('next');
+  const nextPath = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard';
 
   // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard', { replace: true });
+      navigate(nextPath, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, nextPath]);
 
   const validateForm = (): boolean => {
     const newErrors: { email?: string; password?: string; fullName?: string } = {};
     
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
-      newErrors.email = emailResult.error.errors[0].message;
+      newErrors.email = emailResult.error.issues[0].message;
     }
     
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
-      newErrors.password = passwordResult.error.errors[0].message;
+      newErrors.password = passwordResult.error.issues[0].message;
     }
     
     if (!isLogin) {
       const nameResult = nameSchema.safeParse(fullName);
       if (!nameResult.success) {
-        newErrors.fullName = nameResult.error.errors[0].message;
+        newErrors.fullName = nameResult.error.issues[0].message;
       }
     }
     
@@ -76,7 +81,7 @@ const Auth: React.FC = () => {
           return;
         }
         toast.success('Login realizado com sucesso!');
-        navigate('/dashboard', { replace: true });
+        navigate(nextPath, { replace: true });
       } else {
         const { error } = await signUp(email, password, fullName);
         if (error) {
@@ -88,7 +93,7 @@ const Auth: React.FC = () => {
           return;
         }
         toast.success('Conta criada com sucesso! Você já pode usar a plataforma.');
-        navigate('/dashboard', { replace: true });
+        navigate(nextPath, { replace: true });
       }
     } finally {
       setIsSubmitting(false);
