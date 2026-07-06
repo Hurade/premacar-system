@@ -81,7 +81,7 @@ const Auth: React.FC = () => {
           return;
         }
         toast.success('Login realizado com sucesso!');
-        navigate('/dashboard', { replace: true });
+        navigate(nextPath, { replace: true });
       } else {
         const { error } = await signUp(email, password, fullName);
         if (error) {
@@ -93,7 +93,7 @@ const Auth: React.FC = () => {
           return;
         }
         toast.success('Conta criada com sucesso! Você já pode usar a plataforma.');
-        navigate('/dashboard', { replace: true });
+        navigate(nextPath, { replace: true });
       }
     } finally {
       setIsSubmitting(false);
