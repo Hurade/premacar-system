@@ -19,6 +19,7 @@ import Agentes from './pages/Agentes';
 import Automacoes from './pages/Automacoes';
 import BroadcastDetails from './pages/BroadcastDetails';
 import Auth from './pages/Auth';
+import OAuthConsent from './pages/OAuthConsent';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
 import PropostasDashboard from './pages/propostas/PropostasDashboard';
@@ -117,6 +118,8 @@ const App: React.FC = () => {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+                
                 
                 {/* Protected Routes (With Sidebar) */}
                 <Route element={
