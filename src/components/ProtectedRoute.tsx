@@ -23,8 +23,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!user) {
-    // Save the attempted URL for redirecting after login
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    // Preserve full path + search so OAuth consent (/.lovable/oauth/consent?...) returns here
+    const next = location.pathname + location.search;
+    return <Navigate to={`/auth?next=${encodeURIComponent(next)}`} replace />;
   }
 
   return <>{children}</>;
