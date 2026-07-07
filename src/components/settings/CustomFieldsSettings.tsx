@@ -44,7 +44,7 @@ const CustomFieldsSettings: React.FC = () => {
     );
   };
 
-  const startEdit = (field: (typeof fields)[number]) => {
+  const startEdit = (field: NonNullable<typeof fields>[number]) => {
     setEditingId(field.id);
     setForm({ nome: field.nome, tipo: field.tipo, opcoesText: field.opcoes.join(', '), obrigatorio: field.obrigatorio });
   };
