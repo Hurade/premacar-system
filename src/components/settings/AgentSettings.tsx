@@ -29,6 +29,7 @@ interface AgentSettings {
   message_grouping_enabled: boolean;
   message_grouping_delay: number;
   ai_activation_delay_minutes: number;
+  scheduling_notify_phone: string | null;
 }
 
 const DAYS_OF_WEEK = [
@@ -69,6 +70,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     message_grouping_enabled: true,
     message_grouping_delay: 20000,
     ai_activation_delay_minutes: 5,
+    scheduling_notify_phone: null,
   });
 
   useImperativeHandle(ref, () => ({
@@ -125,6 +127,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
         message_grouping_enabled: data.message_grouping_enabled ?? true,
         message_grouping_delay: data.message_grouping_delay ?? 20000,
         ai_activation_delay_minutes: data.ai_activation_delay_minutes ?? 5,
+        scheduling_notify_phone: data.scheduling_notify_phone ?? null,
       });
     } catch (error) {
       console.error('[AgentSettings] Error loading settings:', error);
@@ -155,6 +158,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           message_grouping_enabled: settings.message_grouping_enabled,
           message_grouping_delay: settings.message_grouping_delay,
           ai_activation_delay_minutes: settings.ai_activation_delay_minutes,
+          scheduling_notify_phone: settings.scheduling_notify_phone,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id!);
@@ -338,6 +342,21 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                   placeholder="Nome do agente (ex: Ana, Sofia)"
                   className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 block">
+                  Número para notificação de novos leads
+                </label>
+                <input
+                  type="tel"
+                  value={settings.scheduling_notify_phone || ''}
+                  onChange={(e) => setSettings({ ...settings, scheduling_notify_phone: e.target.value || null })}
+                  placeholder="Ex: 5548999999999 (com DDI e DDD, sem espaços)"
+                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Recebe aviso via WhatsApp quando um lead aceita a demonstração.
+                </p>
               </div>
             </div>
           </div>

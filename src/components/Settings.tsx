@@ -93,7 +93,8 @@ const Settings: React.FC = () => {
       </div>
 
       <Tabs defaultValue="agent" className="w-full" onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-wrap items-center justify-between mb-8 gap-3">
+          <div className="overflow-x-auto pb-1 -mb-1 max-w-full">
           <TabsList>
             <TabsTrigger value="agent" className="gap-2">
               <Bot className="w-4 h-4" />
@@ -132,6 +133,7 @@ const Settings: React.FC = () => {
               Documentação
             </TabsTrigger>
           </TabsList>
+          </div>
 
           {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'quick-replies' && activeTab !== 'knowledge' && activeTab !== 'custom-fields' && isAdmin && (
             <div className="flex gap-3">
