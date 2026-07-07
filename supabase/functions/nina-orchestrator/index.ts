@@ -39,17 +39,21 @@ const handoffToHumanTool = {
   type: "function",
   function: {
     name: "request_demo_handoff",
-    description: "Acionar APENAS quando o lead pede explicitamente para falar com um humano/atendente real, ou quando há um problema complexo que a IA não consegue resolver. NÃO usar para agendamento de demonstração — para agendar demo, inclua o marcador [AGENDAR_DEMO] na resposta.",
+    description: "Acionar quando o lead pede para falar com um humano/atendente real, quando há um problema complexo que a IA não consegue resolver, OU quando o lead CONFIRMA que quer agendar uma demonstração. Para agendamento, marque is_scheduling=true — NUNCA confirme um horário específico como já agendado; a equipe comercial confirma manualmente depois.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
-          description: "Motivo da transferência: por que o lead precisa falar com um humano agora"
+          description: "Motivo da transferência: por que o lead precisa falar com um humano agora, ou por que quer agendar uma demonstração"
         },
         preferred_time: {
           type: "string",
           description: "Horário/dia que o lead mencionou preferir (se informou). Ex: 'terça de manhã', 'qualquer horário', 'entre 14h e 16h'"
+        },
+        is_scheduling: {
+          type: "boolean",
+          description: "true quando o motivo da transferência é o lead querendo agendar uma demonstração (em vez de um problema/pedido para falar com humano)"
         }
       },
       required: ["reason"]
@@ -508,7 +512,7 @@ function parseTimeToMinutes(timeStr: string): number {
 async function handoffToHuman(
   supabase: any,
   conversation: any,
-  args: { reason: string; preferred_time?: string }
+  args: { reason: string; preferred_time?: string; is_scheduling?: boolean }
 ): Promise<{ success: boolean; error?: string }> {
   console.log('[Nina] Handoff to human requested:', args);
 
@@ -534,11 +538,12 @@ async function handoffToHuman(
     console.log('[Nina] Conversation switched to human mode');
 
     // Tag the contact
+    const handoffTag = args.is_scheduling ? 'AGENDAMENTO-PENDENTE' : 'DEMO-SOLICITADA';
     const currentTags = contact?.tags || [];
-    if (!currentTags.includes('DEMO-SOLICITADA')) {
+    if (!currentTags.includes(handoffTag)) {
       await supabase
         .from('contacts')
-        .update({ tags: [...currentTags, 'DEMO-SOLICITADA'] })
+        .update({ tags: [...currentTags, handoffTag] })
         .eq('id', conversation.contact_id);
     }
 
@@ -546,7 +551,8 @@ async function handoffToHuman(
     if (notifSettings?.scheduling_notify_commercial && notifSettings?.scheduling_notify_phone) {
       const instance = notifSettings.scheduling_notify_evolution_instance || notifSettings.evolution_instance_name;
 
-      const notifMessage = `🔔 *Novo Lead Qualificado - PremaCar*
+      const notifMessage = args.is_scheduling
+        ? `📅 *Agendamento Pendente de Confirmação - PremaCar*
 
 👤 *Nome:* ${contact?.name || 'Sem nome'}
 📱 *Telefone:* ${contact?.phone_number}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
@@ -555,7 +561,19 @@ async function handoffToHuman(
 ${args.reason}
 ${args.preferred_time ? `\n⏰ *Horário preferido:* ${args.preferred_time}` : ''}
 
-👉 *Ação:* Entre em contato via WhatsApp para agendar a demo.
+👉 *Ação:* O lead está aguardando confirmação do horário da demonstração — entre em contato via WhatsApp para confirmar.
+
+_A conversa já foi transferida para modo humano no sistema._`
+        : `🔔 *Novo Lead Qualificado - PremaCar*
+
+👤 *Nome:* ${contact?.name || 'Sem nome'}
+📱 *Telefone:* ${contact?.phone_number}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
+
+📋 *Contexto:*
+${args.reason}
+${args.preferred_time ? `\n⏰ *Horário preferido:* ${args.preferred_time}` : ''}
+
+👉 *Ação:* Entre em contato via WhatsApp — há uma conversa aguardando atendimento.
 
 _A conversa já foi transferida para modo humano no sistema._`;
 
@@ -773,7 +791,7 @@ async function processQueueItem(
   const { data: message } = await supabase.from('messages').select('*').eq('id', item.message_id).maybeSingle();
   if (!message) throw new Error('Message not found');
 
-  const { data: conversation } = await supabase.from('conversations').select('*, contact:contacts(*), calendar_flow').eq('id', item.conversation_id).maybeSingle();
+  const { data: conversation } = await supabase.from('conversations').select('*, contact:contacts(*)').eq('id', item.conversation_id).maybeSingle();
   if (!conversation) throw new Error('Conversation not found');
 
   if (conversation.status !== 'nina') {
@@ -849,88 +867,11 @@ async function processQueueItem(
   }
 
   // ═══════════════════════════════════════════
-  // CALENDAR FLOW: handle ongoing booking state
-  // ═══════════════════════════════════════════
-  const calendarFlow = conversation.calendar_flow as {
-    state?: string;
-    offered_slots?: { iso: string; label: string }[];
-    selected_slot?: string;
-  } | null;
-
-  if (calendarFlow?.state === 'showing_slots') {
-    console.log('[Nina] 📅 Calendar flow: showing_slots — parsing slot selection');
-    const userText = (message.content || '').trim();
-    const slotIndex = parseSlotSelection(userText, calendarFlow.offered_slots?.length || 0);
-
-    if (slotIndex !== null && calendarFlow.offered_slots?.[slotIndex]) {
-      const selected = calendarFlow.offered_slots[slotIndex];
-      await supabase.from('conversations').update({
-        calendar_flow: { ...calendarFlow, state: 'requesting_email', selected_slot: selected.iso }
-      }).eq('id', conversation.id);
-      await queueCalendarMessage(supabase, conversation, message,
-        `Ótimo! Reservei *${selected.label}* para você 🗓️\n\nPara confirmar e enviar o convite, qual é o seu e-mail?`,
-        settings);
-    } else {
-      await queueCalendarMessage(supabase, conversation, message,
-        `Digite só o número do horário que prefere:\n\n${(calendarFlow.offered_slots || []).map((s, i) => `${i + 1}. ${s.label}`).join('\n')}`,
-        settings);
-    }
-
-    await supabase.from('messages').update({
-      processed_by_nina: true,
-      nina_response_time: Date.now() - new Date(message.sent_at).getTime()
-    }).eq('id', message.id);
-    return;
-  }
-
-  if (calendarFlow?.state === 'requesting_email') {
-    console.log('[Nina] 📅 Calendar flow: requesting_email — parsing email');
-    const userText = (message.content || '').trim();
-    const email = parseEmail(userText);
-
-    if (email && calendarFlow.selected_slot) {
-      try {
-        const eventResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
-          action: 'create_event',
-          user_id: conversation.user_id,
-          slot_iso: calendarFlow.selected_slot,
-          lead_name: conversation.contact?.name || 'Lead',
-          lead_email: email,
-          lead_company: conversation.contact?.company || '',
-          conversation_id: conversation.id,
-          contact_id: conversation.contact_id,
-        });
-
-        await supabase.from('conversations').update({ calendar_flow: null }).eq('id', conversation.id);
-        await supabase.from('contacts').update({ email }).eq('id', conversation.contact_id);
-
-        const slotLabel = formatSlotLabel(calendarFlow.selected_slot);
-        let confirmMsg = `Perfeito! Sua demo está confirmada para *${slotLabel}* 🎉\n\nEnviei um convite para ${email}.`;
-        if (eventResult?.meet_link) confirmMsg += `\n\n🔗 Link: ${eventResult.meet_link}`;
-
-        await queueCalendarMessage(supabase, conversation, message, confirmMsg, settings);
-      } catch (err) {
-        console.error('[Nina] 📅 Calendar event creation failed:', err);
-        await supabase.from('conversations').update({ calendar_flow: null }).eq('id', conversation.id);
-        await queueCalendarMessage(supabase, conversation, message,
-          'Recebi seu e-mail! Nossa equipe vai confirmar o agendamento em breve 😊', settings);
-      }
-    } else {
-      await queueCalendarMessage(supabase, conversation, message,
-        'Não reconheci o e-mail. Pode me enviar de novo? (ex: nome@email.com)', settings);
-    }
-
-    await supabase.from('messages').update({
-      processed_by_nina: true,
-      nina_response_time: Date.now() - new Date(message.sent_at).getTime()
-    }).eq('id', message.id);
-    return;
-  }
-
-  // ═══════════════════════════════════════════
   // SCHEDULING AUTO-TRIGGER: Lead respondeu com dia/horário após AI perguntar
+  // sobre agendamento — aciona direto o handoff (sem prometer horário
+  // específico), evitando esperar mais um turno da IA.
   // ═══════════════════════════════════════════
-  if (!calendarFlow && settings.ai_scheduling_enabled !== false) {
+  if (settings.ai_scheduling_enabled !== false) {
     const { data: lastNinaMsgRaw } = await supabase
       .from('messages')
       .select('content')
@@ -953,38 +894,19 @@ async function processQueueItem(
     const userGavTimePreference = TIME_PATTERNS.some(p => p.test(message.content || ''));
 
     if (aiAskedAboutTime && userGavTimePreference) {
-      console.log('[Nina] 📅 SCHEDULING AUTO-TRIGGER: lead respondeu com preferência de horário, iniciando calendar flow diretamente');
-      let autoTriggered = false;
-      try {
-        const slotsResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
-          action: 'available_slots',
-          user_id: conversation.user_id,
-        });
-        const slots: { iso: string; label: string }[] = slotsResult?.slots || [];
+      console.log('[Nina] 📅 SCHEDULING AUTO-TRIGGER: lead respondeu com preferência de horário, acionando handoff diretamente');
+      await handoffToHuman(supabase, conversation, {
+        reason: 'Lead confirmou interesse em agendar demonstração e informou preferência de horário.',
+        preferred_time: message.content || undefined,
+      });
+      await queueHoldingMessage(supabase, conversation, message,
+        'Perfeito! Vou verificar a agenda e já te retorno confirmando o horário 😊', settings);
 
-        if (slots.length > 0) {
-          await supabase.from('conversations').update({
-            calendar_flow: { state: 'showing_slots', offered_slots: slots }
-          }).eq('id', conversation.id);
-          await queueCalendarMessage(supabase, conversation, message, formatSlotsMessage(slots), settings);
-          autoTriggered = true;
-        } else {
-          await queueCalendarMessage(supabase, conversation, message,
-            'Perfeito! Vou confirmar os horários e te aviso em instantes 😊', settings);
-          autoTriggered = true;
-        }
-      } catch (err) {
-        console.error('[Nina] SCHEDULING AUTO-TRIGGER error — falling through to AI:', err);
-      }
-
-      if (autoTriggered) {
-        await supabase.from('messages').update({
-          processed_by_nina: true,
-          nina_response_time: Date.now() - new Date(message.sent_at).getTime()
-        }).eq('id', message.id);
-        return;
-      }
-      // Se falhou, continua no fluxo normal da IA abaixo
+      await supabase.from('messages').update({
+        processed_by_nina: true,
+        nina_response_time: Date.now() - new Date(message.sent_at).getTime()
+      }).eq('id', message.id);
+      return;
     }
   }
 
@@ -1219,7 +1141,9 @@ async function processQueueItem(
         const args = JSON.parse(toolCall.function.arguments);
         const handoffResult = await handoffToHuman(supabase, conversation, args);
 
-        if (handoffResult.success) {
+        if (args.is_scheduling) {
+          aiContent = (aiContent || 'Perfeito! Vou verificar a agenda e já te retorno confirmando o horário! 😊');
+        } else if (handoffResult.success) {
           aiContent = (aiContent || 'Vou te conectar com um de nossos consultores agora. Eles vão te atender em breve! 😊');
         } else {
           aiContent = (aiContent || 'Vou te passar para nossa equipe. Eles entrarão em contato em breve!');
@@ -1298,24 +1222,12 @@ async function processQueueItem(
     console.warn('[Nina] Empty AI response, using fallback');
     const fallbackIntent = detectExplicitIntent(message.content || '');
     if (fallbackIntent.has && fallbackIntent.desc.includes('demonstração')) {
-      aiContent = 'Ótimo! Vou verificar os horários disponíveis para sua demo agora. [AGENDAR_DEMO]';
+      await handoffToHuman(supabase, conversation, {
+        reason: 'Lead demonstrou interesse em agendar demonstração (resposta vazia da IA).',
+      });
+      aiContent = 'Vou verificar a agenda e já te retorno confirmando o horário! 😊';
     } else {
       aiContent = 'Olá! Como posso ajudar você hoje? 😊';
-    }
-  }
-
-  // ═══════════════════════════════════════════
-  // CALENDAR FLOW: detect [AGENDAR_DEMO] marker
-  // ═══════════════════════════════════════════
-  let startCalendarFlow = false;
-  if (aiContent.includes('[AGENDAR_DEMO]')) {
-    // Remove o marcador do conteúdo sempre, mesmo que scheduling esteja desativado
-    aiContent = aiContent.replace(/\[AGENDAR_DEMO\]/gi, '').trim();
-    if (settings.ai_scheduling_enabled !== false) {
-      startCalendarFlow = true;
-      console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected — will fetch Google Calendar slots');
-    } else {
-      console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected but ai_scheduling_enabled=false — skipping calendar flow');
     }
   }
 
@@ -1383,32 +1295,6 @@ async function processQueueItem(
     })
   }).catch(err => console.error('[Nina] Error triggering analyze-conversation:', err));
 
-  // ═══════════════════════════════════════════
-  // CALENDAR FLOW: fetch slots and queue listing
-  // ═══════════════════════════════════════════
-  if (startCalendarFlow) {
-    try {
-      const slotsResult = await callGoogleCalendarFunction(supabaseUrl, supabaseServiceKey, {
-        action: 'available_slots',
-        user_id: conversation.user_id,
-      });
-      const slots: { iso: string; label: string }[] = slotsResult?.slots || [];
-
-      if (slots.length > 0) {
-        await supabase.from('conversations').update({
-          calendar_flow: { state: 'showing_slots', offered_slots: slots }
-        }).eq('id', conversation.id);
-
-        // Use queueCalendarMessage so whatsapp-sender is triggered after the AI text is sent
-        await queueCalendarMessage(supabase, conversation, message, formatSlotsMessage(slots), settings);
-        console.log('[Nina] 📅 Calendar slots queued and sender triggered, state: showing_slots');
-      } else {
-        console.warn('[Nina] 📅 No available calendar slots — flow aborted');
-      }
-    } catch (err) {
-      console.error('[Nina] 📅 Calendar flow start error:', err);
-    }
-  }
 }
 
 // Queue text response with chunking
@@ -1443,68 +1329,10 @@ async function queueTextResponse(
 }
 
 // ═══════════════════════════════════════════
-// GOOGLE CALENDAR HELPERS
+// SCHEDULING HOLDING MESSAGE HELPER
 // ═══════════════════════════════════════════
 
-async function callGoogleCalendarFunction(
-  supabaseUrl: string, serviceKey: string, payload: Record<string, any>
-): Promise<any> {
-  const res = await fetch(`${supabaseUrl}/functions/v1/google-calendar`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`google-calendar: ${res.status} — ${errText.substring(0, 200)}`);
-  }
-  return res.json();
-}
-
-function formatSlotsMessage(slots: { iso: string; label: string }[]): string {
-  const lines = slots.map((s, i) => `${i + 1}. ${s.label}`).join('\n');
-  return `Aqui estão os horários disponíveis para a demo 📅\n\n${lines}\n\nQual horário fica melhor pra você? É só digitar o número.`;
-}
-
-function formatSlotLabel(isoString: string): string {
-  try {
-    return new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      weekday: 'long', day: '2-digit', month: '2-digit',
-      hour: '2-digit', minute: '2-digit',
-    }).format(new Date(isoString));
-  } catch {
-    return isoString;
-  }
-}
-
-function parseSlotSelection(text: string, slotCount: number): number | null {
-  const t = text.trim();
-  const numMatch = t.match(/^(\d+)/);
-  if (numMatch) {
-    const n = parseInt(numMatch[1], 10);
-    if (n >= 1 && n <= slotCount) return n - 1;
-  }
-  const wordMap: Record<string, number> = {
-    'primeiro': 0, 'segunda': 0, 'segundo': 1, 'terceiro': 2, 'terceira': 2,
-    'quarto': 3, 'quarta': 3, 'quinto': 4, 'quinta': 4,
-    'um': 0, 'dois': 1, 'três': 2, 'quatro': 3, 'cinco': 4,
-  };
-  for (const [word, idx] of Object.entries(wordMap)) {
-    if (t.toLowerCase().includes(word) && idx < slotCount) return idx;
-  }
-  return null;
-}
-
-function parseEmail(text: string): string | null {
-  const match = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
-  return match ? match[0].toLowerCase() : null;
-}
-
-async function queueCalendarMessage(
+async function queueHoldingMessage(
   supabase: any, conversation: any, triggerMessage: any,
   content: string, settings: any, extraDelayMs = 0
 ): Promise<void> {
@@ -1520,7 +1348,7 @@ async function queueCalendarMessage(
     message_type: 'text',
     priority: 1,
     scheduled_at: new Date(Date.now() + delay).toISOString(),
-    metadata: { response_to_message_id: triggerMessage.id, calendar_flow: true }
+    metadata: { response_to_message_id: triggerMessage.id, scheduling_holding_message: true }
   });
 
   await supabase.rpc('mark_ai_message_sent', {
@@ -1532,8 +1360,8 @@ async function queueCalendarMessage(
   fetch(`${supabaseUrl}/functions/v1/whatsapp-sender`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-    body: JSON.stringify({ triggered_by: 'nina-orchestrator-calendar' }),
-  }).catch(err => console.error('[Nina] Calendar sender trigger failed:', err));
+    body: JSON.stringify({ triggered_by: 'nina-orchestrator-scheduling' }),
+  }).catch(err => console.error('[Nina] Scheduling sender trigger failed:', err));
 }
 
 function getDefaultSystemPrompt(): string {
@@ -1580,10 +1408,10 @@ REGRA CRÍTICA:
 - Nunca pressione para fechar — deixe o interesse surgir naturalmente
 
 AGENDAMENTO DE DEMO:
-- Quando o lead CONFIRMAR que quer agendar, inclua exatamente [AGENDAR_DEMO] em sua resposta
-- Exemplo: "Que ótimo! Vou verificar os horários disponíveis agora. [AGENDAR_DEMO]"
-- O sistema buscará horários no Google Calendar e enviará a lista automaticamente
-- NÃO inclua [AGENDAR_DEMO] se o lead ainda não confirmou interesse em agendar
+- Quando o lead CONFIRMAR que quer agendar, chame a tool request_demo_handoff com is_scheduling=true
+- NUNCA confirme um horário específico como já agendado — a equipe comercial confirma manualmente depois
+- Responda apenas algo como "Perfeito! Vou verificar a agenda e já te retorno confirmando o horário"
+- Não chame a tool se o lead ainda não confirmou interesse em agendar
 </guidelines>
 
 <cognitive_process>
@@ -1795,7 +1623,7 @@ ${origemConversa.origem === 'retorno' ? `
 ATENÇÃO: O lead acabou de expressar intenção explícita: "${intent.desc}".
 - NÃO use saudação genérica como "Olá! Como posso ajudar?"
 - Responda DIRETAMENTE à solicitação
-- Se quiser agendar demo: confirme o interesse, colete tipo de estabelecimento (se ainda não tem), e quando tiver informação suficiente, inclua [AGENDAR_DEMO] na resposta
+- Se quiser agendar demo: confirme o interesse, colete tipo de estabelecimento (se ainda não tem), e quando tiver informação suficiente, chame a tool request_demo_handoff com is_scheduling=true (nunca confirme um horário específico sozinho)
 - Seja objetivo e mostre que entendeu o pedido
 </intencao_explicita>`;
   }
