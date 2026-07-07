@@ -1609,10 +1609,14 @@ async function detectarOrigemConversa(
       return { origem: 'disparo', detalhes: `Lead respondendo a disparo automático. Continue naturalmente.` };
     }
     
-    if (conversasComInteracao > 0 || userMessagesInConversation > 3) {
-      return { origem: 'retorno', detalhes: `Cliente com ${conversasComInteracao} conversa(s) anterior(es). Seja natural.` };
+    // "inbound" (apresentar-se) só deve valer para a 1ª mensagem do contato
+    // nesta conversa. Da 2ª mensagem em diante, mesmo sem conversas
+    // anteriores, a IA não deve se reapresentar — o limiar "> 3" antigo
+    // fazia a IA se apresentar de novo nas mensagens 2 e 3 da conversa.
+    if (conversasComInteracao > 0 || userMessagesInConversation > 1) {
+      return { origem: 'retorno', detalhes: `Cliente com ${conversasComInteracao} conversa(s) anterior(es) ou já em andamento nesta conversa. Seja natural, sem se reapresentar.` };
     }
-    
+
     return { origem: 'inbound', detalhes: 'Primeiro contato. Apresente-se e faça perguntas de descoberta.' };
     
   } catch (error) {
