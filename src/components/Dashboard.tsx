@@ -170,7 +170,7 @@ const Dashboard: React.FC = () => {
               <div key={team} className="flex items-center justify-between">
                 <span className="text-xs text-slate-400">{TEAM_LABELS[team]}</span>
                 <span className="text-sm font-semibold text-slate-200">
-                  {operationalMetrics.loading ? '…' : operationalMetrics.byTeam[team]}
+                  {operationalMetrics.loading ? '…' : operationalMetrics.byTeam[team as keyof typeof operationalMetrics.byTeam]}
                 </span>
               </div>
             ))}
