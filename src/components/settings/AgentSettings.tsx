@@ -1,5 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Bot, Loader2, Calendar, Wand2, Building2, RotateCcw, Info } from 'lucide-react';
+import { Bot, Loader2, Calendar, Wand2, Building2, RotateCcw, Info, Send } from 'lucide-react';
 import { Button } from '../Button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -54,6 +54,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingNotif, setTestingNotif] = useState(false);
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [settings, setSettings] = useState<AgentSettings>({
     system_prompt_override: null,
@@ -171,6 +172,33 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
       toast.error('Erro ao salvar configurações do agente');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (!settings.scheduling_notify_phone?.trim()) {
+      toast.error('Preencha o número antes de testar');
+      return;
+    }
+    setTestingNotif(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('test-whatsapp-message', {
+        body: {
+          phone_number: settings.scheduling_notify_phone.replace(/\D/g, ''),
+          message: '🔔 Teste de notificação PremaCar\n\nSe você recebeu essa mensagem, a notificação de novos leads está configurada corretamente!',
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success('Mensagem de teste enviada!');
+      } else {
+        throw new Error(data?.error || 'Erro desconhecido');
+      }
+    } catch (err) {
+      console.error('[AgentSettings] Test notification error:', err);
+      toast.error('Falha ao enviar — verifique o número e a conexão da Evolution API');
+    } finally {
+      setTestingNotif(false);
     }
   };
 
@@ -347,13 +375,28 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 <label className="text-xs font-medium text-slate-400 mb-1.5 block">
                   Número para notificação de novos leads
                 </label>
-                <input
-                  type="tel"
-                  value={settings.scheduling_notify_phone || ''}
-                  onChange={(e) => setSettings({ ...settings, scheduling_notify_phone: e.target.value || null })}
-                  placeholder="Ex: 5548999999999 (com DDI e DDD, sem espaços)"
-                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    value={settings.scheduling_notify_phone || ''}
+                    onChange={(e) => setSettings({ ...settings, scheduling_notify_phone: e.target.value || null })}
+                    placeholder="Ex: 5548999999999 (com DDI e DDD, sem espaços)"
+                    className="h-9 flex-1 min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestNotification}
+                    disabled={testingNotif || !settings.scheduling_notify_phone?.trim()}
+                    className="h-9 px-3 flex-shrink-0 flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 text-xs text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {testingNotif ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    Testar
+                  </button>
+                </div>
                 <p className="text-[11px] text-slate-500 mt-1">
                   Recebe aviso via WhatsApp quando um lead aceita a demonstração.
                 </p>
