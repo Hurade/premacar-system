@@ -82,14 +82,17 @@ export async function downloadMedia(settings: MediaSettings, mediaId: string): P
   return result?.buffer ?? null;
 }
 
-// Transcreve áudio via Whisper no Lovable AI Gateway.
+// Transcreve áudio no Lovable AI Gateway.
+// Modelo "whisper-1" não é mais aceito pelo gateway (catálogo de modelos
+// mudou) — usa openai/gpt-4o-mini-transcribe, um dos modelos de
+// transcrição atualmente suportados.
 export async function transcribeAudio(audioBuffer: ArrayBuffer, lovableApiKey: string): Promise<string | null> {
   try {
     console.log('[Media] Transcribing audio, size:', audioBuffer.byteLength, 'bytes');
 
     const formData = new FormData();
     formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
-    formData.append('model', 'whisper-1');
+    formData.append('model', 'openai/gpt-4o-mini-transcribe');
     formData.append('language', 'pt');
 
     const response = await fetch(LOVABLE_TRANSCRIBE_URL, {
