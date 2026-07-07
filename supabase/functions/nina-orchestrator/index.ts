@@ -930,7 +930,7 @@ async function processQueueItem(
   // ═══════════════════════════════════════════
   // SCHEDULING AUTO-TRIGGER: Lead respondeu com dia/horário após AI perguntar
   // ═══════════════════════════════════════════
-  if (!calendarFlow && aiSettings.ai_scheduling_enabled !== false) {
+  if (!calendarFlow && settings.ai_scheduling_enabled !== false) {
     const { data: lastNinaMsgRaw } = await supabase
       .from('messages')
       .select('content')
@@ -1265,7 +1265,7 @@ async function processQueueItem(
   if (aiContent.includes('[AGENDAR_DEMO]')) {
     // Remove o marcador do conteúdo sempre, mesmo que scheduling esteja desativado
     aiContent = aiContent.replace(/\[AGENDAR_DEMO\]/gi, '').trim();
-    if (aiSettings.ai_scheduling_enabled !== false) {
+    if (settings.ai_scheduling_enabled !== false) {
       startCalendarFlow = true;
       console.log('[Nina] 📅 [AGENDAR_DEMO] marker detected — will fetch Google Calendar slots');
     } else {
