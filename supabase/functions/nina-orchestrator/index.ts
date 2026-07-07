@@ -552,18 +552,13 @@ async function handoffToHuman(
       const instance = notifSettings.scheduling_notify_evolution_instance || notifSettings.evolution_instance_name;
 
       const notifMessage = args.is_scheduling
-        ? `📅 *Agendamento Pendente de Confirmação - PremaCar*
+        ? `🔔 Novo lead para agendar demo!
 
-👤 *Nome:* ${contact?.name || 'Sem nome'}
-📱 *Telefone:* ${contact?.phone_number}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
+Nome: ${contact?.name || 'Sem nome'}
+Telefone: ${contact?.phone_number || 'Não informado'}${contact?.company ? `\nEmpresa: ${contact.company}` : ''}
+Contexto: ${args.reason}
 
-📋 *Contexto:*
-${args.reason}
-${args.preferred_time ? `\n⏰ *Horário preferido:* ${args.preferred_time}` : ''}
-
-👉 *Ação:* O lead está aguardando confirmação do horário da demonstração — entre em contato via WhatsApp para confirmar.
-
-_A conversa já foi transferida para modo humano no sistema._`
+Entre em contato para confirmar data e horário.`
         : `🔔 *Novo Lead Qualificado - PremaCar*
 
 👤 *Nome:* ${contact?.name || 'Sem nome'}
@@ -571,7 +566,6 @@ _A conversa já foi transferida para modo humano no sistema._`
 
 📋 *Contexto:*
 ${args.reason}
-${args.preferred_time ? `\n⏰ *Horário preferido:* ${args.preferred_time}` : ''}
 
 👉 *Ação:* Entre em contato via WhatsApp — há uma conversa aguardando atendimento.
 
@@ -1142,7 +1136,7 @@ async function processQueueItem(
         const handoffResult = await handoffToHuman(supabase, conversation, args);
 
         if (args.is_scheduling) {
-          aiContent = (aiContent || 'Perfeito! Vou verificar a agenda e já te retorno confirmando o horário! 😊');
+          aiContent = (aiContent || 'Perfeito! Em breve nosso time comercial vai entrar em contato com você para confirmar data e horário. Qualquer dúvida, é só chamar! 😊');
         } else if (handoffResult.success) {
           aiContent = (aiContent || 'Vou te conectar com um de nossos consultores agora. Eles vão te atender em breve! 😊');
         } else {
