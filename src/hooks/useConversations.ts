@@ -180,7 +180,16 @@ export function useConversations() {
         });
       });
       
-      setConversations(data);
+      // Merge em vez de substituir: preserva conversas já em estado (ex:
+      // criada via createConversation/fetchAndAddConversation) que ainda não
+      // apareceriam no snapshot deste fetch por terem sido criadas depois
+      // dele ter começado — sem isso, essa busca completa (mais lenta) podia
+      // "apagar" de volta uma conversa recém-criada que já estava na tela.
+      setConversations(prev => {
+        const freshIds = new Set(data.map(c => c.id));
+        const extras = prev.filter(c => !freshIds.has(c.id));
+        return [...data, ...extras];
+      });
     } catch (err) {
       console.error('[useConversations] Error fetching:', err);
       setError('Erro ao carregar conversas');
