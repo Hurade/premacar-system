@@ -1211,6 +1211,7 @@ async function processQueueItem(
 
   // Process tool calls
   let handoffDone = false;
+  const toolResults: { toolCall: any; result: any }[] = [];
 
   for (const toolCall of toolCalls) {
     if (toolCall.function?.name === 'request_demo_handoff') {
@@ -1224,6 +1225,7 @@ async function processQueueItem(
           aiContent = (aiContent || 'Vou te passar para nossa equipe. Eles entrarão em contato em breve!');
         }
         handoffDone = true;
+        toolResults.push({ toolCall, result: handoffResult });
       } catch (parseError) {
         console.error('[Nina] Error parsing request_demo_handoff:', parseError);
       }
@@ -1232,11 +1234,55 @@ async function processQueueItem(
     if (toolCall.function?.name === 'update_contact_info') {
       try {
         const args = JSON.parse(toolCall.function.arguments);
-        await updateContactInfo(supabase, conversation.contact_id, args);
-        // Silent action — no message added to aiContent
+        const updateResult = await updateContactInfo(supabase, conversation.contact_id, args);
+        // Silent action — não adiciona texto sozinho, mas o resultado é
+        // devolvido ao modelo abaixo para ele continuar a conversa normalmente.
+        toolResults.push({ toolCall, result: updateResult });
       } catch (parseError) {
         console.error('[Nina] Error parsing update_contact_info:', parseError);
       }
+    }
+  }
+
+  // Quando o modelo só chamou a tool (sem texto na mesma resposta) e não houve
+  // handoff, é preciso devolver o resultado da tool e pedir a resposta final —
+  // do contrário perdemos o fio da conversa (ex: usuário respondeu uma pergunta
+  // de qualificação e a IA "esquece" o que estava perguntando).
+  if (!aiContent && toolCalls.length > 0 && !handoffDone && toolResults.length > 0) {
+    try {
+      const followUpMessages = [
+        ...requestBody.messages,
+        aiMessage,
+        ...toolResults.map(({ toolCall, result }) => ({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(result),
+        })),
+      ];
+
+      const followUpResponse = await fetch(LOVABLE_AI_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: aiSettings.model,
+          messages: followUpMessages,
+          temperature: aiSettings.temperature,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (followUpResponse.ok) {
+        const followUpData = await followUpResponse.json();
+        aiContent = followUpData.choices?.[0]?.message?.content || '';
+        console.log('[Nina] Follow-up completion after tool call, content length:', aiContent.length);
+      } else {
+        console.error('[Nina] Follow-up completion error:', followUpResponse.status, await followUpResponse.text());
+      }
+    } catch (err) {
+      console.error('[Nina] Error in follow-up completion after tool call:', err);
     }
   }
 
