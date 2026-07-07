@@ -453,6 +453,17 @@ export function useConversations() {
           console.log('[Realtime] Conversation UPDATE:', payload.new);
           const updated = payload.new as any;
           setConversations(prev => {
+            const existsInState = prev.some(c => c.id === updated.id);
+
+            // Conversa reaberta (ex: webhook reativando um atendimento
+            // encerrado) e ainda não está na lista — precisa buscar com
+            // histórico completo, igual ao caminho de INSERT. Sem isso, ela
+            // fica "invisível" mesmo com is_active=true no banco.
+            if (!existsInState && updated.is_active) {
+              fetchAndAddConversation(updated.id);
+              return prev;
+            }
+
             return prev.map(conv => {
               if (conv.id === updated.id) {
                 return {
