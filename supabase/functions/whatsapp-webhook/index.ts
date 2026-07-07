@@ -352,9 +352,38 @@ serve(async (req) => {
         .eq('api_source', 'evolution')
         .maybeSingle();
 
-      // If no evolution conversation exists, create a new one (don't reuse Meta conversations)
-      // This ensures responses go back through the correct API
+      // If no active evolution conversation exists, tenta reabrir a mais
+      // recente já encerrada deste contato antes de criar uma nova — evita
+      // "perder" o histórico de mensagens numa conversa antiga que a UI do
+      // Chat não mostra mais (só lista is_active=true).
+      if (!conversation) {
+        const { data: existingConversation } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('contact_id', contact.id)
+          .eq('api_source', 'evolution')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
+        if (existingConversation) {
+          const { data: reopened, error: reopenError } = await supabase
+            .from('conversations')
+            .update({ is_active: true, status: 'nina' })
+            .eq('id', existingConversation.id)
+            .select()
+            .single();
+
+          if (reopenError) {
+            console.error('[Webhook] Error reopening conversation:', reopenError);
+          } else {
+            conversation = reopened;
+            console.log('[Webhook] Reopened existing conversation:', conversation.id);
+          }
+        }
+      }
+
+      // Se realmente não existe nenhuma conversa anterior (contato novo), cria uma
       if (!conversation) {
         const { data: newConversation, error: convError } = await supabase
           .from('conversations')
@@ -370,9 +399,9 @@ serve(async (req) => {
 
         if (convError) {
           console.error('[Webhook] Error creating conversation:', convError);
-          return new Response(JSON.stringify({ error: 'Failed to create conversation' }), { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          return new Response(JSON.stringify({ error: 'Failed to create conversation' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
         conversation = newConversation;

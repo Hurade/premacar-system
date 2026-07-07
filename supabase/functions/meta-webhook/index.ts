@@ -502,6 +502,36 @@ async function processMetaWebhookAsync(
           .maybeSingle();
 
         if (!conversation) {
+          // Tenta reabrir a conversa mais recente já encerrada deste contato
+          // antes de criar uma nova — evita perder o histórico de mensagens
+          // numa conversa antiga que a UI do Chat não mostra mais.
+          const { data: existingConversation } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('contact_id', contact.id)
+            .eq('api_source', 'meta')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingConversation) {
+            const { data: reopened, error: reopenError } = await supabase
+              .from('conversations')
+              .update({ is_active: true, status: 'nina' })
+              .eq('id', existingConversation.id)
+              .select()
+              .single();
+
+            if (reopenError) {
+              console.error('[Meta Async] ❌ Erro ao reabrir conversa:', reopenError);
+            } else {
+              conversation = reopened;
+              console.log('[Meta Async] 🔓 Conversa reaberta:', conversation.id);
+            }
+          }
+        }
+
+        if (!conversation) {
           console.log('[Meta Async] ➕ Criando nova conversa');
 
           const { data: newConversation, error: convError } = await supabase
