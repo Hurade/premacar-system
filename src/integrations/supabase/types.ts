@@ -201,6 +201,133 @@ export type Database = {
           },
         ]
       }
+      automation_execution_logs: {
+        Row: {
+          actions_result: Json | null
+          conditions_result: boolean | null
+          contact_id: string | null
+          conversation_id: string | null
+          created_at: string
+          deal_id: string | null
+          error_message: string | null
+          id: string
+          rule_id: string | null
+          status: string
+          trigger_payload: Json | null
+        }
+        Insert: {
+          actions_result?: Json | null
+          conditions_result?: boolean | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          error_message?: string | null
+          id?: string
+          rule_id?: string | null
+          status?: string
+          trigger_payload?: Json | null
+        }
+        Update: {
+          actions_result?: Json | null
+          conditions_result?: boolean | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          error_message?: string | null
+          id?: string
+          rule_id?: string | null
+          status?: string
+          trigger_payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_execution_logs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_rule_runs: {
+        Row: {
+          contact_id: string
+          first_run_at: string
+          rule_id: string
+        }
+        Insert: {
+          contact_id: string
+          first_run_at?: string
+          rule_id: string
+        }
+        Update: {
+          contact_id?: string
+          first_run_at?: string
+          rule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_rule_runs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_rules: {
+        Row: {
+          actions: Json
+          conditions: Json
+          conditions_logic: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+          run_once_per_contact: boolean
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          actions?: Json
+          conditions?: Json
+          conditions_logic?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+          run_once_per_contact?: boolean
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          actions?: Json
+          conditions?: Json
+          conditions_logic?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+          run_once_per_contact?: boolean
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           contact_id: string | null
@@ -705,6 +832,55 @@ export type Database = {
           },
         ]
       }
+      contact_custom_field_values: {
+        Row: {
+          contact_id: string
+          created_at: string
+          field_id: string
+          id: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          field_id: string
+          id?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          field_id?: string
+          id?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_custom_field_values_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_custom_field_values_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_custom_field_values_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "custom_field_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_folders: {
         Row: {
           color: string | null
@@ -878,6 +1054,7 @@ export type Database = {
           last_message_at: string
           metadata: Json | null
           nina_context: Json | null
+          protocol_number: string | null
           started_at: string
           status: Database["public"]["Enums"]["conversation_status"]
           tags: string[] | null
@@ -901,6 +1078,7 @@ export type Database = {
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
+          protocol_number?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           tags?: string[] | null
@@ -924,6 +1102,7 @@ export type Database = {
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
+          protocol_number?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           tags?: string[] | null
@@ -955,6 +1134,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      custom_field_definitions: {
+        Row: {
+          ativo: boolean
+          chave: string
+          created_at: string
+          id: string
+          nome: string
+          obrigatorio: boolean
+          opcoes: Json
+          ordem: number
+          tipo: Database["public"]["Enums"]["custom_field_type"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          created_at?: string
+          id?: string
+          nome: string
+          obrigatorio?: boolean
+          opcoes?: Json
+          ordem?: number
+          tipo?: Database["public"]["Enums"]["custom_field_type"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          obrigatorio?: boolean
+          opcoes?: Json
+          ordem?: number
+          tipo?: Database["public"]["Enums"]["custom_field_type"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       deal_activities: {
         Row: {
@@ -1009,6 +1227,54 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_products: {
+        Row: {
+          created_at: string
+          deal_id: string
+          id: string
+          observacao: string | null
+          plano_id: string
+          quantidade: number
+          updated_at: string
+          valor_aplicado: number
+        }
+        Insert: {
+          created_at?: string
+          deal_id: string
+          id?: string
+          observacao?: string | null
+          plano_id: string
+          quantidade?: number
+          updated_at?: string
+          valor_aplicado?: number
+        }
+        Update: {
+          created_at?: string
+          deal_id?: string
+          id?: string
+          observacao?: string | null
+          plano_id?: string
+          quantidade?: number
+          updated_at?: string
+          valor_aplicado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_products_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_products_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos_propostas"
             referencedColumns: ["id"]
           },
         ]
@@ -1285,6 +1551,86 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           whatsapp_enabled?: boolean | null
+        }
+        Relationships: []
+      }
+      knowledge_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          document_id: string
+          embedding: string | null
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          document_id: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_documents: {
+        Row: {
+          chunk_count: number
+          created_at: string
+          error_message: string | null
+          file_name: string | null
+          file_type: string | null
+          id: string
+          status: string
+          storage_path: string | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          chunk_count?: number
+          created_at?: string
+          error_message?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          status?: string
+          storage_path?: string | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          chunk_count?: number
+          created_at?: string
+          error_message?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          status?: string
+          storage_path?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
         }
         Relationships: []
       }
@@ -1719,8 +2065,10 @@ export type Database = {
           meta_app_secret: string | null
           meta_business_account_id: string | null
           meta_phone_number_id: string | null
+          rag_enabled: boolean
           response_delay_max: number
           response_delay_min: number
+          round_robin_ignore_schedule_if_none_available: boolean
           route_all_to_receiver_enabled: boolean
           scheduling_available_days: number[] | null
           scheduling_buffer_between: number | null
@@ -1781,8 +2129,10 @@ export type Database = {
           meta_app_secret?: string | null
           meta_business_account_id?: string | null
           meta_phone_number_id?: string | null
+          rag_enabled?: boolean
           response_delay_max?: number
           response_delay_min?: number
+          round_robin_ignore_schedule_if_none_available?: boolean
           route_all_to_receiver_enabled?: boolean
           scheduling_available_days?: number[] | null
           scheduling_buffer_between?: number | null
@@ -1843,8 +2193,10 @@ export type Database = {
           meta_app_secret?: string | null
           meta_business_account_id?: string | null
           meta_phone_number_id?: string | null
+          rag_enabled?: boolean
           response_delay_max?: number
           response_delay_min?: number
+          round_robin_ignore_schedule_if_none_available?: boolean
           route_all_to_receiver_enabled?: boolean
           scheduling_available_days?: number[] | null
           scheduling_buffer_between?: number | null
@@ -1916,6 +2268,7 @@ export type Database = {
       planos_propostas: {
         Row: {
           ativo: boolean
+          categoria: string
           created_at: string
           descricao: string | null
           id: string
@@ -1923,9 +2276,11 @@ export type Database = {
           preco_mensal: number
           recursos: Json | null
           tipo: string
+          visivel_pipeline: boolean
         }
         Insert: {
           ativo?: boolean
+          categoria?: string
           created_at?: string
           descricao?: string | null
           id?: string
@@ -1933,9 +2288,11 @@ export type Database = {
           preco_mensal: number
           recursos?: Json | null
           tipo: string
+          visivel_pipeline?: boolean
         }
         Update: {
           ativo?: boolean
+          categoria?: string
           created_at?: string
           descricao?: string | null
           id?: string
@@ -1943,6 +2300,7 @@ export type Database = {
           preco_mensal?: number
           recursos?: Json | null
           tipo?: string
+          visivel_pipeline?: boolean
         }
         Relationships: []
       }
@@ -2167,6 +2525,35 @@ export type Database = {
         }
         Relationships: []
       }
+      round_robin_state: {
+        Row: {
+          current_weight: number
+          last_assigned_at: string | null
+          team_member_id: string
+          updated_at: string
+        }
+        Insert: {
+          current_weight?: number
+          last_assigned_at?: string | null
+          team_member_id: string
+          updated_at?: string
+        }
+        Update: {
+          current_weight?: number
+          last_assigned_at?: string | null
+          team_member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "round_robin_state_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: true
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       send_queue: {
         Row: {
           contact_id: string
@@ -2352,6 +2739,47 @@ export type Database = {
         }
         Relationships: []
       }
+      team_member_schedules: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_available: boolean
+          start_time: string
+          team_member_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time?: string
+          id?: string
+          is_available?: boolean
+          start_time?: string
+          team_member_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_available?: boolean
+          start_time?: string
+          team_member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_member_schedules_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           avatar: string | null
@@ -2473,6 +2901,7 @@ export type Database = {
         Row: {
           audio_url: string | null
           call_sid: string | null
+          call_type: string
           campaign_id: string | null
           contact_id: string | null
           created_at: string | null
@@ -2480,12 +2909,14 @@ export type Database = {
           duration_seconds: number | null
           error_message: string | null
           id: string
+          initiated_by: string | null
           status: string | null
           updated_at: string | null
         }
         Insert: {
           audio_url?: string | null
           call_sid?: string | null
+          call_type?: string
           campaign_id?: string | null
           contact_id?: string | null
           created_at?: string | null
@@ -2493,12 +2924,14 @@ export type Database = {
           duration_seconds?: number | null
           error_message?: string | null
           id?: string
+          initiated_by?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Update: {
           audio_url?: string | null
           call_sid?: string | null
+          call_type?: string
           campaign_id?: string | null
           contact_id?: string | null
           created_at?: string | null
@@ -2506,6 +2939,7 @@ export type Database = {
           duration_seconds?: number | null
           error_message?: string | null
           id?: string
+          initiated_by?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -2628,6 +3062,7 @@ export type Database = {
       }
     }
     Functions: {
+      assign_next_owner_round_robin: { Args: never; Returns: string }
       can_send_ai_message: {
         Args: { p_conversation_id: string }
         Returns: boolean
@@ -2750,6 +3185,10 @@ export type Database = {
         Args: { p_campaign_id: string; p_counter: string; p_lead_id: string }
         Returns: undefined
       }
+      is_team_member_available_now: {
+        Args: { p_team_member_id: string }
+        Returns: boolean
+      }
       mark_ai_message_sent: {
         Args: { p_content: string; p_conversation_id: string }
         Returns: undefined
@@ -2757,6 +3196,19 @@ export type Database = {
       mark_user_responded: {
         Args: { p_conversation_id: string }
         Returns: undefined
+      }
+      match_documents: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          document_id: string
+          id: string
+          similarity: number
+        }[]
       }
       reset_campaign_daily_counts: { Args: never; Returns: undefined }
       update_client_memory: {
@@ -2792,6 +3244,7 @@ export type Database = {
       app_role: "admin" | "user"
       appointment_type: "demo" | "meeting" | "support" | "followup"
       conversation_status: "nina" | "human" | "paused"
+      custom_field_type: "texto" | "numero" | "data" | "select"
       member_role: "admin" | "manager" | "agent"
       member_status: "active" | "invited" | "disabled"
       message_from: "user" | "nina" | "human"
@@ -2929,6 +3382,7 @@ export const Constants = {
       app_role: ["admin", "user"],
       appointment_type: ["demo", "meeting", "support", "followup"],
       conversation_status: ["nina", "human", "paused"],
+      custom_field_type: ["texto", "numero", "data", "select"],
       member_role: ["admin", "manager", "agent"],
       member_status: ["active", "invited", "disabled"],
       message_from: ["user", "nina", "human"],
