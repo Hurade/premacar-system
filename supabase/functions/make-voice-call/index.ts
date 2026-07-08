@@ -28,11 +28,28 @@ serve(async (req) => {
       metadata: { contactId, campaignId: campaignId || null }
     })
 
-    // 1. Buscar settings (apenas Twilio - usando TTS nativo)
-    const { data: settings } = await supabase
+    // 1. Buscar settings do Twilio.
+    // Filtra por twilio_enabled=true para evitar pegar a row errada quando há
+    // múltiplas rows em integration_settings (cada user_id tem a sua própria).
+    let settings: any = null;
+    const { data: twilioRow } = await supabase
       .from('integration_settings')
       .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled')
-      .limit(1).single()
+      .eq('twilio_enabled', true)
+      .not('twilio_account_sid', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    if (twilioRow) {
+      settings = twilioRow;
+    } else {
+      // Fallback: pegar qualquer row para poder logar o estado real
+      const { data: anyRow } = await supabase
+        .from('integration_settings')
+        .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled')
+        .limit(1)
+        .maybeSingle();
+      settings = anyRow;
+    }
 
     // LOG 2: Settings loaded
     await saveLog(supabase, {
@@ -41,13 +58,18 @@ serve(async (req) => {
       message: 'Settings loaded',
       metadata: {
         has_twilio: !!(settings?.twilio_enabled && settings?.twilio_account_sid),
-        twilio_phone: settings?.twilio_phone_number || null
+        twilio_enabled: settings?.twilio_enabled,
+        has_sid: !!settings?.twilio_account_sid,
+        twilio_phone: settings?.twilio_phone_number || null,
+        settings_found: !!settings
       }
     })
 
     if (!settings?.twilio_enabled || !settings?.twilio_account_sid) {
-      const detail = !settings?.twilio_enabled
-        ? 'Twilio desabilitado — ative em Configurações → Integrações → Twilio'
+      const detail = !settings
+        ? 'Nenhuma configuração de integração encontrada — configure em Configurações → Integrações → Twilio'
+        : !settings?.twilio_enabled
+        ? `Twilio desabilitado (twilio_enabled=${settings?.twilio_enabled}) — ative em Configurações → Integrações → Twilio`
         : 'Twilio Account SID não preenchido em Configurações → Integrações → Twilio';
       await saveLog(supabase, { source: SOURCE, level: 'error', message: detail, metadata: { contactId, twilio_enabled: settings?.twilio_enabled, has_sid: !!settings?.twilio_account_sid } })
       return new Response(JSON.stringify({ success: false, error: detail }), { status: 400, headers: corsHeaders })

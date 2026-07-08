@@ -47,12 +47,25 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    // Get integration settings for email configs
-    const { data: integrationSettings } = await supabase
+    // Get integration settings for email configs.
+    // Prefer the row that has SES enabled; fall back to any row so errors are descriptive.
+    let integrationSettings: any = null;
+    const { data: sesRow } = await supabase
       .from("integration_settings")
       .select("aws_access_key_id, aws_secret_access_key, aws_region, aws_ses_email_from, aws_ses_email_from_name, aws_ses_enabled")
+      .eq("aws_ses_enabled", true)
       .limit(1)
-      .single();
+      .maybeSingle();
+    if (sesRow) {
+      integrationSettings = sesRow;
+    } else {
+      const { data: anyRow } = await supabase
+        .from("integration_settings")
+        .select("aws_access_key_id, aws_secret_access_key, aws_region, aws_ses_email_from, aws_ses_email_from_name, aws_ses_enabled")
+        .limit(1)
+        .maybeSingle();
+      integrationSettings = anyRow;
+    }
 
     const results: any[] = [];
 
@@ -487,11 +500,21 @@ async function sendWhatsApp(
       });
 
       const respData = await response.json().catch(() => ({}));
-      console.log(`[recurring-processor] Evolution response ${response.status}:`, JSON.stringify(respData).substring(0, 300));
+      console.log(`[recurring-processor] Evolution response ${response.status}:`, JSON.stringify(respData).substring(0, 400));
 
       if (!response.ok) {
         return { success: false, error: respData.message || respData.error || `Evolution API error ${response.status}` };
       }
+
+      // Evolution API returns key.id on success. HTTP 200 without key.id means the
+      // message was NOT queued (e.g. instance disconnected, invalid number, rate limit).
+      if (!respData?.key?.id && !respData?.messageId) {
+        const errDetail = respData?.message || respData?.error || respData?.status || JSON.stringify(respData).substring(0, 150);
+        console.error(`[recurring-processor] Evolution API HTTP 200 sem key.id — erro silencioso:`, errDetail);
+        return { success: false, error: `Evolution API: mensagem não enfileirada — ${errDetail}` };
+      }
+
+      console.log(`[recurring-processor] Evolution success, key.id:`, respData.key?.id || respData.messageId);
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
