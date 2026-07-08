@@ -182,21 +182,35 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     }
     setTestingNotif(true);
     try {
+      const cleanPhone = settings.scheduling_notify_phone.replace(/\D/g, '');
+      console.log('[AgentSettings] Sending test notification to:', cleanPhone);
+
       const { data, error } = await supabase.functions.invoke('test-whatsapp-message', {
         body: {
-          phone_number: settings.scheduling_notify_phone.replace(/\D/g, ''),
+          phone_number: cleanPhone,
           message: '🔔 Teste de notificação PremaCar\n\nSe você recebeu essa mensagem, a notificação de novos leads está configurada corretamente!',
+          api_type: 'evolution',
         },
       });
-      if (error) throw error;
+
+      console.log('[AgentSettings] Test response:', { data, error });
+
+      if (error) {
+        console.error('[AgentSettings] Function invocation error:', error);
+        throw new Error(error.message || String(error));
+      }
+
       if (data?.success) {
         toast.success('Mensagem de teste enviada!');
       } else {
-        throw new Error(data?.error || 'Erro desconhecido');
+        const detail = data?.error || data?.details?.message || 'Erro desconhecido';
+        console.error('[AgentSettings] Evolution API returned failure:', detail, 'full response:', data);
+        throw new Error(detail);
       }
     } catch (err) {
-      console.error('[AgentSettings] Test notification error:', err);
-      toast.error('Falha ao enviar — verifique o número e a conexão da Evolution API');
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[AgentSettings] Test notification failed:', msg);
+      toast.error('Falha ao enviar', { description: msg });
     } finally {
       setTestingNotif(false);
     }

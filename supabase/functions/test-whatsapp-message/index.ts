@@ -15,15 +15,15 @@ serve(async (req) => {
   try {
     console.log('🧪 Test WhatsApp Message function invoked');
 
-    const { phone_number, message } = await req.json();
+    const { phone_number, message, api_type } = await req.json();
 
     // Validate inputs
     if (!phone_number || !message) {
       console.error('❌ Missing required fields');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Número de telefone e mensagem são obrigatórios' 
+        JSON.stringify({
+          success: false,
+          error: 'Número de telefone e mensagem são obrigatórios'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -31,6 +31,73 @@ serve(async (req) => {
 
     // Validate phone number format (should start with country code, no + needed here)
     const cleanPhone = phone_number.replace(/[^0-9]/g, '');
+
+    // ─── Branch: Evolution API (usado para testar notificações de handoff) ─────
+    if (api_type === 'evolution') {
+      console.log('🔌 Using Evolution API path for test notification');
+
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const { data: evoSettings, error: evoErr } = await supabase
+        .from('nina_settings')
+        .select('evolution_api_url, evolution_api_key, evolution_instance_name')
+        .limit(1)
+        .maybeSingle();
+
+      if (evoErr) {
+        console.error('❌ Error fetching Evolution settings:', evoErr);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Erro ao buscar configurações: ' + evoErr.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!evoSettings?.evolution_api_url || !evoSettings?.evolution_api_key || !evoSettings?.evolution_instance_name) {
+        console.error('❌ Evolution API not configured:', {
+          url: !!evoSettings?.evolution_api_url,
+          key: !!evoSettings?.evolution_api_key,
+          instance: !!evoSettings?.evolution_instance_name,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: 'Evolution API não configurada. Acesse Configurações → APIs e preencha os campos da Evolution API.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const baseUrl = evoSettings.evolution_api_url.replace(/\/$/, '');
+      const evoUrl = `${baseUrl}/message/sendText/${evoSettings.evolution_instance_name}`;
+
+      console.log('📤 Sending via Evolution API:', { url: evoUrl, phone: cleanPhone });
+
+      const evoResponse = await fetch(evoUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evoSettings.evolution_api_key,
+        },
+        body: JSON.stringify({ number: cleanPhone, text: message }),
+      });
+
+      const evoData = await evoResponse.json().catch(() => ({}));
+      console.log('📥 Evolution API response status:', evoResponse.status, 'body:', JSON.stringify(evoData));
+
+      if (!evoResponse.ok) {
+        const detail = evoData?.message || evoData?.error || JSON.stringify(evoData);
+        console.error('❌ Evolution API error:', detail);
+        return new Response(
+          JSON.stringify({ success: false, error: detail, details: evoData }),
+          { status: evoResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message_id: evoData?.key?.id, data: evoData }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    // ─── End Evolution API branch ─────────────────────────────────────────────
     if (cleanPhone.length < 10) {
       console.error('❌ Invalid phone number format:', phone_number);
       return new Response(
