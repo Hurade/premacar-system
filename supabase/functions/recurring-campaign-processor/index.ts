@@ -233,11 +233,15 @@ async function sendEmail(
   dayConfig: any,
   settings: any
 ): Promise<{ success: boolean; error?: string }> {
+  console.log(`[recurring-processor] Email: aws_ses_enabled=${settings?.aws_ses_enabled}, has_key=${!!settings?.aws_access_key_id}, has_from=${!!settings?.aws_ses_email_from}, contact_email=${contact.email || '(vazio)'}`);
   if (!settings?.aws_ses_enabled) {
-    return { success: false, error: "AWS SES não está habilitado" };
+    return { success: false, error: "AWS SES desabilitado — ative em Configurações → Integrações → AWS SES" };
+  }
+  if (!settings?.aws_access_key_id || !settings?.aws_secret_access_key) {
+    return { success: false, error: "Credenciais AWS SES não configuradas (Access Key / Secret Key)" };
   }
   if (!contact.email) {
-    return { success: false, error: "Contato sem email" };
+    return { success: false, error: "Contato sem email cadastrado" };
   }
 
   const config = dayConfig.config || {};
@@ -362,6 +366,11 @@ async function sendWhatsApp(
     .replace(/\{\{nome\}\}/g, contactName)
     .replace(/\{\{empresa\}\}/g, contact.oficina || "");
 
+  // Guard: phone_number is required
+  if (!contact.phone_number) {
+    return { success: false, error: "Contato sem número de telefone" };
+  }
+
   const cleanPhone = contact.phone_number.replace(/\D/g, "");
   const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
@@ -381,46 +390,47 @@ async function sendWhatsApp(
           .single();
 
         if (!template) {
-          return { success: false, error: `Template ${config.template_id} não encontrado` };
-        }
+          // Template not found — skip Meta, fall through to Evolution
+          console.warn(`[recurring-processor] Template ${config.template_id} não encontrado, tentando Evolution`);
+        } else {
+          console.log(`[recurring-processor] Sending template "${template.name}" (${template.language_code}) to ${formattedPhone}`);
 
-        console.log(`[recurring-processor] Sending template "${template.name}" (${template.language_code}) to ${formattedPhone}`);
+          // Build template parameters
+          const components: any[] = [];
+          if (template.parameters_count > 0) {
+            const params: any[] = [];
+            const mapping = (template.parameters_mapping as Record<string, string>) || {};
 
-        // Build template parameters
-        const components: any[] = [];
-        if (template.parameters_count > 0) {
-          const params: any[] = [];
-          const mapping = (template.parameters_mapping as Record<string, string>) || {};
-          
-          for (let i = 1; i <= template.parameters_count; i++) {
-            const paramKey = mapping[`${i}`] || mapping[String(i)] || "";
-            let value = contactName; // default
-            
-            if (paramKey === "nome" || paramKey === "name" || paramKey === "1") {
-              value = contactName;
-            } else if (paramKey === "empresa" || paramKey === "company") {
-              value = contact.oficina || "sua empresa";
-            } else if (paramKey === "telefone" || paramKey === "phone") {
-              value = contact.phone_number;
+            for (let i = 1; i <= template.parameters_count; i++) {
+              const paramKey = mapping[`${i}`] || mapping[String(i)] || "";
+              let value = contactName; // default
+
+              if (paramKey === "nome" || paramKey === "name" || paramKey === "1") {
+                value = contactName;
+              } else if (paramKey === "empresa" || paramKey === "company") {
+                value = contact.oficina || "sua empresa";
+              } else if (paramKey === "telefone" || paramKey === "phone") {
+                value = contact.phone_number;
+              }
+
+              params.push({ type: "text", text: value });
             }
-            
-            params.push({ type: "text", text: value });
-          }
-          
-          components.push({ type: "body", parameters: params });
-        }
 
-        payload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: formattedPhone,
-          type: "template",
-          template: {
-            name: template.name,
-            language: { code: template.language_code },
-            ...(components.length > 0 ? { components } : {}),
-          },
-        };
+            components.push({ type: "body", parameters: params });
+          }
+
+          payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: formattedPhone,
+            type: "template",
+            template: {
+              name: template.name,
+              language: { code: template.language_code },
+              ...(components.length > 0 ? { components } : {}),
+            },
+          };
+        }
       } else if (message) {
         // Send as plain text (only works within 24h window)
         payload = {
@@ -430,42 +440,43 @@ async function sendWhatsApp(
           type: "text",
           text: { body: message },
         };
-      } else {
-        return { success: false, error: "Mensagem vazia e sem template selecionado" };
       }
 
-      console.log(`[recurring-processor] Meta payload:`, JSON.stringify(payload).substring(0, 500));
+      if (payload) {
+        console.log(`[recurring-processor] Meta payload:`, JSON.stringify(payload).substring(0, 500));
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${settings.meta_access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${settings.meta_access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
 
-      const data = await response.json();
-      if (!response.ok) {
+        const data = await response.json();
+        if (response.ok) {
+          console.log(`[recurring-processor] Meta API success, message ID:`, data.messages?.[0]?.id);
+          return { success: true };
+        }
+
+        // Meta failed — log and fall through to Evolution API
         const errMsg = data.error?.message || JSON.stringify(data.error) || "Meta API error";
-        console.error(`[recurring-processor] Meta API error:`, JSON.stringify(data));
-        return { success: false, error: errMsg };
+        console.error(`[recurring-processor] Meta API falhou (${response.status}): ${errMsg} — tentando Evolution API`);
       }
-
-      console.log(`[recurring-processor] Meta API success, message ID:`, data.messages?.[0]?.id);
-      return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message };
+      console.error(`[recurring-processor] Meta API exception, tentando Evolution:`, err.message);
     }
   }
 
-  // Fallback to Evolution API
+  // Fallback to Evolution API (also used when Meta is not configured or Meta failed)
   if (settings?.evolution_api_url && settings?.evolution_api_key && settings?.evolution_instance_name) {
     if (!message) {
-      return { success: false, error: "Evolution API requer mensagem de texto" };
+      return { success: false, error: "Sem mensagem de texto para Evolution API (configure uma mensagem no dia da campanha)" };
     }
     try {
-      const evolutionUrl = `${settings.evolution_api_url}/message/sendText/${settings.evolution_instance_name}`;
+      const evolutionUrl = `${settings.evolution_api_url.replace(/\/$/, "")}/message/sendText/${settings.evolution_instance_name}`;
+      console.log(`[recurring-processor] Evolution API: ${evolutionUrl}, phone: ${formattedPhone}`);
       const response = await fetch(evolutionUrl, {
         method: "POST",
         headers: {
@@ -475,9 +486,11 @@ async function sendWhatsApp(
         body: JSON.stringify({ number: formattedPhone, text: message }),
       });
 
+      const respData = await response.json().catch(() => ({}));
+      console.log(`[recurring-processor] Evolution response ${response.status}:`, JSON.stringify(respData).substring(0, 300));
+
       if (!response.ok) {
-        const errData = await response.json();
-        return { success: false, error: errData.message || "Evolution API error" };
+        return { success: false, error: respData.message || respData.error || `Evolution API error ${response.status}` };
       }
       return { success: true };
     } catch (err: any) {
@@ -485,7 +498,7 @@ async function sendWhatsApp(
     }
   }
 
-  return { success: false, error: "Nenhuma API WhatsApp configurada" };
+  return { success: false, error: "Nenhuma API WhatsApp configurada (configure Evolution ou Meta API nas Configurações → APIs)" };
 }
 
 // ===== Ligação via make-voice-call =====
@@ -497,6 +510,7 @@ async function sendCall(
 ): Promise<{ success: boolean; error?: string }> {
   const config = dayConfig.config || {};
   const message = config.message || 'Olá {{nome}}, esta é uma mensagem da PremaCar.';
+  console.log(`[recurring-processor] Call: contactId=${contact.id}, phone=${contact.phone_number}, supabaseUrl=${supabaseUrl}`);
 
   try {
     const resp = await fetch(`${supabaseUrl}/functions/v1/make-voice-call`, {

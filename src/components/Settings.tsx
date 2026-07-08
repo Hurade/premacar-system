@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus } from 'lucide-react';
+import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
@@ -37,7 +37,7 @@ const Settings: React.FC = () => {
   const handleSave = async () => {
     if (activeTab === 'agent') {
       await agentRef.current?.save();
-    } else if (activeTab === 'apis') {
+    } else if (activeTab === 'connections') {
       await apiRef.current?.save();
     }
   };
@@ -45,15 +45,20 @@ const Settings: React.FC = () => {
   const handleCancel = () => {
     if (activeTab === 'agent') {
       agentRef.current?.cancel();
-    } else if (activeTab === 'apis') {
+    } else if (activeTab === 'connections') {
       apiRef.current?.cancel();
     }
   };
 
-  const isSaving = activeTab === 'agent' 
-    ? agentRef.current?.isSaving 
-    : apiRef.current?.isSaving;
-  
+  const isSaving = activeTab === 'agent'
+    ? agentRef.current?.isSaving
+    : activeTab === 'connections'
+    ? apiRef.current?.isSaving
+    : false;
+
+  // Tabs where the global Save/Cancel buttons are shown
+  const hasSaveButton = activeTab === 'agent' || activeTab === 'connections';
+
   return (
     <div className="p-8 max-w-5xl mx-auto h-full overflow-y-auto bg-slate-950 text-slate-50 custom-scrollbar">
       <div className="mb-10 flex items-center justify-between">
@@ -95,47 +100,43 @@ const Settings: React.FC = () => {
       <Tabs defaultValue="agent" className="w-full" onValueChange={setActiveTab}>
         <div className="flex flex-wrap items-center justify-between mb-8 gap-3">
           <div className="overflow-x-auto pb-1 -mb-1 max-w-full">
-          <TabsList>
-            <TabsTrigger value="agent" className="gap-2">
-              <Bot className="w-4 h-4" />
-              Agente
-            </TabsTrigger>
-            <TabsTrigger value="apis" className="gap-2">
-              <Plug className="w-4 h-4" />
-              APIs
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2">
-              <Cable className="w-4 h-4" />
-              Integrações
-            </TabsTrigger>
-            <TabsTrigger value="connections" className="gap-2">
-              <Smartphone className="w-4 h-4" />
-              Conexões
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Templates
-            </TabsTrigger>
-            <TabsTrigger value="quick-replies" className="gap-2">
-              <Zap className="w-4 h-4" />
-              Resp. Rápidas
-            </TabsTrigger>
-            <TabsTrigger value="knowledge" className="gap-2">
-              <Database className="w-4 h-4" />
-              Base de Conhecimento
-            </TabsTrigger>
-            <TabsTrigger value="custom-fields" className="gap-2">
-              <ListPlus className="w-4 h-4" />
-              Campos Personalizados
-            </TabsTrigger>
-            <TabsTrigger value="docs" className="gap-2">
-              <BookOpen className="w-4 h-4" />
-              Documentação
-            </TabsTrigger>
-          </TabsList>
+            <TabsList>
+              <TabsTrigger value="agent" className="gap-2">
+                <Bot className="w-4 h-4" />
+                Agente
+              </TabsTrigger>
+              <TabsTrigger value="connections" className="gap-2">
+                <Smartphone className="w-4 h-4" />
+                Conexões
+              </TabsTrigger>
+              <TabsTrigger value="integrations" className="gap-2">
+                <Cable className="w-4 h-4" />
+                Integrações
+              </TabsTrigger>
+              <TabsTrigger value="templates" className="gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Templates
+              </TabsTrigger>
+              <TabsTrigger value="quick-replies" className="gap-2">
+                <Zap className="w-4 h-4" />
+                Resp. Rápidas
+              </TabsTrigger>
+              <TabsTrigger value="knowledge" className="gap-2">
+                <Database className="w-4 h-4" />
+                Base de Conhecimento
+              </TabsTrigger>
+              <TabsTrigger value="custom-fields" className="gap-2">
+                <ListPlus className="w-4 h-4" />
+                Campos Personalizados
+              </TabsTrigger>
+              <TabsTrigger value="docs" className="gap-2">
+                <BookOpen className="w-4 h-4" />
+                Documentação
+              </TabsTrigger>
+            </TabsList>
           </div>
 
-          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'quick-replies' && activeTab !== 'knowledge' && activeTab !== 'custom-fields' && isAdmin && (
+          {hasSaveButton && isAdmin && (
             <div className="flex gap-3">
               <Button
                 variant="ghost"
@@ -164,8 +165,8 @@ const Settings: React.FC = () => {
               </Button>
             </div>
           )}
-          
-          {activeTab !== 'docs' && activeTab !== 'integrations' && activeTab !== 'connections' && activeTab !== 'templates' && activeTab !== 'knowledge' && activeTab !== 'custom-fields' && !isAdmin && (
+
+          {hasSaveButton && !isAdmin && (
             <div className="flex items-center gap-2 text-sm text-amber-400">
               <Lock className="w-4 h-4" />
               Apenas administradores podem editar
@@ -177,17 +178,23 @@ const Settings: React.FC = () => {
           <AgentSettings ref={agentRef} />
         </TabsContent>
 
-        <TabsContent value="apis">
-          <ApiSettings ref={apiRef} />
+        <TabsContent value="connections">
+          <div className="space-y-10">
+            {/* API Credentials — Evolution + Meta */}
+            <ApiSettings ref={apiRef} />
+
+            {/* Divider */}
+            <div className="border-t border-slate-800" />
+
+            {/* Connected numbers managed individually */}
+            <ConnectionsManager />
+          </div>
         </TabsContent>
 
         <TabsContent value="integrations">
           <IntegrationSettings />
         </TabsContent>
 
-        <TabsContent value="connections">
-          <ConnectionsManager />
-        </TabsContent>
         <TabsContent value="templates">
           <MetaTemplatesManager />
         </TabsContent>

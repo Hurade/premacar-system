@@ -161,8 +161,8 @@ export function ConnectionsManager() {
               </div>
 
               {conn.id.startsWith('__legacy_') ? (
-                <div className="mt-3 text-xs text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-                  Configurada em <strong>Configurações → APIs</strong>. Para gerenciar aqui, remova as credenciais de lá e adicione uma nova conexão.
+                <div className="mt-3 text-xs text-slate-400/70 bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2">
+                  Detectada pelas credenciais acima. Para gerenciar individualmente, adicione como nova conexão e limpe os campos de API acima.
                 </div>
               ) : (
                 <div className="mt-3 flex items-center gap-2">

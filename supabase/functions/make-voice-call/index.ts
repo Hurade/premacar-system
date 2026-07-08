@@ -46,8 +46,11 @@ serve(async (req) => {
     })
 
     if (!settings?.twilio_enabled || !settings?.twilio_account_sid) {
-      await saveLog(supabase, { source: SOURCE, level: 'error', message: 'Twilio not configured', metadata: { contactId } })
-      return new Response(JSON.stringify({ success: false, error: 'Twilio não configurado' }), { status: 400, headers: corsHeaders })
+      const detail = !settings?.twilio_enabled
+        ? 'Twilio desabilitado — ative em Configurações → Integrações → Twilio'
+        : 'Twilio Account SID não preenchido em Configurações → Integrações → Twilio';
+      await saveLog(supabase, { source: SOURCE, level: 'error', message: detail, metadata: { contactId, twilio_enabled: settings?.twilio_enabled, has_sid: !!settings?.twilio_account_sid } })
+      return new Response(JSON.stringify({ success: false, error: detail }), { status: 400, headers: corsHeaders })
     }
 
     // 2. Buscar contato
