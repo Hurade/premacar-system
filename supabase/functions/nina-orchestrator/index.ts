@@ -523,11 +523,32 @@ async function handoffToHuman(
       .limit(1)
       .single();
 
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('name, phone_number, company, tags')
-      .eq('id', conversation.contact_id)
-      .single();
+    // Prefer the contact already embedded in conversation (from the join at query time).
+    // Fall back to a fresh query only if not available, and include call_name which
+    // is the field Cris populates via update_contact_info during the conversation.
+    let contact = conversation.contact ?? null;
+    if (!contact && conversation.contact_id) {
+      const { data: freshContact } = await supabase
+        .from('contacts')
+        .select('name, call_name, phone_number, company, tags')
+        .eq('id', conversation.contact_id)
+        .maybeSingle();
+      contact = freshContact;
+    }
+
+    // call_name is set by Cris during qualification; name may be null for auto-created contacts
+    const displayName = contact?.call_name || contact?.name || null;
+    const displayPhone = contact?.phone_number || null;
+
+    console.log('[Nina] Contact for notification:', {
+      contact_id: conversation.contact_id,
+      has_contact: !!contact,
+      call_name: contact?.call_name,
+      name: contact?.name,
+      phone_number: contact?.phone_number,
+      displayName,
+      displayPhone,
+    });
 
     // Switch conversation to human mode
     await supabase
@@ -554,15 +575,15 @@ async function handoffToHuman(
       const notifMessage = args.is_scheduling
         ? `🔔 Novo lead para agendar demo!
 
-Nome: ${contact?.name || 'Sem nome'}
-Telefone: ${contact?.phone_number || 'Não informado'}${contact?.company ? `\nEmpresa: ${contact.company}` : ''}
+Nome: ${displayName || 'Sem nome'}
+Telefone: ${displayPhone || 'Não informado'}${contact?.company ? `\nEmpresa: ${contact.company}` : ''}
 Contexto: ${args.reason}
 
 Entre em contato para confirmar data e horário.`
         : `🔔 *Novo Lead Qualificado - PremaCar*
 
-👤 *Nome:* ${contact?.name || 'Sem nome'}
-📱 *Telefone:* ${contact?.phone_number}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
+👤 *Nome:* ${displayName || 'Sem nome'}
+📱 *Telefone:* ${displayPhone || 'Não informado'}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
 
 📋 *Contexto:*
 ${args.reason}
