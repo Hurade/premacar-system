@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import type { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
+import { api } from '@/services/api';
 
 interface ConnectionModalProps {
   connection: WhatsAppConnection | null;
@@ -27,6 +28,7 @@ interface ConnectionModalProps {
 
 export function ConnectionModal({ connection, onClose, onSave }: ConnectionModalProps) {
   const [saving, setSaving] = useState(false);
+  const [queues, setQueues] = useState<Array<{ id: string; name: string; color: string }>>([]);
   const [data, setData] = useState({
     name: connection?.name || '',
     phone_number: connection?.phone_number || '',
@@ -37,7 +39,12 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
     meta_phone_number_id: connection?.meta_phone_number_id || '',
     meta_access_token: connection?.meta_access_token || '',
     meta_business_account_id: connection?.meta_business_account_id || '',
+    default_queue_id: connection?.default_queue_id ?? null as string | null,
   });
+
+  useEffect(() => {
+    api.fetchQueues().then((data: any) => setQueues(data)).catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     if (!data.name || !data.phone_number) return;
@@ -93,6 +100,27 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
                 <SelectItem value="meta_official">✅ Meta Official API</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Fila Padrão</Label>
+            <Select
+              value={data.default_queue_id ?? '__none__'}
+              onValueChange={(v) => setData({ ...data, default_queue_id: v === '__none__' ? null : v })}
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-700">
+                <SelectValue placeholder="Nenhuma" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-700">
+                <SelectItem value="__none__">Nenhuma</SelectItem>
+                {queues.map((q) => (
+                  <SelectItem key={q.id} value={q.id}>{q.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">
+              Conversas novas nesta conexão já nascem nessa fila (ex: número dedicado de Suporte)
+            </p>
           </div>
 
           {data.api_type === 'evolution' && (

@@ -186,13 +186,19 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Check system prompt - now pre-filled by default
-      if (settings.system_prompt_override && settings.system_prompt_override.length > 100) {
+      // Check system prompt do agente Padrão (agent_configs, não mais nina_settings)
+      const { data: defaultAgent } = await supabase
+        .from('agent_configs')
+        .select('system_prompt, model_mode')
+        .eq('trigger_type', 'default')
+        .maybeSingle();
+
+      if (defaultAgent?.system_prompt && defaultAgent.system_prompt.length > 100) {
         results.push({
           component: 'agent_prompt',
           status: 'ok',
           message: 'Prompt do agente configurado',
-          details: { promptLength: settings.system_prompt_override.length },
+          details: { promptLength: defaultAgent.system_prompt.length },
         });
       } else {
         results.push({
@@ -254,7 +260,7 @@ Deno.serve(async (req) => {
         details: {
           isActive: settings.is_active,
           autoResponseEnabled: settings.auto_response_enabled,
-          aiModelMode: settings.ai_model_mode,
+          aiModelMode: defaultAgent?.model_mode ?? 'flash',
         },
       });
     }

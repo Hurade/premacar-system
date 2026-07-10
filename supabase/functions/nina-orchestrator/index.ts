@@ -62,11 +62,17 @@ const handoffToHumanTool = {
 };
 
 // ═══════════════════════════════════════════
-// AGENT SELECTION: campaign > origin > default
+// AGENT SELECTION: campanha > fila > padrão
+//
+// Substituiu campanha > origem > padrão: `conversations` nunca teve
+// colunas `origin`/`campaign_id` de verdade, então esses gatilhos
+// nunca casavam em produção. Fila (`queue_id`, atribuída manualmente
+// no chat ou por conexão) e Campanha (`campaign_id`, gravada pelo
+// webhook ao criar a conversa) são colunas reais agora.
 // ═══════════════════════════════════════════
 async function selectAgentConfig(
   supabase: ReturnType<typeof createClient>,
-  ctx: { origin: string; campaignId: string | null }
+  ctx: { queueId: string | null; campaignId: string | null }
 ) {
   // 1. Campaign-specific agent (highest priority)
   if (ctx.campaignId) {
@@ -82,13 +88,13 @@ async function selectAgentConfig(
     if (data) return data;
   }
 
-  // 2. Origin-based agent
-  if (ctx.origin) {
+  // 2. Queue-based agent
+  if (ctx.queueId) {
     const { data } = await supabase
       .from('agent_configs')
       .select('*')
-      .eq('trigger_type', 'origin')
-      .eq('trigger_origin', ctx.origin)
+      .eq('trigger_type', 'queue')
+      .eq('trigger_queue_id', ctx.queueId)
       .eq('is_active', true)
       .order('priority', { ascending: false })
       .limit(1)
@@ -254,11 +260,8 @@ Deno.serve(async (req) => {
         const effectiveSettings = settings || {
           is_active: true,
           auto_response_enabled: true,
-          system_prompt_override: null,
-          ai_model_mode: 'flash',
           response_delay_min: 1000,
           response_delay_max: 3000,
-          message_breaking_enabled: false,
           audio_response_enabled: false,
           elevenlabs_api_key: null,
           ai_scheduling_enabled: true,
@@ -278,23 +281,26 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Select agent config: campaign > origin > default > nina_settings fallback
+        // Select agent config: campanha > fila > padrão (agent_configs
+        // sempre tem uma linha 'default' ativa — ver migration
+        // 20260710120000_unify_agent_configs.sql)
         const agentConfig = await selectAgentConfig(supabase, {
-          origin: conversation.origin ?? 'inbound',
+          queueId: conversation.queue_id ?? null,
           campaignId: conversation.campaign_id ?? null,
         });
 
-        const systemPrompt = agentConfig?.system_prompt
-          || effectiveSettings.system_prompt_override
-          || getDefaultSystemPrompt();
+        const systemPrompt = agentConfig?.system_prompt || getDefaultSystemPrompt();
 
-        // Merge agent-level overrides into effective settings when config found
-        const mergedSettings = agentConfig ? {
+        // Prompt/modelo/comportamento vêm inteiramente do agente selecionado
+        // (system_prompt_override/ai_model_mode/message_breaking_enabled/
+        // ai_activation_delay_minutes saíram de nina_settings — unificados
+        // em agent_configs)
+        const mergedSettings = {
           ...effectiveSettings,
-          ai_model_mode: agentConfig.model_mode ?? effectiveSettings.ai_model_mode,
-          message_breaking_enabled: agentConfig.message_breaking_enabled ?? effectiveSettings.message_breaking_enabled,
-          ai_activation_delay_minutes: agentConfig.ai_activation_delay_minutes ?? effectiveSettings.ai_activation_delay_minutes,
-        } : effectiveSettings;
+          ai_model_mode: agentConfig?.model_mode ?? 'flash',
+          message_breaking_enabled: agentConfig?.message_breaking_enabled ?? true,
+          ai_activation_delay_minutes: agentConfig?.ai_activation_delay_minutes ?? 5,
+        };
 
         console.log(`[Nina] Agent selected: ${agentConfig?.name ?? 'nina_settings fallback'} (trigger: ${agentConfig?.trigger_type ?? 'none'})`);
 
@@ -1327,6 +1333,7 @@ async function queueTextResponse(
     
     const { error: sendQueueError } = await supabase.from('send_queue').insert({
       conversation_id: conversation.id, contact_id: conversation.contact_id,
+      connection_id: conversation.connection_id ?? null,
       content: messageChunks[i], from_type: 'nina', message_type: 'text', priority: 1,
       scheduled_at: new Date(Date.now() + chunkDelay).toISOString(),
       metadata: {
@@ -1358,6 +1365,7 @@ async function queueHoldingMessage(
   await supabase.from('send_queue').insert({
     conversation_id: conversation.id,
     contact_id: conversation.contact_id,
+    connection_id: conversation.connection_id ?? null,
     content,
     from_type: 'nina',
     message_type: 'text',

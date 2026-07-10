@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { api } from '@/services/api';
+import { api, logUserAction } from '@/services/api';
 import { 
   UIConversation, 
   UIMessage,
@@ -116,7 +116,7 @@ export function useConversations() {
     try {
       const { data: convData, error: convError } = await supabase
         .from('conversations')
-        .select(`*, contact:contacts(*)`)
+        .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
         .eq('id', conversationId)
         .maybeSingle();
       
@@ -720,8 +720,79 @@ export function useConversations() {
     }
   }, [conversations]);
 
-  // Finalize conversation (mark as inactive)
+  // Assign conversation to a queue (categorização/roteamento por setor)
+  const assignQueue = useCallback(async (conversationId: string, queueId: string | null) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv) return;
+
+    setConversations(prev => prev.map(c => (
+      c.id === conversationId ? { ...c, queueId } : c
+    )));
+
+    try {
+      await api.assignQueue(conversationId, queueId);
+    } catch (err) {
+      console.error('[useConversations] Error assigning queue:', err);
+      setConversations(prev => prev.map(c => (
+        c.id === conversationId ? { ...c, queueId: conv.queueId } : c
+      )));
+    }
+  }, [conversations]);
+
+  // Transfere a conversa para outra conexão WhatsApp, mantendo o histórico
+  const transferConnection = useCallback(async (
+    conversationId: string,
+    newConnection: { id: string; name: string; api_type: 'evolution' | 'meta_official' }
+  ) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv) return;
+
+    const previousConnectionId = conv.connectionId;
+    const newApiSource: 'meta' | 'evolution' = newConnection.api_type === 'meta_official' ? 'meta' : 'evolution';
+
+    setConversations(prev => prev.map(c => (
+      c.id === conversationId
+        ? { ...c, connectionId: newConnection.id, connectionName: newConnection.name, apiSource: newApiSource }
+        : c
+    )));
+
+    try {
+      await api.transferConnection(conversationId, newConnection.id, newConnection.api_type, previousConnectionId);
+    } catch (err) {
+      console.error('[useConversations] Error transferring connection:', err);
+      setConversations(prev => prev.map(c => (
+        c.id === conversationId
+          ? { ...c, connectionId: conv.connectionId, connectionName: conv.connectionName, apiSource: conv.apiSource }
+          : c
+      )));
+      throw err;
+    }
+  }, [conversations]);
+
+  // Toggle favorite flag
+  const toggleFavorite = useCallback(async (conversationId: string) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv) return;
+    const nextValue = !conv.isFavorite;
+
+    setConversations(prev => prev.map(c => (
+      c.id === conversationId ? { ...c, isFavorite: nextValue } : c
+    )));
+
+    try {
+      await api.toggleConversationFavorite(conversationId, nextValue);
+    } catch (err) {
+      console.error('[useConversations] Error toggling favorite:', err);
+      setConversations(prev => prev.map(c => (
+        c.id === conversationId ? { ...c, isFavorite: conv.isFavorite } : c
+      )));
+    }
+  }, [conversations]);
+
+  // Finalize conversation (mark as inactive) — dispara pesquisa de CSAT
   const finalizeConversation = useCallback(async (conversationId: string) => {
+    const conv = conversations.find(c => c.id === conversationId);
+
     try {
       const { error } = await supabase
         .from('conversations')
@@ -730,15 +801,23 @@ export function useConversations() {
 
       if (error) throw error;
 
+      logUserAction('finalize_conversation', 'conversation', conversationId);
+
+      if (conv?.contactId) {
+        api.sendCsatSurvey(conversationId, conv.contactId).catch((err) =>
+          console.error('[useConversations] Error sending CSAT survey (non-blocking):', err)
+        );
+      }
+
       // Remove from active conversations list
       setConversations(prev => prev.filter(c => c.id !== conversationId));
-      
+
       return true;
     } catch (err) {
       console.error('[useConversations] Error finalizing conversation:', err);
       throw err;
     }
-  }, []);
+  }, [conversations]);
 
   // Delete conversation and all messages
   const deleteConversation = useCallback(async (conversationId: string) => {
@@ -767,9 +846,11 @@ export function useConversations() {
 
       if (convError) throw convError;
 
+      logUserAction('delete_conversation', 'conversation', conversationId);
+
       // Remove from state
       setConversations(prev => prev.filter(c => c.id !== conversationId));
-      
+
       return true;
     } catch (err) {
       console.error('[useConversations] Error deleting conversation:', err);
@@ -779,10 +860,11 @@ export function useConversations() {
 
   // Create new conversation for a contact
   const createConversation = useCallback(async (
-    contactId: string, 
+    contactId: string,
     apiSource: 'meta' | 'evolution' = 'evolution',
     templateId?: string,
-    connectionId?: string
+    connectionId?: string,
+    queueId?: string
   ): Promise<string> => {
     try {
       // Check if there's already an active conversation for this contact WITH THE SAME API SOURCE
@@ -808,6 +890,7 @@ export function useConversations() {
           last_message_at: new Date().toISOString(),
           api_source: apiSource,
           connection_id: connectionId ?? null,
+          queue_id: queueId ?? null,
           metadata: templateId ? { initial_template_id: templateId } : {},
         })
         .select()
@@ -834,6 +917,9 @@ export function useConversations() {
     updateStatus,
     markAsRead,
     assignConversation,
+    assignQueue,
+    transferConnection,
+    toggleFavorite,
     finalizeConversation,
     deleteConversation,
     createConversation,

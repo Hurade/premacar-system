@@ -5,7 +5,7 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
-  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign
+  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -17,7 +17,7 @@ import { useConversations } from '../hooks/useConversations';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useUserRole } from '@/hooks/useUserRole';
-import { api } from '@/services/api';
+import { api, logUserAction } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,7 +48,7 @@ import { VoiceCallsPanel } from './chat/VoiceCallsPanel';
 import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-type FilterType = 'all' | 'unread';
+type FilterType = 'all' | 'unread' | 'favorite';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
 
 interface ContactOption {
@@ -61,9 +61,10 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, finalizeConversation, deleteConversation, createConversation, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, createConversation, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
-  const { currentUserName } = useUserRole();
+  const { currentUserName, isAdmin, isManager } = useUserRole();
+  const canSupervise = isAdmin || isManager;
   const signatureName = currentUserName || sdrName;
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -81,7 +82,10 @@ const ChatInterface: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [filterAssignedUser, setFilterAssignedUser] = useState<string | null>(null);
-  
+  const [filterQueue, setFilterQueue] = useState<string | null>(null);
+  const [queues, setQueues] = useState<any[]>([]);
+  const [spyConversationId, setSpyConversationId] = useState<string | null>(null);
+
   // Estados para modais de confirmação
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -97,6 +101,7 @@ const ChatInterface: React.FC = () => {
   const [selectedApiSource, setSelectedApiSource] = useState<'meta' | 'evolution'>('evolution');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
+  const [selectedQueueId, setSelectedQueueId] = useState('');
   const [newContactMode, setNewContactMode] = useState(false);
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -130,7 +135,27 @@ const ChatInterface: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeChat = conversations.find(c => c.id === selectedChatId);
+  const isSpyMode = canSupervise && spyConversationId !== null && spyConversationId === selectedChatId;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleExportConversation = (chat: UIConversation) => {
+    const header = 'Data,Remetente,Tipo,Conteudo\n';
+    const rows = chat.messages.map(m => {
+      const remetente = m.isInternal ? 'Nota Interna' : m.direction === MessageDirection.OUTGOING ? (m.senderName || 'Atendente') : chat.contactName;
+      const conteudo = (m.content || '').replace(/"/g, '""').replace(/\n/g, ' ');
+      return `"${m.sentAt}","${remetente}","${m.type}","${conteudo}"`;
+    }).join('\n');
+
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `conversa_${chat.contactName.replace(/\s+/g, '_')}_${chat.protocolNumber || chat.id}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    logUserAction('export_messages', 'conversation', chat.id);
+  };
   
   // 24h Window hook for Meta API
   const {
@@ -146,13 +171,14 @@ const ChatInterface: React.FC = () => {
   // Approved Meta templates for new conversation modal
   const { data: approvedMetaTemplates = [] } = useApprovedMetaTemplates();
 
-  // Active WhatsApp connections for new conversation modal
+  // Active WhatsApp connections for new conversation modal e para
+  // transferir uma conversa existente entre conexões
   const { data: activeConnections = [] } = useQuery({
     queryKey: ['whatsapp-connections-active'],
     queryFn: async () => {
       const { data } = await supabase
         .from('whatsapp_connections')
-        .select('id, name, phone_number, is_connected')
+        .select('id, name, phone_number, is_connected, api_type')
         .eq('is_connected', true)
         .order('name');
       return data || [];
@@ -177,6 +203,10 @@ const ChatInterface: React.FC = () => {
     api.fetchTeam().then(setTeamMembers).catch(err => {
       console.error('Error loading team members:', err);
     });
+
+    api.fetchQueues().then(setQueues).catch(err => {
+      console.error('Error loading queues:', err);
+    });
   }, []);
 
   // Handle URL params for conversation selection and new contact
@@ -195,25 +225,41 @@ const ChatInterface: React.FC = () => {
         refetchedForConvParam.current = conversationParam;
         refetch();
       }
-    } else if (newContactParam && !isCreatingConversation) {
-      // Criar nova conversa para o contato
+    } else if (newContactParam && !isCreatingConversation && !showNewConversationModal) {
+      // Não cria a conversa direto — abre o modal "Nova Conversa" já com o
+      // contato selecionado, pra sempre passar pela escolha obrigatória de
+      // Conexão + Fila, não importa a tela de origem (Contatos, Proposta, etc).
       setIsCreatingConversation(true);
-      createConversation(newContactParam).then(newConvId => {
-        setSelectedChatId(newConvId);
-        // Limpar parâmetros da URL
-        searchParams.delete('newContact');
-        searchParams.delete('phone');
-        setSearchParams(searchParams, { replace: true });
-        toast.success('Conversa iniciada!');
-      }).catch(err => {
-        console.error('Error creating conversation:', err);
-        toast.error('Erro ao iniciar conversa');
-      }).finally(() => {
-        setIsCreatingConversation(false);
-      });
+      (async () => {
+        try {
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('id, name, phone_number')
+            .eq('id', newContactParam)
+            .maybeSingle();
+
+          if (contact) {
+            setSelectedContactForConv(contact);
+            setSelectedTagsForConv([]);
+            setSelectedApiSource('evolution');
+            setSelectedTemplateId('');
+            setSelectedConnectionId('');
+            setSelectedQueueId('');
+            setNewContactMode(false);
+            setShowNewConversationModal(true);
+          } else {
+            toast.error('Contato não encontrado');
+          }
+          searchParams.delete('newContact');
+          searchParams.delete('phone');
+          setSearchParams(searchParams, { replace: true });
+        } finally {
+          setIsCreatingConversation(false);
+        }
+      })();
     }
     // Removido: auto-seleção do primeiro chat ao entrar na página
-  }, [conversations, loading, selectedChatId, searchParams, createConversation, setSearchParams, isCreatingConversation, refetch]);
+  }, [conversations, loading, selectedChatId, searchParams, setSearchParams, isCreatingConversation, showNewConversationModal, refetch]);
 
   // Mark as read when selecting conversation
   useEffect(() => {
@@ -414,6 +460,21 @@ const ChatInterface: React.FC = () => {
     await updateStatus(activeChat.id, status);
   };
 
+  const handleTransferConnection = async (connection: { id: string; name: string; api_type: string }) => {
+    if (!activeChat) return;
+    try {
+      await transferConnection(activeChat.id, {
+        id: connection.id,
+        name: connection.name,
+        api_type: connection.api_type as 'evolution' | 'meta_official',
+      });
+      toast.success(`Conversa transferida para ${connection.name}`);
+    } catch (error) {
+      console.error('Error transferring connection:', error);
+      toast.error('Erro ao transferir conexão');
+    }
+  };
+
   const handleFinalizeConversation = async () => {
     if (!activeChat) return;
     setIsProcessingAction(true);
@@ -484,24 +545,18 @@ const ChatInterface: React.FC = () => {
     setSelectedApiSource('evolution');
     setSelectedTemplateId('');
     setSelectedConnectionId('');
+    setSelectedQueueId('');
     setNewContactMode(false);
     setShowNewConversationModal(true);
     searchContacts('');
   };
 
-  const handleInlineContactCreated = async (contactId: string) => {
-    setIsCreatingConversation(true);
-    try {
-      const newConvId = await createConversation(contactId, selectedApiSource);
-      setSelectedChatId(newConvId);
-      setShowNewConversationModal(false);
-      toast.success('Conversa iniciada com novo contato!');
-    } catch (err) {
-      console.error('Error starting conversation:', err);
-      toast.error('Erro ao iniciar conversa');
-    } finally {
-      setIsCreatingConversation(false);
-    }
+  // Contato criado inline vira o contato selecionado, para passar pelo
+  // mesmo passo de Conexão + Fila obrigatórias que os demais fluxos
+  // (não cria a conversa direto — evita duplicar a validação em dois lugares).
+  const handleInlineContactCreated = (contactId: string, name: string | null, phoneNumber: string) => {
+    setNewContactMode(false);
+    setSelectedContactForConv({ id: contactId, name, phone_number: phoneNumber });
   };
 
   const handleSelectContactForConv = (contact: ContactOption) => {
@@ -516,14 +571,25 @@ const ChatInterface: React.FC = () => {
     );
   };
 
+  // Conexões compatíveis com a API escolhida (Evolution vs Meta) — toda
+  // conversa nova precisa de conexão e fila explícitas, não importa a tela
+  // de origem (Contatos, Proposta, ou o próprio botão "Nova Conversa").
+  const connectionsForSelectedApi = activeConnections.filter(c =>
+    selectedApiSource === 'meta' ? c.api_type === 'meta_official' : c.api_type === 'evolution'
+  );
+
   const handleStartNewConversation = async () => {
     if (!selectedContactForConv) return;
     if (selectedApiSource === 'meta' && !selectedTemplateId) {
       toast.error('Selecione um template para iniciar conversa via Meta API');
       return;
     }
-    if (selectedApiSource === 'evolution' && activeConnections.length > 1 && !selectedConnectionId) {
+    if (!selectedConnectionId) {
       toast.error('Selecione qual conexão usar');
+      return;
+    }
+    if (!selectedQueueId) {
+      toast.error('Selecione qual fila vai atender esta conversa');
       return;
     }
 
@@ -538,7 +604,8 @@ const ChatInterface: React.FC = () => {
         selectedContactForConv.id,
         selectedApiSource,
         selectedApiSource === 'meta' ? selectedTemplateId : undefined,
-        selectedApiSource === 'evolution' && activeConnections.length > 0 ? (selectedConnectionId || activeConnections[0].id) : undefined
+        selectedConnectionId,
+        selectedQueueId
       );
       setSelectedChatId(newConvId);
       setShowNewConversationModal(false);
@@ -557,17 +624,27 @@ const ChatInterface: React.FC = () => {
     if (filterType === 'unread' && chat.unreadCount === 0) {
       return false;
     }
-    
+
+    // Filtro por favoritas
+    if (filterType === 'favorite' && !chat.isFavorite) {
+      return false;
+    }
+
     // Filtro por status da conversa
     if (statusFilter !== 'all' && chat.status !== statusFilter) {
       return false;
     }
-    
+
     // Filtro por membro da equipe atribuído
     if (filterAssignedUser && chat.assignedUserId !== filterAssignedUser) {
       return false;
     }
-    
+
+    // Filtro por fila de atendimento
+    if (filterQueue && chat.queueId !== filterQueue) {
+      return false;
+    }
+
     // Filtro por tag (incluir apenas conversas com esta tag)
     if (filterTag && !chat.tags.includes(filterTag)) {
       return false;
@@ -798,8 +875,19 @@ const ChatInterface: React.FC = () => {
                   <Inbox className="w-3 h-3" />
                   Não lidas
                 </button>
+                <button
+                  onClick={() => setFilterType(filterType === 'favorite' ? 'all' : 'favorite')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                    filterType === 'favorite'
+                      ? 'bg-cyan-600 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Star className="w-3 h-3" />
+                  Favoritas
+                </button>
               </div>
-              
+
               {/* Filtro por status */}
               <Popover>
                 <PopoverTrigger asChild>
@@ -1054,11 +1142,64 @@ const ChatInterface: React.FC = () => {
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {/* Filtro por fila de atendimento */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      filterQueue
+                        ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <Layers className="w-3 h-3" />
+                    {filterQueue ? queues.find(q => q.id === filterQueue)?.name || 'Fila' : 'Fila'}
+                    {filterQueue && (
+                      <X
+                        className="w-3 h-3 ml-1 hover:text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterQueue(null);
+                        }}
+                      />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2 bg-slate-900 border-slate-700">
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 px-3 py-1 font-medium">Ver conversas da fila:</p>
+                    <button
+                      onClick={() => setFilterQueue(null)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                        !filterQueue ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      Todas as filas
+                    </button>
+                    {queues.filter(q => q.is_active).map(queue => (
+                      <button
+                        key={queue.id}
+                        onClick={() => setFilterQueue(queue.id)}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                          filterQueue === queue.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: queue.color }} />
+                        {queue.name}
+                      </button>
+                    ))}
+                    {queues.filter(q => q.is_active).length === 0 && (
+                      <p className="text-xs text-slate-500 text-center py-2">Nenhuma fila criada</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-          
+
           {/* Contador de resultados */}
-          {(filterType !== 'all' || filterTag || statusFilter !== 'all' || excludedTags.length > 0 || filterAssignedUser || searchQuery) && (
+          {(filterType !== 'all' || filterTag || statusFilter !== 'all' || excludedTags.length > 0 || filterAssignedUser || filterQueue || searchQuery) && (
             <p className="text-xs text-slate-500">
               {filteredConversations.length} conversa{filteredConversations.length !== 1 ? 's' : ''} encontrada{filteredConversations.length !== 1 ? 's' : ''}
             </p>
@@ -1101,10 +1242,36 @@ const ChatInterface: React.FC = () => {
                 
                 <div className="ml-3 flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
-                    <h3 className={`text-sm font-semibold truncate ${selectedChatId === chat.id ? 'text-white' : 'text-slate-300'}`}>
+                    <h3 className={`text-sm font-semibold truncate flex items-center gap-1 ${selectedChatId === chat.id ? 'text-white' : 'text-slate-300'}`}>
                       {chat.contactName}
                     </h3>
-                    <span className="text-[10px] text-slate-500 font-medium">{chat.lastMessageTime}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(chat.id);
+                        }}
+                        title={chat.isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                        className="p-0.5"
+                      >
+                        <Star className={`w-3.5 h-3.5 ${chat.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-slate-600 hover:text-amber-400'}`} />
+                      </button>
+                      {canSupervise && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSpyConversationId(chat.id);
+                            setSelectedChatId(chat.id);
+                            logUserAction('espiar_conversa', 'conversation', chat.id);
+                          }}
+                          title="Espiar conversa (modo supervisão, sem participar)"
+                          className="p-0.5"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-600 hover:text-cyan-400" />
+                        </button>
+                      )}
+                      <span className="text-[10px] text-slate-500 font-medium">{chat.lastMessageTime}</span>
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
                     {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
@@ -1230,9 +1397,42 @@ const ChatInterface: React.FC = () => {
                 <div className="h-6 w-px bg-slate-800 mx-1"></div>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Transferir conexão"
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <Repeat className="w-5 h-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2 bg-slate-900 border-slate-700" align="end">
+                    <p className="text-xs text-slate-500 px-2 pb-2">Transferir conversa para:</p>
+                    <div className="space-y-1">
+                      {activeConnections
+                        .filter((c: any) => c.id !== activeChat.connectionId)
+                        .map((c: any) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleTransferConnection(c)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                          >
+                            <span>{c.api_type === 'meta_official' ? '✅' : '🔧'}</span>
+                            <span className="truncate">{c.name}</span>
+                          </button>
+                        ))}
+                      {activeConnections.filter((c: any) => c.id !== activeChat.connectionId).length === 0 && (
+                        <p className="text-xs text-slate-600 px-2 py-1.5">Nenhuma outra conexão ativa</p>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <div className="h-6 w-px bg-slate-800 mx-1"></div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       title="Mais opções"
                       className="text-slate-400 hover:text-white"
                     >
@@ -1241,6 +1441,13 @@ const ChatInterface: React.FC = () => {
                   </PopoverTrigger>
                   <PopoverContent className="w-48 p-2 bg-slate-900 border-slate-700" align="end">
                     <div className="space-y-1">
+                      <button
+                        onClick={() => handleExportConversation(activeChat)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                      >
+                        <Download className="w-4 h-4 text-cyan-400" />
+                        Exportar Conversa
+                      </button>
                       <button
                         onClick={() => setShowFinalizeDialog(true)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
@@ -1260,6 +1467,21 @@ const ChatInterface: React.FC = () => {
                 </Popover>
               </div>
             </div>
+
+            {isSpyMode && (
+              <div className="flex items-center justify-between gap-2 px-4 py-2 bg-cyan-950/60 border-b border-cyan-800/50 text-cyan-300 text-xs font-medium shrink-0">
+                <span className="flex items-center gap-2">
+                  <Eye className="w-3.5 h-3.5" />
+                  Você está em modo supervisão — visualizando sem participar
+                </span>
+                <button
+                  onClick={() => setSpyConversationId(null)}
+                  className="text-cyan-300 hover:text-white underline"
+                >
+                  Sair da supervisão
+                </button>
+              </div>
+            )}
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-0">
@@ -1356,11 +1578,16 @@ const ChatInterface: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area OR Window Expired Alert */}
-            {activeChat.apiSource === 'meta' && !canSendFreeMessage ? (
+            {/* Input Area OR Window Expired Alert OR Modo Supervisão */}
+            {isSpyMode ? (
+              <div className="p-4 border-t border-cyan-800/40 bg-cyan-950/40 text-center text-xs text-cyan-300">
+                Modo supervisão ativo — envio de mensagens desabilitado nesta conversa.
+              </div>
+            ) : activeChat.apiSource === 'meta' && !canSendFreeMessage ? (
               <WindowExpiredAlert
                 conversationId={activeChat.id}
                 contactId={activeChat.contactId}
+                connectionId={activeChat.connectionId}
                 expiredAt={expiredAt}
                 hoursSinceExpired={hoursSinceExpired}
                 onTemplateSent={refetchWindow}
@@ -1765,6 +1992,26 @@ const ChatInterface: React.FC = () => {
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
 
+                {/* Queue / Fila */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    Fila
+                  </h4>
+                  <select
+                    value={activeChat.queueId || ''}
+                    onChange={(e) => assignQueue(activeChat.id, e.target.value || null)}
+                    className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none transition-all"
+                  >
+                    <option value="">Sem fila</option>
+                    {queues.filter(q => q.is_active).map(queue => (
+                      <option key={queue.id} value={queue.id}>{queue.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="h-px bg-slate-800/50 w-full"></div>
+
                 {/* Tags */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
@@ -1969,6 +2216,7 @@ const ChatInterface: React.FC = () => {
         if (!open) {
           setSelectedTemplateId('');
           setSelectedConnectionId('');
+          setSelectedQueueId('');
         }
       }}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
@@ -2083,7 +2331,7 @@ const ChatInterface: React.FC = () => {
                   <label className="text-sm font-medium text-slate-300">Conexão de Envio</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => setSelectedApiSource('evolution')}
+                      onClick={() => { setSelectedApiSource('evolution'); setSelectedConnectionId(''); }}
                       className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
                         selectedApiSource === 'evolution'
                           ? 'border-emerald-500 bg-emerald-500/10'
@@ -2096,7 +2344,7 @@ const ChatInterface: React.FC = () => {
                       </span>
                     </button>
                     <button
-                      onClick={() => setSelectedApiSource('meta')}
+                      onClick={() => { setSelectedApiSource('meta'); setSelectedConnectionId(''); }}
                       className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
                         selectedApiSource === 'meta'
                           ? 'border-blue-500 bg-blue-500/10'
@@ -2146,24 +2394,52 @@ const ChatInterface: React.FC = () => {
                   </div>
                 )}
 
-                {/* Seletor de conexão (Evolution, múltiplas) */}
-                {selectedApiSource === 'evolution' && activeConnections.length > 1 && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">Qual conexão usar?</label>
+                {/* Seletor de conexão (obrigatório) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Qual conexão usar? *</label>
+                  {connectionsForSelectedApi.length === 0 ? (
+                    <p className="text-xs text-amber-400 p-3 border border-amber-500/30 bg-amber-500/10 rounded-lg">
+                      Nenhuma conexão {selectedApiSource === 'meta' ? 'Meta' : 'Evolution'} ativa configurada.
+                      Configure uma em Configurações → Conexões.
+                    </p>
+                  ) : (
                     <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
                       <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200">
                         <SelectValue placeholder="Selecione uma conexão..." />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-700">
-                        {activeConnections.map(c => (
+                        {connectionsForSelectedApi.map(c => (
                           <SelectItem key={c.id} value={c.id} className="text-slate-200">
                             {c.name} ({c.phone_number})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* Seletor de fila (obrigatório) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Qual fila vai atender? *</label>
+                  {queues.filter(q => q.is_active).length === 0 ? (
+                    <p className="text-xs text-amber-400 p-3 border border-amber-500/30 bg-amber-500/10 rounded-lg">
+                      Nenhuma fila ativa configurada. Configure uma em Configurações → Filas.
+                    </p>
+                  ) : (
+                    <Select value={selectedQueueId} onValueChange={setSelectedQueueId}>
+                      <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200">
+                        <SelectValue placeholder="Selecione uma fila..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        {queues.filter(q => q.is_active).map(q => (
+                          <SelectItem key={q.id} value={q.id} className="text-slate-200">
+                            {q.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
 
                 {/* Seleção de Tags */}
                 <div className="space-y-2">
@@ -2204,7 +2480,8 @@ const ChatInterface: React.FC = () => {
                   disabled={
                     isCreatingConversation ||
                     (selectedApiSource === 'meta' && !selectedTemplateId) ||
-                    (selectedApiSource === 'evolution' && activeConnections.length > 1 && !selectedConnectionId)
+                    !selectedConnectionId ||
+                    !selectedQueueId
                   }
                   className="w-full h-11 gap-2"
                 >

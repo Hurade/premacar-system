@@ -9,6 +9,7 @@ import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
 interface WindowExpiredAlertProps {
   conversationId: string;
   contactId: string;
+  connectionId?: string | null;
   expiredAt: Date | null;
   hoursSinceExpired: number;
   onTemplateSent: () => void;
@@ -17,6 +18,7 @@ interface WindowExpiredAlertProps {
 export function WindowExpiredAlert({
   conversationId,
   contactId,
+  connectionId,
   expiredAt,
   hoursSinceExpired,
   onTemplateSent,
@@ -42,25 +44,45 @@ export function WindowExpiredAlert({
 
       if (!contact) throw new Error('Contato não encontrado');
 
-      // Get Meta settings
-      const { data: settings } = await supabase
-        .from('nina_settings')
-        .select('meta_phone_number_id, meta_access_token')
-        .limit(1)
-        .single();
+      // Credenciais Meta: da conexão específica da conversa quando houver,
+      // senão cai na config global legada (mesmo fallback usado nas edge
+      // functions — ver connection-resolver.ts).
+      let metaPhoneNumberId: string | null = null;
+      let metaAccessToken: string | null = null;
 
-      if (!settings?.meta_phone_number_id || !settings?.meta_access_token) {
+      if (connectionId) {
+        const { data: conn } = await supabase
+          .from('whatsapp_connections')
+          .select('meta_phone_number_id, meta_access_token')
+          .eq('id', connectionId)
+          .eq('is_active', true)
+          .maybeSingle();
+        metaPhoneNumberId = conn?.meta_phone_number_id ?? null;
+        metaAccessToken = conn?.meta_access_token ?? null;
+      }
+
+      if (!metaPhoneNumberId || !metaAccessToken) {
+        const { data: settings } = await supabase
+          .from('nina_settings')
+          .select('meta_phone_number_id, meta_access_token')
+          .limit(1)
+          .single();
+        metaPhoneNumberId = settings?.meta_phone_number_id ?? null;
+        metaAccessToken = settings?.meta_access_token ?? null;
+      }
+
+      if (!metaPhoneNumberId || !metaAccessToken) {
         throw new Error('Credenciais Meta não configuradas');
       }
 
       // Send template via Meta API
       const phone = contact.phone_number.replace(/\D/g, '');
       const metaResponse = await fetch(
-        `https://graph.facebook.com/v21.0/${settings.meta_phone_number_id}/messages`,
+        `https://graph.facebook.com/v21.0/${metaPhoneNumberId}/messages`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${settings.meta_access_token}`,
+            'Authorization': `Bearer ${metaAccessToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({

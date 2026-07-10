@@ -91,6 +91,17 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
   const [startType, setStartType] = useState<'immediate' | 'scheduled'>('immediate');
   const [scheduledStart, setScheduledStart] = useState('');
   const [apiSource, setApiSource] = useState<'meta' | 'evolution'>('meta');
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<Array<{ id: string; name: string; api_type: string }>>([]);
+
+  useEffect(() => {
+    supabase
+      .from('whatsapp_connections')
+      .select('id, name, api_type')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setConnections(data || []));
+  }, []);
 
   // Leads state
   const [leads, setLeads] = useState<ParsedLead[]>([]);
@@ -352,6 +363,7 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
         scheduled_start: startType === 'scheduled' ? scheduledStart : null,
         total_leads: leads.length,
         api_source: apiSource,
+        connection_id: connectionId,
         tag_on_delivered: tagOnDelivered && tagOnDelivered !== 'none' ? tagOnDelivered : null,
         tag_on_no_whatsapp: tagOnNoWhatsApp && tagOnNoWhatsApp !== 'none' ? tagOnNoWhatsApp : null,
       });
@@ -432,10 +444,31 @@ export const BroadcastNewCampaign: React.FC<NewCampaignProps> = ({ onSuccess }) 
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {apiSource === 'meta' 
+              {apiSource === 'meta'
                 ? '🔵 Templates pré-aprovados pela Meta para iniciar conversas.'
                 : '🟢 Mensagens personalizadas via Evolution API.'
               }
+            </p>
+          </div>
+
+          {/* Conexão WhatsApp (opcional) */}
+          <div className="space-y-2">
+            <Label>Conexão WhatsApp</Label>
+            <Select value={connectionId ?? '__default__'} onValueChange={(v) => setConnectionId(v === '__default__' ? null : v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__default__">Usar configuração padrão</SelectItem>
+                {connections
+                  .filter((c) => (apiSource === 'meta' ? c.api_type === 'meta_official' : c.api_type === 'evolution'))
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Qual conexão cadastrada em Configurações envia esta campanha. Deixe em "padrão" para manter o comportamento atual.
             </p>
           </div>
 

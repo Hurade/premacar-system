@@ -5,6 +5,7 @@ import { Link, LinkProps } from "react-router-dom";
 import React, { useState, createContext, useContext } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, ChevronLeft } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 
 interface Links {
   label: string;
@@ -145,11 +146,12 @@ export const MobileSidebar = ({
         )}
         {...props}
       >
-        <div className="flex justify-end z-20 w-full">
+        <div className="flex items-center justify-between z-20 w-full">
           <Menu
             className="text-slate-200 cursor-pointer hover:text-cyan-400 transition-colors"
             onClick={() => setOpen(!open)}
           />
+          <NotificationBell />
         </div>
         <AnimatePresence>
           {open && (

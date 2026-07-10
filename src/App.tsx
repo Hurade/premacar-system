@@ -13,9 +13,7 @@ import Broadcasts from './pages/Broadcasts';
 import Campanhas from './pages/Campanhas';
 import CreateCampaign from './pages/CreateCampaign';
 import CampaignDetails from './pages/CampaignDetails';
-import Logs from './pages/Logs';
 import Followup from './pages/Followup';
-import Agentes from './pages/Agentes';
 import Automacoes from './pages/Automacoes';
 import BroadcastDetails from './pages/BroadcastDetails';
 import Auth from './pages/Auth';
@@ -28,6 +26,8 @@ import NovaPropostaWizard from './pages/propostas/NovaPropostaWizard';
 import PropostaDetalhe from './pages/propostas/PropostaDetalhe';
 import PropostaPublica from './pages/propostas/PropostaPublica';
 import Biblioteca from './pages/propostas/Biblioteca';
+import DuplicateContacts from './pages/DuplicateContacts';
+import CsatPublic from './pages/CsatPublic';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -35,6 +35,7 @@ import { UserRoleProvider } from './hooks/useUserRole';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { useOnlinePresence } from './hooks/useOnlinePresence';
+import NotificationBell from './components/NotificationBell';
 
 // Sem UI própria — só mantém a sessão do usuário logado marcada como "online"
 // via Presence API do Supabase Realtime enquanto o app estiver aberto.
@@ -58,15 +59,14 @@ const PAGE_TITLES: Record<string, string> = {
   '/scheduling': 'PremaCar - Agendamentos',
   '/team': 'PremaCar - Equipe',
   '/settings': 'PremaCar - Configurações',
-  '/logs': 'PremaCar - Logs',
   '/followup': 'PremaCar - Follow-up',
-  '/agentes': 'PremaCar - Agentes de IA',
   '/automacoes': 'PremaCar - Automações',
   '/auth': 'PremaCar - Login',
   '/propostas': 'PremaCar - Propostas',
   '/propostas/leads': 'PremaCar - Leads',
   '/propostas/nova': 'PremaCar - Nova Proposta',
   '/propostas/biblioteca': 'PremaCar - Biblioteca Comercial',
+  '/contatos-duplicados': 'PremaCar - Contatos Duplicados',
 };
 
 const PageTitle: React.FC = () => {
@@ -93,7 +93,12 @@ const AppLayout: React.FC = () => {
       <main className="flex-1 h-full overflow-hidden relative z-10 flex flex-col pt-14 md:pt-0">
         {/* Top Border Gradient */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent opacity-50 z-20"></div>
-        
+
+        {/* Desktop top bar — notificações */}
+        <div className="hidden md:flex h-14 items-center justify-end px-6 border-b border-border/50 shrink-0 relative z-20">
+          <NotificationBell />
+        </div>
+
         <div className="flex-1 w-full h-full relative">
           <Outlet context={{ showOnboarding, setShowOnboarding }} />
         </div>
@@ -163,11 +168,6 @@ const App: React.FC = () => {
                       <Settings />
                     </RoleGate>
                   } />
-                  <Route path="/logs" element={
-                    <RoleGate allowedRoles={['admin', 'manager']}>
-                      <Logs />
-                    </RoleGate>
-                  } />
                   <Route path="/followup" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
                       <Followup />
@@ -183,9 +183,9 @@ const App: React.FC = () => {
                       <Automacoes />
                     </RoleGate>
                   } />
-                  <Route path="/agentes" element={
+                  <Route path="/contatos-duplicados" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
-                      <Agentes />
+                      <DuplicateContacts />
                     </RoleGate>
                   } />
                   {/* Propostas */}
@@ -198,6 +198,9 @@ const App: React.FC = () => {
 
                 {/* Proposta pública — sem autenticação */}
                 <Route path="/p/:slug" element={<PropostaPublica />} />
+
+                {/* Avaliação CSAT pública — sem autenticação */}
+                <Route path="/csat/:token" element={<CsatPublic />} />
 
                 {/* Catch all - redirect to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />

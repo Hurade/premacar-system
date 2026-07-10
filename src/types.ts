@@ -244,6 +244,9 @@ export interface DBConversation {
   assigned_user_id: string | null;
   assigned_team: string | null;
   protocol_number?: string | null;
+  queue_id?: string | null;
+  connection_id?: string | null;
+  is_favorite?: boolean;
   tags: string[];
   metadata: Record<string, any>;
   nina_context: Record<string, any>;
@@ -255,6 +258,7 @@ export interface DBConversation {
   // Joined data
   contact?: DBContact;
   messages?: DBMessage[];
+  connection?: { id: string; name: string; api_type: string } | null;
 }
 
 export interface DBMessage {
@@ -304,6 +308,10 @@ export interface UIConversation {
   assignedTeam: string | null;
   assignedUserId: string | null;
   assignedUserName: string | null;
+  queueId: string | null;
+  connectionId: string | null;
+  connectionName: string | null;
+  isFavorite: boolean;
   protocolNumber: string | null;
   apiSource: ApiSource;
   lastMessage: string;
@@ -356,6 +364,10 @@ export function transformDBToUIConversation(
     assignedTeam: conv.assigned_team,
     assignedUserId: conv.assigned_user_id,
     assignedUserName: null, // Will be populated if needed
+    queueId: conv.queue_id || null,
+    connectionId: conv.connection_id || null,
+    connectionName: conv.connection?.name || null,
+    isFavorite: conv.is_favorite || false,
     protocolNumber: conv.protocol_number || null,
     apiSource: (conv.api_source as ApiSource) || 'evolution',
     lastMessage: lastMsg?.content || '',

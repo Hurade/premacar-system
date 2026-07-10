@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, ScrollText, MessageSquarePlus, Bot, FileText, Zap } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, MessageSquarePlus, FileText, Zap } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,49 +15,33 @@ const menuItems = [{
   label: 'Dashboard',
   icon: LayoutDashboard
 }, {
-  id: 'pipeline',
-  label: 'Pipeline',
-  icon: Kanban
-}, {
   id: 'chat',
   label: 'Chat',
   icon: MessageSquare
+}, {
+  id: 'pipeline',
+  label: 'Pipeline',
+  icon: Kanban
 }, {
   id: 'contacts',
   label: 'Contatos',
   icon: Users
 }, {
-  id: 'broadcasts',
-  label: 'Disparos',
-  icon: Send
+  id: 'scheduling',
+  label: 'Agendamentos',
+  icon: Calendar
 }, {
   id: 'campanhas',
   label: 'Campanhas',
   icon: BarChart3
 }, {
-  id: 'scheduling',
-  label: 'Agendamentos',
-  icon: Calendar
-}, {
-  id: 'team',
-  label: 'Equipe',
-  icon: ShieldCheck
-}, {
-  id: 'settings',
-  label: 'Configurações',
-  icon: SettingsIcon
-}, {
-  id: 'logs',
-  label: 'Logs',
-  icon: ScrollText
-}, {
   id: 'followup',
   label: 'Follow-up',
   icon: MessageSquarePlus
 }, {
-  id: 'agentes',
-  label: 'Agentes de IA',
-  icon: Bot
+  id: 'broadcasts',
+  label: 'Disparos',
+  icon: Send
 }, {
   id: 'automacoes',
   label: 'Automações',
@@ -66,6 +50,14 @@ const menuItems = [{
   id: 'propostas',
   label: 'Propostas',
   icon: FileText
+}, {
+  id: 'team',
+  label: 'Equipe',
+  icon: ShieldCheck
+}, {
+  id: 'settings',
+  label: 'Configurações',
+  icon: SettingsIcon
 }];
 const Logo = ({
   companyName

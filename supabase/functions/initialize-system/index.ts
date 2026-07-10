@@ -178,7 +178,6 @@ Nina: "Oi! Bem-vindo ao Viver de IA! Temos 22 soluções incríveis, formações
 const DEFAULT_NINA_SETTINGS = {
   is_active: true,
   auto_response_enabled: true,
-  ai_model_mode: 'flash',
   timezone: 'America/Sao_Paulo',
   business_hours_start: '09:00:00',
   business_hours_end: '18:00:00',
@@ -186,13 +185,11 @@ const DEFAULT_NINA_SETTINGS = {
   audio_response_enabled: false,
   response_delay_min: 1000,
   response_delay_max: 3000,
-  message_breaking_enabled: true,
   adaptive_response_enabled: true,
   ai_scheduling_enabled: true,
   route_all_to_receiver_enabled: false,
   company_name: 'Viver de IA',
   sdr_name: 'Nina',
-  system_prompt_override: DEFAULT_SYSTEM_PROMPT,
 };
 
 Deno.serve(async (req) => {
@@ -383,6 +380,37 @@ Deno.serve(async (req) => {
         results.verify_token.generated = true;
         results.verify_token.token = newToken;
         console.log('[initialize-system] Global nina_settings created');
+      }
+
+      // Create global default agent_configs row (prompt/modelo do agente
+      // Padrão agora vive aqui, não mais em nina_settings)
+      const { data: existingDefaultAgent } = await supabase
+        .from('agent_configs')
+        .select('id')
+        .eq('trigger_type', 'default')
+        .maybeSingle();
+
+      if (!existingDefaultAgent) {
+        const { error: defaultAgentError } = await supabase
+          .from('agent_configs')
+          .insert({
+            name: 'Agente Padrão',
+            description: 'Usado quando nenhuma fila ou campanha específica casar com a conversa.',
+            icon: '🤖',
+            trigger_type: 'default',
+            system_prompt: DEFAULT_SYSTEM_PROMPT,
+            model_mode: 'flash',
+            message_breaking_enabled: true,
+            ai_activation_delay_minutes: 5,
+            is_active: true,
+            priority: 0,
+          });
+
+        if (defaultAgentError && defaultAgentError.code !== '23505') {
+          console.error('[initialize-system] Error creating default agent_configs:', defaultAgentError);
+        } else if (!defaultAgentError) {
+          console.log('[initialize-system] Global default agent_configs created');
+        }
       }
 
       // Create global pipeline_stages (user_id = NULL)

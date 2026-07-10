@@ -216,8 +216,14 @@ serve(async (req) => {
         });
       }
 
-      // Check Agent Prompt
-      if (settings.system_prompt_override && settings.system_prompt_override.length > 100) {
+      // Check Agent Prompt do agente Padrão (agent_configs, não mais nina_settings)
+      const { data: defaultAgent } = await supabase
+        .from('agent_configs')
+        .select('system_prompt')
+        .eq('trigger_type', 'default')
+        .maybeSingle();
+
+      if (defaultAgent?.system_prompt && defaultAgent.system_prompt.length > 100) {
         results.push({
           component: 'agent_prompt',
           status: 'ok',

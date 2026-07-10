@@ -75,6 +75,7 @@ export interface Campaign {
   created_at: string;
   updated_at: string;
   api_source: 'meta' | 'evolution';
+  connection_id: string | null;
   tag_on_delivered: string | null;
   tag_on_no_whatsapp: string | null;
   template?: MessageTemplate | null;
@@ -201,6 +202,7 @@ export function useCreateCampaign() {
         scheduled_start: campaign.scheduled_start,
         total_leads: campaign.total_leads || 0,
         api_source: campaign.api_source || 'meta',
+        connection_id: campaign.connection_id || null,
         tag_on_delivered: campaign.tag_on_delivered || null,
         tag_on_no_whatsapp: campaign.tag_on_no_whatsapp || null,
       };

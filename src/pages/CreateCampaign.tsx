@@ -19,6 +19,7 @@ export interface CampaignFormData {
   tags: string[];
   flow_config: Record<string, any>;
   contacts: string[]; // contact IDs
+  connection_id: string | null;
 }
 
 const DEFAULT_FLOW: Record<string, any> = {
@@ -68,6 +69,7 @@ const CreateCampaignPage: React.FC = () => {
     tags: [],
     flow_config: DEFAULT_FLOW,
     contacts: [],
+    connection_id: null,
   });
 
   const progress = (currentStep / 4) * 100;
@@ -96,6 +98,7 @@ const CreateCampaignPage: React.FC = () => {
           flow_config: formData.flow_config,
           total_contacts: formData.contacts.length,
           in_progress_count: formData.contacts.length,
+          connection_id: formData.connection_id,
           status: 'active',
           user_id: user.id,
           created_by: user.id,

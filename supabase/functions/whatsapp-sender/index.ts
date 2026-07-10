@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,55 +81,25 @@ serve(async (req) => {
 
       for (const item of queueItems) {
         try {
-          // Get conversation to determine which API to use
+          // Usa connection_id gravado no próprio item (fila) quando existe;
+          // senão cai no connection_id da conversa (ex: item antigo, enfileirado
+          // antes desta mudança) — ver connection-resolver.ts
           const { data: conversation } = await supabase
             .from('conversations')
-            .select('api_source')
+            .select('api_source, connection_id')
             .eq('id', item.conversation_id)
             .maybeSingle();
 
           const apiSource = conversation?.api_source || 'evolution';
-          console.log(`[Sender] Using ${apiSource} API for message ${item.id}`);
+          const connectionId = item.connection_id ?? conversation?.connection_id ?? null;
+          console.log(`[Sender] Using ${apiSource} API (connection: ${connectionId ?? 'legado/global'}) for message ${item.id}`);
 
-          // Get appropriate settings based on API source
-          const cacheKey = apiSource;
+          // Get appropriate settings based on connection + API source
+          const cacheKey = connectionId ?? apiSource;
           let settings = settingsCache[cacheKey];
-          
+
           if (!settings) {
-            if (apiSource === 'meta') {
-              const { data: settingsData } = await supabase
-                .from('nina_settings')
-                .select('meta_phone_number_id, meta_access_token, meta_api_enabled')
-                .eq('meta_api_enabled', true)
-                .limit(1)
-                .maybeSingle();
-
-              if (!settingsData || !settingsData.meta_api_enabled) {
-                console.error('[Sender] Meta API not configured or disabled');
-                throw new Error('Meta API not configured');
-              }
-
-              settings = { ...settingsData, api_type: 'meta' };
-            } else {
-              const { data: settingsData } = await supabase
-                .from('nina_settings')
-                .select('evolution_api_url, evolution_api_key, evolution_instance_name, evolution_api_enabled')
-                .not('evolution_api_url', 'is', null)
-                .limit(1)
-                .maybeSingle();
-
-              if (!settingsData) {
-                console.error('[Sender] No Evolution API settings found');
-                throw new Error('Evolution API not configured');
-              }
-
-              if (!settingsData.evolution_api_url || !settingsData.evolution_api_key || !settingsData.evolution_instance_name) {
-                console.error('[Sender] Incomplete Evolution API configuration');
-                throw new Error('Evolution API not fully configured');
-              }
-
-              settings = { ...settingsData, api_type: 'evolution' };
-            }
+            settings = await resolveSendCredentials(supabase, { connectionId, apiSource });
             settingsCache[cacheKey] = settings;
           }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, ShieldCheck, Crown, KeyRound, Eye, EyeOff, Clock } from 'lucide-react';
 import { Button } from './Button';
-import { api } from '../services/api';
+import { api, logUserAction } from '../services/api';
 import { TeamMember, type Team as TeamType, type TeamFunction } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import TeamConfigModal from './TeamConfigModal';
@@ -146,6 +146,7 @@ const Team: React.FC = () => {
       }
 
       toast.success('Usuário criado com sucesso!');
+      logUserAction('invite_team_member', 'team_member', userId, { email: formData.email, role: formData.role });
       setShowModal(false);
       setNewPassword('');
       setConfirmPassword('');
@@ -160,6 +161,7 @@ const Team: React.FC = () => {
   const handleUpdateMember = async (id: string, field: string, value: any) => {
     try {
       await api.updateTeamMember(id, { [field]: value });
+      logUserAction('update_team_member', 'team_member', id, { field, value });
       toast.success('Membro atualizado com sucesso');
     } catch (error) {
       console.error('Erro ao atualizar membro:', error);

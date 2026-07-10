@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -6,6 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import type { CampaignFormData } from '@/pages/CreateCampaign';
 
 interface Step1Props {
@@ -14,6 +15,17 @@ interface Step1Props {
 }
 
 export function Step1BasicInfo({ data, onChange }: Step1Props) {
+  const [connections, setConnections] = useState<Array<{ id: string; name: string; api_type: string }>>([]);
+
+  useEffect(() => {
+    supabase
+      .from('whatsapp_connections')
+      .select('id, name, api_type')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data: rows }) => setConnections(rows || []));
+  }, []);
+
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -96,6 +108,30 @@ export function Step1BasicInfo({ data, onChange }: Step1Props) {
         </Select>
         <p className="text-xs text-muted-foreground">
           Recomendado: 3-5 dias para melhor conversão
+        </p>
+      </div>
+
+      {/* Conexão WhatsApp */}
+      <div className="space-y-2">
+        <Label>Conexão WhatsApp</Label>
+        <Select
+          value={data.connection_id ?? '__default__'}
+          onValueChange={(value) => onChange({ ...data, connection_id: value === '__default__' ? null : value })}
+        >
+          <SelectTrigger className="bg-card/50 border-border/50">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__default__">Usar configuração padrão</SelectItem>
+            {connections.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.api_type === 'meta_official' ? '✅' : '🔧'} {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Conexão usada nos dias de WhatsApp desta campanha. Deixe em "padrão" para manter o comportamento atual.
         </p>
       </div>
 

@@ -135,7 +135,8 @@ serve(async (req) => {
           if (dayConfig.type === "email") {
             sendResult = await sendEmail(contact, dayConfig, integrationSettings);
           } else if (dayConfig.type === "whatsapp") {
-            sendResult = await sendWhatsApp(contact, dayConfig, ninaSettings, supabase);
+            const whatsappSettings = await resolveCampaignWhatsAppSettings(supabase, campaign, ninaSettings);
+            sendResult = await sendWhatsApp(contact, dayConfig, whatsappSettings, supabase);
           } else if (dayConfig.type === "sms") {
             // SMS not implemented yet
             sendResult = { success: false, error: "SMS não implementado ainda" };
@@ -367,6 +368,31 @@ async function sendEmail(
 }
 
 // ===== WhatsApp via Meta or Evolution =====
+// sendWhatsApp tenta Meta e cai para Evolution em sequência, com base em
+// quais campos vierem preenchidos em `settings` — diferente das outras
+// edge functions (que têm um api_source único por conversa/campanha),
+// por isso não usa o connection-resolver compartilhado: quando a campanha
+// tem connection_id, usamos só os campos daquela conexão (uma conexão só
+// tem um api_type, então o outro bloco de sendWhatsApp já é
+// naturalmente pulado); sem connection_id, mantém o comportamento legado
+// de tentar as duas configs globais em sequência, sem mudança nenhuma.
+async function resolveCampaignWhatsAppSettings(supabase: any, campaign: any, globalNinaSettings: any): Promise<any> {
+  if (!campaign.connection_id) return globalNinaSettings;
+
+  const { data: conn } = await supabase
+    .from("whatsapp_connections")
+    .select("*")
+    .eq("id", campaign.connection_id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!conn) return globalNinaSettings; // conexão excluída/inativa -> fallback legado
+
+  return conn.api_type === "meta_official"
+    ? { meta_phone_number_id: conn.meta_phone_number_id, meta_access_token: conn.meta_access_token }
+    : { evolution_api_url: conn.evolution_base_url, evolution_api_key: conn.evolution_api_key, evolution_instance_name: conn.evolution_instance_name };
+}
+
 async function sendWhatsApp(
   contact: any,
   dayConfig: any,

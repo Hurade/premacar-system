@@ -23,7 +23,7 @@ interface FolderDef {
 }
 
 interface InlineCreateContactProps {
-  onContactCreated: (contactId: string) => void;
+  onContactCreated: (contactId: string, name: string | null, phoneNumber: string) => void;
   onCancel: () => void;
 }
 
@@ -101,7 +101,7 @@ const InlineCreateContact: React.FC<InlineCreateContactProps> = ({ onContactCrea
       if (error) throw error;
 
       toast.success('Contato criado!');
-      onContactCreated(data.id);
+      onContactCreated(data.id, name.trim() || null, cleanPhone);
     } catch (error) {
       console.error('Erro ao criar contato:', error);
       toast.error('Erro ao criar contato');

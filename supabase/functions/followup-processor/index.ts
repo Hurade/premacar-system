@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
+import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,7 @@ interface FollowupSettings {
 interface EligibleConversation {
   id: string;
   contact_id: string;
+  connection_id: string | null;
   window_expires_at: string;
   last_customer_message_at: string;
 }
@@ -104,27 +106,6 @@ serve(async (req) => {
       );
     }
 
-    // Fetch Meta API credentials (company-wide)
-    const { data: ninaSettings } = await supabase
-      .from("nina_settings")
-      .select("meta_phone_number_id, meta_access_token, meta_api_enabled")
-      .eq("meta_api_enabled", true)
-      .limit(1)
-      .maybeSingle();
-
-    if (!ninaSettings?.meta_phone_number_id || !ninaSettings?.meta_access_token) {
-      console.error(`[${SOURCE}] Meta API not configured or disabled.`);
-      await saveLog(supabase, {
-        source: SOURCE,
-        level: "error",
-        message: "Meta API não configurada ou desativada — follow-up não processado",
-      });
-      return new Response(
-        JSON.stringify({ success: false, error: "Meta API not configured" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
-    }
-
     const now = new Date();
     // Safety: ensure at least 30 minutes remain in the window before sending
     const windowSafetyThreshold = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
@@ -145,7 +126,7 @@ serve(async (req) => {
       // - has a customer message (last_customer_message_at not null)
       const { data: conversations, error: convError } = await supabase
         .from("conversations")
-        .select("id, contact_id, window_expires_at, last_customer_message_at")
+        .select("id, contact_id, connection_id, window_expires_at, last_customer_message_at")
         .eq("api_source", "meta")
         .eq("window_status", "open")
         .not("last_customer_message_at", "is", null)
@@ -194,12 +175,27 @@ serve(async (req) => {
           `[${SOURCE}] Sending follow-up to ${contactData.phone_number} (conv: ${conv.id})`
         );
 
+        // Credenciais da conexão específica da conversa, com fallback
+        // legado — ver connection-resolver.ts
+        let credentials;
+        try {
+          credentials = await resolveSendCredentials(supabase, {
+            connectionId: conv.connection_id ?? null,
+            apiSource: "meta",
+          });
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : "Meta API not configured";
+          console.error(`[${SOURCE}] Meta API not configured for conversation ${conv.id}: ${errorMessage}`);
+          results.push({ conversationId: conv.id, sent: false, reason: "meta_api_not_configured" });
+          continue;
+        }
+
         // Send message via Meta API
         const sendResult = await sendTextViaMeta(
           contactData.phone_number,
           settings.message,
-          ninaSettings.meta_phone_number_id,
-          ninaSettings.meta_access_token
+          credentials.meta_phone_number_id!,
+          credentials.meta_access_token!
         );
 
         if (!sendResult.success) {

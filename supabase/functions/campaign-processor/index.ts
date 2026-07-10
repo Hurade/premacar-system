@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
+import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +30,7 @@ interface Campaign {
   total_sent: number;
   paused_until: string | null;
   api_source: 'meta' | 'evolution';
+  connection_id: string | null;
   tag_on_delivered: string | null;
   tag_on_no_whatsapp: string | null;
 }
@@ -331,7 +333,17 @@ serve(async (req) => {
         results.push({ campaignId: campaignData.id, sent: false, reason: "non_meta_api_not_supported" });
         continue;
       }
-      if (!ninaSettings?.meta_phone_number_id || !ninaSettings?.meta_access_token) {
+
+      // Credenciais por conexão específica da campanha (campaignData.connection_id),
+      // com fallback para a config global legada — ver connection-resolver.ts
+      let campaignCredentials: NinaSettings;
+      try {
+        const resolved = await resolveSendCredentials(supabase, {
+          connectionId: campaignData.connection_id ?? null,
+          apiSource: 'meta',
+        });
+        campaignCredentials = { ...ninaSettings, ...resolved } as NinaSettings;
+      } catch {
         console.log(`[campaign-processor] Meta API não configurada para campanha ${campaignData.name}`);
         results.push({ campaignId: campaignData.id, sent: false, reason: "meta_api_not_configured" });
         continue;
@@ -575,7 +587,7 @@ serve(async (req) => {
         });
 
         // Enviar via Meta Template API
-        sendResult = await sendTemplateViaMeta(lead.phone, metaTemplateData, lead, ninaSettings);
+        sendResult = await sendTemplateViaMeta(lead.phone, metaTemplateData, lead, campaignCredentials);
         
         // Gerar mensagem para log (substituir variáveis no body_text)
         message = metaTemplateData.body_text
@@ -788,6 +800,7 @@ serve(async (req) => {
                 status: "nina", // IA ativa para responder quando o contato responder
                 last_message_at: new Date().toISOString(),
                 api_source: campaignData.api_source,
+                connection_id: campaignData.connection_id ?? null,
                 dispatch_sent_at: new Date().toISOString(), // Registrar timestamp do disparo
               })
               .select("id")

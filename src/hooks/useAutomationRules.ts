@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logUserAction } from '@/services/api';
 
 export type AutomationTriggerType = 'new_message' | 'tag_applied' | 'stage_changed';
 export type ConditionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty';
@@ -63,8 +64,14 @@ export function useSaveAutomationRule() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['automation_rules'] });
+      logUserAction(
+        variables.id ? 'update_automation_rule' : 'create_automation_rule',
+        'automation_rule',
+        variables.id,
+        { name: variables.name }
+      );
       toast.success('Automação salva');
     },
     onError: (error: any) => {
@@ -81,8 +88,9 @@ export function useToggleAutomationRule() {
       const { error } = await db().from('automation_rules').update({ is_active }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['automation_rules'] });
+      logUserAction('toggle_automation_rule', 'automation_rule', variables.id, { is_active: variables.is_active });
     },
     onError: (error: any) => {
       toast.error(`Erro ao atualizar automação: ${error.message || error}`);
@@ -98,8 +106,9 @@ export function useDeleteAutomationRule() {
       const { error } = await db().from('automation_rules').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['automation_rules'] });
+      logUserAction('delete_automation_rule', 'automation_rule', id);
       toast.success('Automação removida');
     },
     onError: (error: any) => {

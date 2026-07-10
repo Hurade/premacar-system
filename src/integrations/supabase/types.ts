@@ -19,21 +19,16 @@ export type Database = {
           ai_activation_delay_minutes: number
           created_at: string
           description: string | null
-          handoff_keywords: string[] | null
-          handoff_message: string | null
           icon: string | null
           id: string
           is_active: boolean
-          max_messages_per_hour: number
           message_breaking_enabled: boolean
           model_mode: string
           name: string
           priority: number
-          response_delay_seconds: number
           system_prompt: string
           trigger_campaign_id: string | null
-          trigger_event: string | null
-          trigger_origin: string | null
+          trigger_queue_id: string | null
           trigger_type: string
           updated_at: string
         }
@@ -41,21 +36,16 @@ export type Database = {
           ai_activation_delay_minutes?: number
           created_at?: string
           description?: string | null
-          handoff_keywords?: string[] | null
-          handoff_message?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
-          max_messages_per_hour?: number
           message_breaking_enabled?: boolean
           model_mode?: string
           name: string
           priority?: number
-          response_delay_seconds?: number
           system_prompt: string
           trigger_campaign_id?: string | null
-          trigger_event?: string | null
-          trigger_origin?: string | null
+          trigger_queue_id?: string | null
           trigger_type: string
           updated_at?: string
         }
@@ -63,21 +53,16 @@ export type Database = {
           ai_activation_delay_minutes?: number
           created_at?: string
           description?: string | null
-          handoff_keywords?: string[] | null
-          handoff_message?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
-          max_messages_per_hour?: number
           message_breaking_enabled?: boolean
           model_mode?: string
           name?: string
           priority?: number
-          response_delay_seconds?: number
           system_prompt?: string
           trigger_campaign_id?: string | null
-          trigger_event?: string | null
-          trigger_origin?: string | null
+          trigger_queue_id?: string | null
           trigger_type?: string
           updated_at?: string
         }
@@ -86,7 +71,14 @@ export type Database = {
             foreignKeyName: "agent_configs_trigger_campaign_id_fkey"
             columns: ["trigger_campaign_id"]
             isOneToOne: false
-            referencedRelation: "campaigns"
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_configs_trigger_queue_id_fkey"
+            columns: ["trigger_queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
             referencedColumns: ["id"]
           },
         ]
@@ -131,6 +123,59 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          title?: string
+        }
+        Relationships: []
       }
       appointments: {
         Row: {
@@ -1044,17 +1089,20 @@ export type Database = {
           assigned_team: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id: string | null
           calendar_flow: Json | null
+          campaign_id: string | null
           connection_id: string | null
           contact_id: string
           created_at: string
           dispatch_sent_at: string | null
           id: string
           is_active: boolean
+          is_favorite: boolean
           last_customer_message_at: string | null
           last_message_at: string
           metadata: Json | null
           nina_context: Json | null
           protocol_number: string | null
+          queue_id: string | null
           started_at: string
           status: Database["public"]["Enums"]["conversation_status"]
           tags: string[] | null
@@ -1068,17 +1116,20 @@ export type Database = {
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
           calendar_flow?: Json | null
+          campaign_id?: string | null
           connection_id?: string | null
           contact_id: string
           created_at?: string
           dispatch_sent_at?: string | null
           id?: string
           is_active?: boolean
+          is_favorite?: boolean
           last_customer_message_at?: string | null
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
           protocol_number?: string | null
+          queue_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           tags?: string[] | null
@@ -1092,17 +1143,20 @@ export type Database = {
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
           calendar_flow?: Json | null
+          campaign_id?: string | null
           connection_id?: string | null
           contact_id?: string
           created_at?: string
           dispatch_sent_at?: string | null
           id?: string
           is_active?: boolean
+          is_favorite?: boolean
           last_customer_message_at?: string | null
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
           protocol_number?: string | null
+          queue_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           tags?: string[] | null
@@ -1131,6 +1185,75 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      csat_surveys: {
+        Row: {
+          comment: string | null
+          contact_id: string | null
+          conversation_id: string | null
+          id: string
+          rating: number | null
+          responded_at: string | null
+          sent_at: string
+          token: string
+        }
+        Insert: {
+          comment?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          id?: string
+          rating?: number | null
+          responded_at?: string | null
+          sent_at?: string
+          token?: string
+        }
+        Update: {
+          comment?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          id?: string
+          rating?: number | null
+          responded_at?: string | null
+          sent_at?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csat_surveys_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "csat_surveys_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "csat_surveys_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -2031,8 +2154,6 @@ export type Database = {
       nina_settings: {
         Row: {
           adaptive_response_enabled: boolean
-          ai_activation_delay_minutes: number | null
-          ai_model_mode: string | null
           ai_scheduling_enabled: boolean | null
           async_booking_enabled: boolean | null
           audio_response_enabled: boolean | null
@@ -2057,7 +2178,6 @@ export type Database = {
           google_calendar_url: string | null
           id: string
           is_active: boolean
-          message_breaking_enabled: boolean
           message_grouping_delay: number | null
           message_grouping_enabled: boolean | null
           meta_access_token: string | null
@@ -2082,7 +2202,6 @@ export type Database = {
           scheduling_slot_duration: number | null
           scheduling_start_time: string | null
           sdr_name: string | null
-          system_prompt_override: string | null
           test_phone_numbers: Json | null
           test_system_prompt: string | null
           timezone: string
@@ -2095,8 +2214,6 @@ export type Database = {
         }
         Insert: {
           adaptive_response_enabled?: boolean
-          ai_activation_delay_minutes?: number | null
-          ai_model_mode?: string | null
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
@@ -2121,7 +2238,6 @@ export type Database = {
           google_calendar_url?: string | null
           id?: string
           is_active?: boolean
-          message_breaking_enabled?: boolean
           message_grouping_delay?: number | null
           message_grouping_enabled?: boolean | null
           meta_access_token?: string | null
@@ -2146,7 +2262,6 @@ export type Database = {
           scheduling_slot_duration?: number | null
           scheduling_start_time?: string | null
           sdr_name?: string | null
-          system_prompt_override?: string | null
           test_phone_numbers?: Json | null
           test_system_prompt?: string | null
           timezone?: string
@@ -2159,8 +2274,6 @@ export type Database = {
         }
         Update: {
           adaptive_response_enabled?: boolean
-          ai_activation_delay_minutes?: number | null
-          ai_model_mode?: string | null
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
@@ -2185,7 +2298,6 @@ export type Database = {
           google_calendar_url?: string | null
           id?: string
           is_active?: boolean
-          message_breaking_enabled?: boolean
           message_grouping_delay?: number | null
           message_grouping_enabled?: boolean | null
           meta_access_token?: string | null
@@ -2210,7 +2322,6 @@ export type Database = {
           scheduling_slot_duration?: number | null
           scheduling_start_time?: string | null
           sdr_name?: string | null
-          system_prompt_override?: string | null
           test_phone_numbers?: Json | null
           test_system_prompt?: string | null
           timezone?: string
@@ -2461,6 +2572,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      queues: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       recurring_campaigns: {
         Row: {
@@ -2876,6 +3014,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_action_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2971,6 +3139,7 @@ export type Database = {
         Row: {
           api_type: string
           created_at: string | null
+          default_queue_id: string | null
           evolution_api_key: string | null
           evolution_base_url: string | null
           evolution_instance_name: string | null
@@ -2991,6 +3160,7 @@ export type Database = {
         Insert: {
           api_type?: string
           created_at?: string | null
+          default_queue_id?: string | null
           evolution_api_key?: string | null
           evolution_base_url?: string | null
           evolution_instance_name?: string | null
@@ -3011,6 +3181,7 @@ export type Database = {
         Update: {
           api_type?: string
           created_at?: string | null
+          default_queue_id?: string | null
           evolution_api_key?: string | null
           evolution_base_url?: string | null
           evolution_instance_name?: string | null
@@ -3028,7 +3199,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_connections_default_queue_id_fkey"
+            columns: ["default_queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -3150,6 +3329,10 @@ export type Database = {
       cleanup_processed_queues: { Args: never; Returns: undefined }
       get_auth_user_id: { Args: never; Returns: string }
       get_campaign_funnel: { Args: { p_campaign_id: string }; Returns: Json }
+      get_csat_survey_by_token: {
+        Args: { p_token: string }
+        Returns: { already_responded: boolean }[]
+      }
       get_or_create_conversation_state: {
         Args: { p_conversation_id: string }
         Returns: {
@@ -3210,7 +3393,15 @@ export type Database = {
           similarity: number
         }[]
       }
+      merge_contacts: {
+        Args: { p_duplicate_id: string; p_primary_id: string }
+        Returns: undefined
+      }
       reset_campaign_daily_counts: { Args: never; Returns: undefined }
+      submit_csat_response: {
+        Args: { p_comment?: string; p_rating: number; p_token: string }
+        Returns: boolean
+      }
       update_client_memory: {
         Args: { p_contact_id: string; p_new_memory: Json }
         Returns: undefined

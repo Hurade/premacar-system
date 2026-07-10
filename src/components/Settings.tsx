@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus } from 'lucide-react';
+import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus, Megaphone, Layers, Star, ScrollText, History } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
@@ -10,6 +10,11 @@ import { MetaTemplatesManager } from './broadcasts/MetaTemplates';
 import QuickRepliesSettings from './settings/QuickRepliesSettings';
 import KnowledgeBaseSettings from './settings/KnowledgeBaseSettings';
 import CustomFieldsSettings from './settings/CustomFieldsSettings';
+import AnnouncementsSettings from './settings/AnnouncementsSettings';
+import Filas from '@/pages/Filas';
+import Ratings from '@/pages/Ratings';
+import Logs from '@/pages/Logs';
+import AuditLog from '@/pages/AuditLog';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
 import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
@@ -98,43 +103,61 @@ const Settings: React.FC = () => {
       </div>
 
       <Tabs defaultValue="agent" className="w-full" onValueChange={setActiveTab}>
-        <div className="flex flex-wrap items-center justify-between mb-8 gap-3">
-          <div className="overflow-x-auto pb-1 -mb-1 max-w-full">
-            <TabsList>
-              <TabsTrigger value="agent" className="gap-2">
-                <Bot className="w-4 h-4" />
-                Agente
-              </TabsTrigger>
-              <TabsTrigger value="connections" className="gap-2">
-                <Smartphone className="w-4 h-4" />
-                Conexões
-              </TabsTrigger>
-              <TabsTrigger value="integrations" className="gap-2">
-                <Cable className="w-4 h-4" />
-                Integrações
-              </TabsTrigger>
-              <TabsTrigger value="templates" className="gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Templates
-              </TabsTrigger>
-              <TabsTrigger value="quick-replies" className="gap-2">
-                <Zap className="w-4 h-4" />
-                Resp. Rápidas
-              </TabsTrigger>
-              <TabsTrigger value="knowledge" className="gap-2">
-                <Database className="w-4 h-4" />
-                Base de Conhecimento
-              </TabsTrigger>
-              <TabsTrigger value="custom-fields" className="gap-2">
-                <ListPlus className="w-4 h-4" />
-                Campos Personalizados
-              </TabsTrigger>
-              <TabsTrigger value="docs" className="gap-2">
-                <BookOpen className="w-4 h-4" />
-                Documentação
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        <div className="flex flex-col gap-3 mb-8">
+          <TabsList className="h-auto flex-wrap justify-start gap-1 w-full">
+            <TabsTrigger value="agent" className="gap-2">
+              <Bot className="w-4 h-4" />
+              Agente
+            </TabsTrigger>
+            <TabsTrigger value="connections" className="gap-2">
+              <Smartphone className="w-4 h-4" />
+              Conexões
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="gap-2">
+              <Cable className="w-4 h-4" />
+              Integrações
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Templates
+            </TabsTrigger>
+            <TabsTrigger value="quick-replies" className="gap-2">
+              <Zap className="w-4 h-4" />
+              Resp. Rápidas
+            </TabsTrigger>
+            <TabsTrigger value="knowledge" className="gap-2">
+              <Database className="w-4 h-4" />
+              Base de Conhecimento
+            </TabsTrigger>
+            <TabsTrigger value="custom-fields" className="gap-2">
+              <ListPlus className="w-4 h-4" />
+              Campos Personalizados
+            </TabsTrigger>
+            <TabsTrigger value="filas" className="gap-2">
+              <Layers className="w-4 h-4" />
+              Filas
+            </TabsTrigger>
+            <TabsTrigger value="avaliacoes" className="gap-2">
+              <Star className="w-4 h-4" />
+              Avaliações
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="gap-2">
+              <ScrollText className="w-4 h-4" />
+              Logs
+            </TabsTrigger>
+            <TabsTrigger value="auditoria" className="gap-2">
+              <History className="w-4 h-4" />
+              Registro de Atividades
+            </TabsTrigger>
+            <TabsTrigger value="announcements" className="gap-2">
+              <Megaphone className="w-4 h-4" />
+              Anúncios
+            </TabsTrigger>
+            <TabsTrigger value="docs" className="gap-2">
+              <BookOpen className="w-4 h-4" />
+              Documentação
+            </TabsTrigger>
+          </TabsList>
 
           {hasSaveButton && isAdmin && (
             <div className="flex gap-3">
@@ -206,6 +229,21 @@ const Settings: React.FC = () => {
         </TabsContent>
         <TabsContent value="custom-fields">
           <CustomFieldsSettings />
+        </TabsContent>
+        <TabsContent value="filas" className="-mx-8">
+          <Filas />
+        </TabsContent>
+        <TabsContent value="avaliacoes" className="-mx-8">
+          <Ratings />
+        </TabsContent>
+        <TabsContent value="logs" className="-mx-8">
+          <Logs />
+        </TabsContent>
+        <TabsContent value="auditoria" className="-mx-8">
+          <AuditLog />
+        </TabsContent>
+        <TabsContent value="announcements">
+          <AnnouncementsSettings />
         </TabsContent>
         <TabsContent value="docs">
           <SystemRoadmap />

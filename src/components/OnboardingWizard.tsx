@@ -235,23 +235,28 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
           // Identity
           setCompanyName(data.company_name || '');
           setSdrName(data.sdr_name || '');
-          
+
           // Evolution API
           setEvolutionApiUrl((data as any).evolution_api_url || '');
           setEvolutionApiKey((data as any).evolution_api_key || '');
           setEvolutionInstanceName((data as any).evolution_instance_name || '');
-          
-          // Agent - usar prompt padrão se vazio
-          setSystemPrompt(data.system_prompt_override || DEFAULT_NINA_PROMPT);
-          setAiModelMode(data.ai_model_mode || 'flash');
-          
-          
+
           // Business Hours
           setTimezone(data.timezone || 'America/Sao_Paulo');
           setBusinessHoursStart(data.business_hours_start?.substring(0, 5) || '09:00');
           setBusinessHoursEnd(data.business_hours_end?.substring(0, 5) || '18:00');
           setBusinessDays(data.business_days || [1, 2, 3, 4, 5]);
         }
+
+        // Agente Padrão agora mora em agent_configs (unificado com os
+        // agentes especializados) — usar prompt padrão se ainda não existir
+        const { data: defaultAgent } = await supabase
+          .from('agent_configs')
+          .select('system_prompt, model_mode')
+          .eq('trigger_type', 'default')
+          .maybeSingle();
+        setSystemPrompt(defaultAgent?.system_prompt || DEFAULT_NINA_PROMPT);
+        setAiModelMode(defaultAgent?.model_mode || 'flash');
       } catch (error) {
         console.error('[OnboardingWizard] Error:', error);
       } finally {
@@ -380,12 +385,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         evolution_api_url: evolutionApiUrl?.trim() || null,
         evolution_api_key: evolutionApiKey?.trim() || null,
         evolution_instance_name: evolutionInstanceName?.trim() || null,
-        
-        // Agent - use default prompt if empty
-        system_prompt_override: systemPrompt?.trim() || DEFAULT_NINA_PROMPT,
-        ai_model_mode: aiModelMode || 'flash',
-        
-        
+
         // Business Hours
         timezone: timezone || 'America/Sao_Paulo',
         business_hours_start: businessHoursStart || '09:00',
@@ -403,7 +403,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         evolution_api_url: settings.evolution_api_url ? '✓ SET' : '✗ EMPTY',
         evolution_api_key: settings.evolution_api_key ? '✓ SET' : '✗ EMPTY',
         evolution_instance_name: settings.evolution_instance_name ? '✓ SET' : '✗ EMPTY',
-        system_prompt_override: settings.system_prompt_override ? '✓ SET' : '✗ EMPTY',
         is_active: settings.is_active,
         auto_response_enabled: settings.auto_response_enabled,
       });
@@ -449,15 +448,39 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
         sdr_name: result.data.sdr_name,
         whatsapp_phone_number_id: result.data.whatsapp_phone_number_id ? '✓ SAVED' : '✗ NOT SAVED',
         whatsapp_access_token: result.data.whatsapp_access_token ? '✓ SAVED' : '✗ NOT SAVED',
-        system_prompt_override: result.data.system_prompt_override ? '✓ SAVED' : '✗ NOT SAVED',
         is_active: result.data.is_active,
       });
+
+      // Step 4b: Agente Padrão mora em agent_configs (unificado) — upsert separado
+      const { data: existingDefaultAgent } = await supabase
+        .from('agent_configs')
+        .select('id')
+        .eq('trigger_type', 'default')
+        .maybeSingle();
+
+      const defaultAgentPayload = {
+        name: 'Agente Padrão',
+        trigger_type: 'default',
+        system_prompt: systemPrompt?.trim() || DEFAULT_NINA_PROMPT,
+        model_mode: aiModelMode || 'flash',
+        is_active: true,
+      };
+
+      const agentResult = existingDefaultAgent
+        ? await supabase.from('agent_configs').update(defaultAgentPayload).eq('id', existingDefaultAgent.id)
+        : await supabase.from('agent_configs').insert(defaultAgentPayload);
+
+      if (agentResult.error) {
+        console.error('[OnboardingWizard] ❌ Error saving default agent:', agentResult.error);
+        toast.error('Erro ao salvar o agente padrão: ' + agentResult.error.message);
+        return false;
+      }
 
       // Step 5: Verify data was actually saved by re-fetching
       console.log('[OnboardingWizard] Step 5: Verifying saved data...');
       const { data: verifyData, error: verifyError } = await supabase
         .from('nina_settings')
-        .select('company_name, sdr_name, evolution_api_url, evolution_api_key, evolution_instance_name, whatsapp_phone_number_id, whatsapp_access_token, system_prompt_override, is_active')
+        .select('company_name, sdr_name, evolution_api_url, evolution_api_key, evolution_instance_name, whatsapp_phone_number_id, whatsapp_access_token, is_active')
         .eq('id', result.data.id)
         .maybeSingle();
 
@@ -472,7 +495,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
           evolution_instance_name: (verifyData as any)?.evolution_instance_name ? '✓ VERIFIED' : '✗ NULL',
           whatsapp_phone_number_id: verifyData?.whatsapp_phone_number_id ? '✓ VERIFIED' : '✗ NULL',
           whatsapp_access_token: verifyData?.whatsapp_access_token ? '✓ VERIFIED' : '✗ NULL',
-          system_prompt_override: verifyData?.system_prompt_override ? '✓ VERIFIED' : '✗ NULL',
           is_active: verifyData?.is_active,
         });
 

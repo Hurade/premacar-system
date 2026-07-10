@@ -385,6 +385,13 @@ serve(async (req) => {
 
       // Se realmente não existe nenhuma conversa anterior (contato novo), cria uma
       if (!conversation) {
+        // Fila padrão da conexão (ex: número dedicado de Suporte já nasce
+        // na fila Suporte) + campanha recorrente ativa do contato, se houver
+        const [{ data: connection }, { data: activeCampaign }] = await Promise.all([
+          supabase.from('whatsapp_connections').select('id, default_queue_id').eq('evolution_instance_name', instanceName).maybeSingle(),
+          supabase.from('campaign_contacts').select('campaign_id').eq('contact_id', contact.id).eq('status', 'in_progress').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+        ]);
+
         const { data: newConversation, error: convError } = await supabase
           .from('conversations')
           .insert({
@@ -392,7 +399,10 @@ serve(async (req) => {
             status: 'nina',
             is_active: true,
             api_source: 'evolution',
-            user_id: ownerId
+            user_id: ownerId,
+            connection_id: connection?.id ?? null,
+            queue_id: connection?.default_queue_id ?? null,
+            campaign_id: activeCampaign?.campaign_id ?? null
           })
           .select()
           .single();

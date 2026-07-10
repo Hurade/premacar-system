@@ -197,7 +197,17 @@ async function processMetaWebhookAsync(
     console.log('[Meta Async] - meta_api_enabled:', metaSettings.meta_api_enabled);
     console.log('[Meta Async] - meta_phone_number_id:', metaSettings.meta_phone_number_id);
     console.log('[Meta Async] - message_grouping_enabled:', metaSettings.message_grouping_enabled);
-    console.log('[Meta Async] - ai_activation_delay_minutes:', metaSettings.ai_activation_delay_minutes);
+
+    // ai_activation_delay_minutes saiu de nina_settings (agora é por
+    // agente, em agent_configs) — usa o valor do agente Padrão aqui,
+    // já que a seleção real do agente (por fila/campanha) só acontece
+    // depois, no nina-orchestrator.
+    const { data: defaultAgentForDelay } = await supabase
+      .from('agent_configs')
+      .select('ai_activation_delay_minutes')
+      .eq('trigger_type', 'default')
+      .maybeSingle();
+    console.log('[Meta Async] - ai_activation_delay_minutes (agente padrão):', defaultAgentForDelay?.ai_activation_delay_minutes);
 
     // Validate signature if app secret is configured
     if (metaSettings.meta_app_secret && signature) {
@@ -212,7 +222,7 @@ async function processMetaWebhookAsync(
 
     const groupingEnabled = metaSettings.message_grouping_enabled !== false;
     const groupingDelay = metaSettings.message_grouping_delay || DEFAULT_GROUPING_DELAY_MS;
-    const aiActivationDelayMinutes = metaSettings.ai_activation_delay_minutes ?? 5;
+    const aiActivationDelayMinutes = defaultAgentForDelay?.ai_activation_delay_minutes ?? 5;
 
     // Validar estrutura do body
     if (!body || !body.entry || !Array.isArray(body.entry)) {
@@ -534,6 +544,24 @@ async function processMetaWebhookAsync(
         if (!conversation) {
           console.log('[Meta Async] ➕ Criando nova conversa');
 
+          // Roteamento real por Fila (conexão) e Campanha (recurring_campaigns)
+          // — ver migration 20260710120000_unify_agent_configs.sql
+          const [{ data: metaConnection }, { data: activeCampaign }] = await Promise.all([
+            supabase
+              .from('whatsapp_connections')
+              .select('id, default_queue_id')
+              .eq('meta_phone_number_id', metaSettings.meta_phone_number_id)
+              .maybeSingle(),
+            supabase
+              .from('campaign_contacts')
+              .select('campaign_id')
+              .eq('contact_id', contact.id)
+              .eq('status', 'in_progress')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ]);
+
           const { data: newConversation, error: convError } = await supabase
             .from('conversations')
             .insert({
@@ -541,7 +569,10 @@ async function processMetaWebhookAsync(
               status: 'nina',
               is_active: true,
               api_source: 'meta',
-              user_id: metaSettings.user_id || null
+              user_id: metaSettings.user_id || null,
+              connection_id: metaConnection?.id ?? null,
+              queue_id: metaConnection?.default_queue_id ?? null,
+              campaign_id: activeCampaign?.campaign_id ?? null
             })
             .select()
             .single();

@@ -53,6 +53,31 @@ export const clearStagesCache = () => {
   systemStagesCacheByUser.clear();
 };
 
+/**
+ * Registro de Atividades (audit log de ações humanas).
+ * Fire-and-forget: nunca lança erro nem bloqueia o fluxo que a chamou
+ * (mesmo padrão do logger das edge functions, mas do lado do cliente).
+ */
+export const logUserAction = async (
+  action: string,
+  entityType: string,
+  entityId?: string | null,
+  metadata?: Record<string, unknown>
+): Promise<void> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('user_action_logs').insert({
+      actor_id: user?.id ?? null,
+      action,
+      entity_type: entityType,
+      entity_id: entityId ?? null,
+      metadata: (metadata ?? null) as any,
+    });
+  } catch (err) {
+    console.error('[API] Error logging user action (non-blocking):', err);
+  }
+};
+
 // Helper functions for dashboard metrics
 const formatResponseTime = (ms: number): string => {
   if (!ms || ms === 0) return '0s';
@@ -352,6 +377,112 @@ export const api = {
       status: 'lead' as const, // Map from tags or client_memory in future
       lastContact: new Date(c.last_activity).toLocaleDateString('pt-BR')
     }));
+  },
+
+  /**
+   * Contatos Duplicados: busca todos os contatos com os campos mínimos
+   * para detecção de duplicados (agrupamento por telefone é feito no cliente).
+   */
+  fetchContactsBasic: async (): Promise<Array<{ id: string; name: string | null; call_name: string | null; phone_number: string; email: string | null; created_at: string }>> => {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('id, name, call_name, phone_number, email, created_at')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[API] Error fetching contacts for duplicate check:', error);
+      throw error;
+    }
+    return data || [];
+  },
+
+  /**
+   * Mescla o contato duplicado no principal (transação no banco via RPC).
+   */
+  mergeContacts: async (primaryId: string, duplicateId: string): Promise<void> => {
+    const { error } = await supabase.rpc('merge_contacts', {
+      p_primary_id: primaryId,
+      p_duplicate_id: duplicateId,
+    });
+    if (error) {
+      console.error('[API] Error merging contacts:', error);
+      throw error;
+    }
+    logUserAction('merge_contacts', 'contact', primaryId, { duplicate_id: duplicateId });
+  },
+
+  /**
+   * Anúncios internos + Histórico de Avisos
+   */
+  fetchAnnouncements: async () => {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[API] Error fetching announcements:', error);
+      throw error;
+    }
+    return data || [];
+  },
+
+  createAnnouncement: async (title: string, body: string): Promise<void> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from('announcements')
+      .insert({ title, body, created_by: user?.id ?? null })
+      .select('id')
+      .single();
+    if (error) {
+      console.error('[API] Error creating announcement:', error);
+      throw error;
+    }
+    logUserAction('create_announcement', 'announcement', data?.id, { title });
+  },
+
+  updateAnnouncement: async (id: string, updates: { title?: string; body?: string; is_active?: boolean }): Promise<void> => {
+    const { error } = await supabase.from('announcements').update(updates).eq('id', id);
+    if (error) {
+      console.error('[API] Error updating announcement:', error);
+      throw error;
+    }
+  },
+
+  deleteAnnouncement: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (error) {
+      console.error('[API] Error deleting announcement:', error);
+      throw error;
+    }
+  },
+
+  fetchUnreadAnnouncementsCount: async (): Promise<number> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return 0;
+
+    const { data: readRows } = await supabase
+      .from('announcement_reads')
+      .select('announcement_id')
+      .eq('user_id', user.id);
+    const readIds = new Set((readRows || []).map(r => r.announcement_id));
+
+    const { data: active } = await supabase
+      .from('announcements')
+      .select('id')
+      .eq('is_active', true);
+
+    return (active || []).filter(a => !readIds.has(a.id)).length;
+  },
+
+  markAnnouncementRead: async (announcementId: string): Promise<void> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase
+      .from('announcement_reads')
+      .upsert({ announcement_id: announcementId, user_id: user.id }, { onConflict: 'announcement_id,user_id' });
+    if (error) {
+      console.error('[API] Error marking announcement read:', error);
+    }
   },
 
   /**
@@ -1229,6 +1360,8 @@ export const api = {
       console.error('[API] Error marking deal as won:', error);
       throw error;
     }
+
+    logUserAction('deal_won', 'deal', dealId);
   },
 
   /**
@@ -1256,6 +1389,8 @@ export const api = {
       console.error('[API] Error marking deal as lost:', error);
       throw error;
     }
+
+    logUserAction('deal_lost', 'deal', dealId, { reason });
   },
 
   /**
@@ -1379,7 +1514,7 @@ export const api = {
     // Buscar conversas SEM dispatch_sent_at (conversas normais) - sempre mostrar
     const { data: normalConversations, error: normalError } = await supabase
       .from('conversations')
-      .select(`*, contact:contacts(*)`)
+      .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
       .eq('is_active', true)
       .is('dispatch_sent_at', null)
       .order('last_message_at', { ascending: false })
@@ -1404,7 +1539,7 @@ export const api = {
     if (interactedIds.size > 0) {
       const { data: dispatchData } = await supabase
         .from('conversations')
-        .select(`*, contact:contacts(*)`)
+        .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
         .eq('is_active', true)
         .not('dispatch_sent_at', 'is', null)
         .in('id', Array.from(interactedIds))
@@ -1609,6 +1744,100 @@ export const api = {
     }
 
     console.log(`[API] Conversation ${conversationId} and deals assigned to user ${userId}`);
+    logUserAction('assign_conversation', 'conversation', conversationId, { user_id: userId });
+  },
+
+  /**
+   * Assign conversation to a queue (categorização/roteamento, não
+   * substitui assigned_user_id nem o round-robin individual)
+   */
+  assignQueue: async (conversationId: string, queueId: string | null): Promise<void> => {
+    const { error } = await supabase
+      .from('conversations')
+      .update({ queue_id: queueId })
+      .eq('id', conversationId);
+
+    if (error) {
+      console.error('[API] Error assigning queue:', error);
+      throw error;
+    }
+
+    logUserAction('assign_queue', 'conversation', conversationId, { queue_id: queueId });
+  },
+
+  // Transfere uma conversa para outra conexão WhatsApp (ex: janela de 24h
+  // da Meta expirou, continuar pela Evolution sem perder o histórico).
+  transferConnection: async (
+    conversationId: string,
+    newConnectionId: string,
+    newApiType: 'evolution' | 'meta_official',
+    previousConnectionId: string | null
+  ): Promise<void> => {
+    const { error } = await supabase
+      .from('conversations')
+      .update({
+        connection_id: newConnectionId,
+        api_source: newApiType === 'meta_official' ? 'meta' : 'evolution',
+      })
+      .eq('id', conversationId);
+
+    if (error) {
+      console.error('[API] Error transferring connection:', error);
+      throw error;
+    }
+
+    logUserAction('transfer_connection', 'conversation', conversationId, {
+      from_connection_id: previousConnectionId,
+      to_connection_id: newConnectionId,
+    });
+  },
+
+  /**
+   * Cria a pesquisa CSAT e enfileira o link de avaliação para o cliente,
+   * chamado ao finalizar uma conversa (useConversations.finalizeConversation).
+   */
+  sendCsatSurvey: async (conversationId: string, contactId: string): Promise<void> => {
+    const { data: survey, error: surveyError } = await supabase
+      .from('csat_surveys')
+      .insert({ conversation_id: conversationId, contact_id: contactId })
+      .select('token')
+      .single();
+
+    if (surveyError) {
+      console.error('[API] Error creating csat_survey:', surveyError);
+      throw surveyError;
+    }
+
+    const link = `${window.location.origin}/csat/${survey.token}`;
+
+    const { error: queueError } = await supabase.from('send_queue').insert({
+      conversation_id: conversationId,
+      contact_id: contactId,
+      message_type: 'text',
+      from_type: 'system',
+      content: `Como foi seu atendimento? Sua opinião é muito importante para nós! Avalie aqui: ${link}`,
+      priority: 2,
+    });
+
+    if (queueError) {
+      console.error('[API] Error queueing csat_survey message:', queueError);
+      throw queueError;
+    }
+  },
+
+  /**
+   * Toggle favorite flag on a conversation
+   */
+  toggleConversationFavorite: async (conversationId: string, isFavorite: boolean): Promise<void> => {
+    const { error } = await supabase
+      .from('conversations')
+      .update({ is_favorite: isFavorite })
+      .eq('id', conversationId);
+
+    if (error) {
+      console.error('[API] Error toggling favorite:', error);
+      throw error;
+    }
   },
 
   /**
@@ -1660,6 +1889,46 @@ export const api = {
       throw error;
     }
     return data || [];
+  },
+
+  /**
+   * Filas de atendimento (roteamento/categorização de conversas)
+   */
+  fetchQueues: async () => {
+    const { data, error } = await supabase
+      .from('queues')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('[API] Error fetching queues:', error);
+      throw error;
+    }
+    return data || [];
+  },
+
+  createQueue: async (name: string, color: string): Promise<void> => {
+    const { error } = await supabase.from('queues').insert({ name, color });
+    if (error) {
+      console.error('[API] Error creating queue:', error);
+      throw error;
+    }
+  },
+
+  updateQueue: async (id: string, updates: { name?: string; color?: string; is_active?: boolean }): Promise<void> => {
+    const { error } = await supabase.from('queues').update(updates).eq('id', id);
+    if (error) {
+      console.error('[API] Error updating queue:', error);
+      throw error;
+    }
+  },
+
+  deleteQueue: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('queues').delete().eq('id', id);
+    if (error) {
+      console.error('[API] Error deleting queue:', error);
+      throw error;
+    }
   },
 
   /**

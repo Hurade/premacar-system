@@ -13,6 +13,7 @@ export interface WhatsAppConnection {
   meta_phone_number_id: string | null;
   meta_access_token: string | null;
   meta_business_account_id: string | null;
+  default_queue_id: string | null;
   is_active: boolean;
   is_connected: boolean;
   last_connected_at: string | null;
@@ -54,6 +55,7 @@ export function useWhatsAppConnections() {
             meta_phone_number_id: ns.meta_phone_number_id,
             meta_access_token: ns.meta_access_token,
             meta_business_account_id: ns.meta_business_account_id ?? null,
+            default_queue_id: null,
             evolution_instance_name: null,
             evolution_api_key: null,
             evolution_base_url: null,
@@ -76,6 +78,7 @@ export function useWhatsAppConnections() {
             meta_phone_number_id: null,
             meta_access_token: null,
             meta_business_account_id: null,
+            default_queue_id: null,
             is_active: true,
             is_connected: true,
             last_connected_at: null,

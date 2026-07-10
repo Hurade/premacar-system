@@ -1,10 +1,8 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Bot, Loader2, Calendar, Wand2, Building2, RotateCcw, Info, Send } from 'lucide-react';
-import { Button } from '../Button';
+import { Bot, Loader2, Calendar, Building2, Info, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import PromptGeneratorSheet from './PromptGeneratorSheet';
-import { DEFAULT_NINA_PROMPT } from '@/prompts/default-nina-prompt';
+import SpecializedAgentsSection from './SpecializedAgentsSection';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Tooltip,
@@ -15,11 +13,8 @@ import {
 
 interface AgentSettings {
   id?: string;
-  system_prompt_override: string | null;
   is_active: boolean;
   auto_response_enabled: boolean;
-  ai_model_mode: 'flash' | 'pro' | 'pro3' | 'adaptive';
-  message_breaking_enabled: boolean;
   business_hours_start: string;
   business_hours_end: string;
   business_days: number[];
@@ -28,7 +23,6 @@ interface AgentSettings {
   ai_scheduling_enabled: boolean;
   message_grouping_enabled: boolean;
   message_grouping_delay: number;
-  ai_activation_delay_minutes: number;
   scheduling_notify_phone: string | null;
 }
 
@@ -42,8 +36,6 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Sáb' },
 ];
 
-// Using shared prompt from @/prompts/default-nina-prompt
-
 export interface AgentSettingsRef {
   save: () => Promise<void>;
   cancel: () => void;
@@ -55,13 +47,9 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingNotif, setTestingNotif] = useState(false);
-  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [settings, setSettings] = useState<AgentSettings>({
-    system_prompt_override: null,
     is_active: true,
     auto_response_enabled: true,
-    ai_model_mode: 'flash',
-    message_breaking_enabled: true,
     business_hours_start: '09:00',
     business_hours_end: '18:00',
     business_days: [1, 2, 3, 4, 5],
@@ -70,7 +58,6 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     ai_scheduling_enabled: true,
     message_grouping_enabled: true,
     message_grouping_delay: 20000,
-    ai_activation_delay_minutes: 5,
     scheduling_notify_phone: null,
   });
 
@@ -91,7 +78,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
       setLoading(false);
       return;
     }
-    
+
     try {
       // Fetch global nina_settings (no user_id filter - single tenant)
       const { data, error } = await supabase
@@ -112,13 +99,8 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
       // Load settings from global data
       setSettings({
         id: data.id,
-        system_prompt_override: data.system_prompt_override,
         is_active: data.is_active,
         auto_response_enabled: data.auto_response_enabled,
-        ai_model_mode: (data.ai_model_mode === 'flash' || data.ai_model_mode === 'pro' || data.ai_model_mode === 'pro3' || data.ai_model_mode === 'adaptive') 
-          ? data.ai_model_mode 
-          : 'flash',
-        message_breaking_enabled: data.message_breaking_enabled,
         business_hours_start: data.business_hours_start,
         business_hours_end: data.business_hours_end,
         business_days: data.business_days,
@@ -127,7 +109,6 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
         ai_scheduling_enabled: data.ai_scheduling_enabled ?? true,
         message_grouping_enabled: data.message_grouping_enabled ?? true,
         message_grouping_delay: data.message_grouping_delay ?? 20000,
-        ai_activation_delay_minutes: data.ai_activation_delay_minutes ?? 5,
         scheduling_notify_phone: data.scheduling_notify_phone ?? null,
       });
     } catch (error) {
@@ -145,11 +126,8 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
       const { error } = await supabase
         .from('nina_settings')
         .update({
-          system_prompt_override: settings.system_prompt_override,
           is_active: settings.is_active,
           auto_response_enabled: settings.auto_response_enabled,
-          ai_model_mode: settings.ai_model_mode,
-          message_breaking_enabled: settings.message_breaking_enabled,
           business_hours_start: settings.business_hours_start,
           business_hours_end: settings.business_hours_end,
           business_days: settings.business_days,
@@ -158,7 +136,6 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           ai_scheduling_enabled: settings.ai_scheduling_enabled,
           message_grouping_enabled: settings.message_grouping_enabled,
           message_grouping_delay: settings.message_grouping_delay,
-          ai_activation_delay_minutes: settings.ai_activation_delay_minutes,
           scheduling_notify_phone: settings.scheduling_notify_phone,
           updated_at: new Date().toISOString(),
         })
@@ -225,15 +202,6 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     }));
   };
 
-  const handlePromptGenerated = (prompt: string) => {
-    setSettings(prev => ({ ...prev, system_prompt_override: prompt }));
-  };
-
-  const handleRestoreDefault = () => {
-    setSettings(prev => ({ ...prev, system_prompt_override: DEFAULT_NINA_PROMPT }));
-    toast.success('Prompt restaurado para o padrão');
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -243,115 +211,8 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
   }
 
   return (
-    <>
-      <PromptGeneratorSheet
-        open={isGeneratorOpen}
-        onOpenChange={setIsGeneratorOpen}
-        onPromptGenerated={handlePromptGenerated}
-      />
-      
-      <TooltipProvider>
+    <TooltipProvider>
       <div className="space-y-6">
-        {/* System Prompt - PRIMEIRA SEÇÃO */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Bot className="w-5 h-5 text-cyan-400" />
-              <h3 className="font-semibold text-white">Prompt do Sistema</h3>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRestoreDefault}
-                className="text-slate-400 hover:text-white hover:bg-slate-700"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Restaurar Padrão
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsGeneratorOpen(true)}
-                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                Gerar com IA
-              </Button>
-            </div>
-          </div>
-          
-          {/* Nota explicativa sobre o prompt */}
-          <div className="mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-            <p className="flex items-start gap-2">
-              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>
-                <strong>Template de exemplo:</strong> Este é um modelo inicial para você começar. 
-                Personalize completamente com as informações da sua empresa, produtos, serviços e tom de comunicação.
-              </span>
-            </p>
-          </div>
-          
-          <textarea
-            value={settings.system_prompt_override || ''}
-            onChange={(e) => setSettings({ ...settings, system_prompt_override: e.target.value || null })}
-            placeholder="Cole ou escreva o prompt do agente aqui..."
-            rows={12}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-y font-mono custom-scrollbar"
-          />
-        <details className="mt-3">
-            <summary className="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300 flex items-center gap-2">
-              <span>📋</span> Variáveis dinâmicas disponíveis
-            </summary>
-            <div className="mt-2 p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono space-y-3">
-              {/* Tempo */}
-              <div>
-                <div className="text-violet-400 font-semibold mb-1 text-[11px]">⏰ Tempo</div>
-                <div><span className="text-cyan-400">{"{{ data_hora }}"}</span> → Data e hora atual</div>
-                <div><span className="text-cyan-400">{"{{ data }}"}</span> → Apenas data</div>
-                <div><span className="text-cyan-400">{"{{ hora }}"}</span> → Apenas hora</div>
-                <div><span className="text-cyan-400">{"{{ dia_semana }}"}</span> → Dia da semana por extenso</div>
-              </div>
-              {/* Cliente */}
-              <div>
-                <div className="text-emerald-400 font-semibold mb-1 text-[11px]">👤 Cliente</div>
-                <div><span className="text-cyan-400">{"{{ cliente_nome }}"}</span> → Nome do cliente</div>
-                <div><span className="text-cyan-400">{"{{ cliente_telefone }}"}</span> → Telefone do cliente</div>
-                <div><span className="text-cyan-400">{"{{ cliente_email }}"}</span> → Email do cliente</div>
-                <div><span className="text-cyan-400">{"{{ cliente_tags }}"}</span> → Tags separadas por vírgula</div>
-                <div><span className="text-cyan-400">{"{{ cliente_notas }}"}</span> → Observações do contato</div>
-                <div><span className="text-cyan-400">{"{{ cliente_oficina }}"}</span> → Campo oficina</div>
-                <div><span className="text-cyan-400">{"{{ primeiro_contato }}"}</span> → Data do primeiro contato</div>
-              </div>
-              {/* Origem e Histórico */}
-              <div>
-                <div className="text-amber-400 font-semibold mb-1 text-[11px]">🔀 Origem e Histórico</div>
-                <div><span className="text-cyan-400">{"{{ origem_conversa }}"}</span> → disparo | inbound | retorno</div>
-                <div><span className="text-cyan-400">{"{{ historico_conversa }}"}</span> → true se já conversou antes</div>
-              </div>
-              {/* Deal/Pipeline */}
-              <div>
-                <div className="text-pink-400 font-semibold mb-1 text-[11px]">💰 Negócio (Pipeline)</div>
-                <div><span className="text-cyan-400">{"{{ deal_estagio }}"}</span> → Nome do estágio atual</div>
-                <div><span className="text-cyan-400">{"{{ deal_valor }}"}</span> → Valor do negócio (R$)</div>
-                <div><span className="text-cyan-400">{"{{ deal_titulo }}"}</span> → Título do deal</div>
-              </div>
-              {/* Empresa/Agente */}
-              <div>
-                <div className="text-blue-400 font-semibold mb-1 text-[11px]">🏢 Empresa/Agente</div>
-                <div><span className="text-cyan-400">{"{{ empresa_nome }}"}</span> → Nome da empresa</div>
-                <div><span className="text-cyan-400">{"{{ agente_nome }}"}</span> → Nome do agente/SDR</div>
-              </div>
-              {/* Conversa */}
-              <div>
-                <div className="text-orange-400 font-semibold mb-1 text-[11px]">💬 Conversa</div>
-                <div><span className="text-cyan-400">{"{{ total_mensagens }}"}</span> → Total de mensagens trocadas</div>
-                <div><span className="text-cyan-400">{"{{ conversa_status }}"}</span> → Status (nina, human, paused)</div>
-              </div>
-            </div>
-          </details>
-        </div>
-
         {/* 2-Column Grid: Company Info + Business Hours */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Company Info */}
@@ -467,90 +328,27 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           </div>
         </div>
 
-        {/* Comportamento */}
+        {/* Comportamento Geral */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
           <div className="flex items-center gap-3 mb-4">
             <Bot className="w-5 h-5 text-violet-400" />
-            <h3 className="font-semibold text-white">Comportamento</h3>
-          </div>
-          
-          {/* AI Model Selection */}
-          <div className="mb-4">
-            <label className="text-xs font-medium text-slate-400 mb-3 block">Modelo de IA</label>
-            <div className="grid grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => setSettings({ ...settings, ai_model_mode: 'flash' })}
-                className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-all ${
-                  settings.ai_model_mode === 'flash'
-                    ? 'bg-violet-500/20 border-violet-500 text-violet-300'
-                    : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:bg-slate-800'
-                }`}
-              >
-                <span className="text-lg">⚡</span>
-                <span className="text-xs font-medium">Gemini 2.5 Flash</span>
-                <span className="text-[10px] text-center opacity-70">Rápido</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettings({ ...settings, ai_model_mode: 'pro' })}
-                className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-all ${
-                  settings.ai_model_mode === 'pro'
-                    ? 'bg-violet-500/20 border-violet-500 text-violet-300'
-                    : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:bg-slate-800'
-                }`}
-              >
-                <span className="text-lg">🧠</span>
-                <span className="text-xs font-medium">Gemini 2.5 Pro</span>
-                <span className="text-[10px] text-center opacity-70">Inteligente</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettings({ ...settings, ai_model_mode: 'pro3' })}
-                className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-all ${
-                  settings.ai_model_mode === 'pro3'
-                    ? 'bg-violet-500/20 border-violet-500 text-violet-300'
-                    : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:bg-slate-800'
-                }`}
-              >
-                <span className="text-lg">🚀</span>
-                <span className="text-xs font-medium">Gemini 3 Pro</span>
-                <span className="text-[10px] text-center opacity-70">Mais Recente</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettings({ ...settings, ai_model_mode: 'adaptive' })}
-                className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-all ${
-                  settings.ai_model_mode === 'adaptive'
-                    ? 'bg-violet-500/20 border-violet-500 text-violet-300'
-                    : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:bg-slate-800'
-                }`}
-              >
-                <span className="text-lg">🎯</span>
-                <span className="text-xs font-medium">Adaptativo</span>
-                <span className="text-[10px] text-center opacity-70">Por contexto</span>
-              </button>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              {settings.ai_model_mode === 'flash' && 'Gemini 2.5 Flash: respostas rápidas e econômicas'}
-              {settings.ai_model_mode === 'pro' && 'Gemini 2.5 Pro: respostas elaboradas e inteligentes'}
-              {settings.ai_model_mode === 'pro3' && 'Gemini 3 Pro: modelo mais recente e avançado'}
-              {settings.ai_model_mode === 'adaptive' && 'Escolhe automaticamente entre Flash/Pro/Pro 3 conforme a complexidade da conversa'}
+            <h3 className="font-semibold text-white">Comportamento Geral</h3>
+            <p className="text-xs text-slate-500">
+              Interruptores globais — prompt, modelo e comportamento de cada agente ficam na lista "Agentes de IA" abaixo.
             </p>
           </div>
 
-          {/* Toggles em grid 2x2 com tooltips */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-sm text-slate-300 cursor-help flex items-center gap-1.5">
-                    Agente Ativo
+                    IA Ativa
                     <Info className="w-3 h-3 text-slate-500" />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="text-xs max-w-[200px]">Liga ou desliga o agente de IA completamente. Quando desativado, nenhuma resposta automática será enviada.</p>
+                  <p className="text-xs max-w-[200px]">Liga ou desliga a IA completamente, para todos os agentes. Quando desativado, nenhuma resposta automática será enviada.</p>
                 </TooltipContent>
               </Tooltip>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -581,29 +379,6 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                   type="checkbox"
                   checked={settings.auto_response_enabled}
                   onChange={(e) => setSettings({ ...settings, auto_response_enabled: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm text-slate-300 cursor-help flex items-center gap-1.5">
-                    Quebrar Mensagens
-                    <Info className="w-3 h-3 text-slate-500" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs max-w-[200px]">Divide respostas longas em várias mensagens menores, simulando uma conversa mais natural.</p>
-                </TooltipContent>
-              </Tooltip>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.message_breaking_enabled}
-                  onChange={(e) => setSettings({ ...settings, message_breaking_enabled: e.target.checked })}
                   className="sr-only peer"
                 />
                 <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
@@ -645,7 +420,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[280px]">
                     <p className="text-xs">
-                      Quando ativo, aguarda um período antes de responder para agrupar mensagens seguidas do cliente em uma única resposta. 
+                      Quando ativo, aguarda um período antes de responder para agrupar mensagens seguidas do cliente em uma única resposta.
                       Evita respostas múltiplas quando o cliente envia mensagens "picotadas".
                     </p>
                   </TooltipContent>
@@ -661,7 +436,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                 <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
               </label>
             </div>
-            
+
             {settings.message_grouping_enabled && (
               <div className="space-y-3">
                 <div>
@@ -687,68 +462,17 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Aguarda este tempo após cada mensagem antes de processar. Se o cliente enviar outra mensagem durante o período, 
+                  Aguarda este tempo após cada mensagem antes de processar. Se o cliente enviar outra mensagem durante o período,
                   o timer reinicia e todas as mensagens são combinadas em uma única resposta.
                 </p>
               </div>
             )}
           </div>
-
-          {/* AI Activation Delay Section */}
-          <div className="mt-6 pt-4 border-t border-slate-800">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-sm font-medium text-slate-300">⏱️ Delay de Ativação após Disparo</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-3.5 h-3.5 text-slate-500 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-[300px]">
-                  <p className="text-xs">
-                    Tempo que a IA aguarda antes de responder após um disparo de campanha. 
-                    Evita loops com outros bots que respondem imediatamente. 
-                    Apenas pessoas reais (que demoram mais) serão atendidas.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            
-            <div className="space-y-3">
-              <select
-                value={settings.ai_activation_delay_minutes}
-                onChange={(e) => setSettings({ ...settings, ai_activation_delay_minutes: parseFloat(e.target.value) })}
-                className="w-full h-10 rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-              >
-                <option value="0">Sem delay (responder imediatamente)</option>
-                <option value="0.33">20 segundos</option>
-                <option value="0.5">30 segundos</option>
-                <option value="1">1 minuto</option>
-                <option value="2">2 minutos</option>
-                <option value="3">3 minutos</option>
-                <option value="5">5 minutos (recomendado)</option>
-                <option value="10">10 minutos</option>
-                <option value="15">15 minutos</option>
-                <option value="30">30 minutos</option>
-                <option value="60">1 hora</option>
-              </select>
-              
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <p className="text-[11px] text-amber-300 leading-relaxed">
-                  <strong>⚠️ Anti-Bot:</strong> A IA só começará a responder após esse tempo do envio do disparo. 
-                  Mensagens recebidas antes serão armazenadas mas não processadas até o delay expirar.
-                  {settings.ai_activation_delay_minutes === 0 && (
-                    <span className="block mt-1 text-amber-400">
-                      ⚡ Delay desabilitado - a IA responderá imediatamente (risco de loops com bots).
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
+        <SpecializedAgentsSection />
       </div>
-      </TooltipProvider>
-    </>
+    </TooltipProvider>
   );
 });
 

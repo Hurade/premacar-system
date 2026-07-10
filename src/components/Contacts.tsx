@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
@@ -42,6 +43,7 @@ const Contacts: React.FC = () => {
   const [pageSize, setPageSize] = useState<PageSize>(50);
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
+  const { isAdmin, isManager } = useUserRole();
 
   const loadTagDefinitions = useCallback(async () => {
     try {
@@ -314,8 +316,19 @@ const Contacts: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
+            {(isAdmin || isManager) && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/contatos-duplicados')}
+                className="border-slate-700 hover:border-cyan-500/50"
+                title="Encontrar e mesclar contatos com o mesmo telefone"
+              >
+                <UserX className="w-4 h-4 mr-2" />
+                Contatos Duplicados
+              </Button>
+            )}
+            <Button
+              variant="outline"
               onClick={() => setShowAddModal(true)}
               className="border-slate-700 hover:border-cyan-500/50"
             >
