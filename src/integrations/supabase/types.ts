@@ -762,6 +762,7 @@ export type Database = {
           business_hours_enabled: boolean
           business_hours_end: string | null
           business_hours_start: string | null
+          connection_id: string | null
           created_at: string
           daily_limit: number
           description: string | null
@@ -797,6 +798,7 @@ export type Database = {
           business_hours_enabled?: boolean
           business_hours_end?: string | null
           business_hours_start?: string | null
+          connection_id?: string | null
           created_at?: string
           daily_limit?: number
           description?: string | null
@@ -832,6 +834,7 @@ export type Database = {
           business_hours_enabled?: boolean
           business_hours_end?: string | null
           business_hours_start?: string | null
+          connection_id?: string | null
           created_at?: string
           daily_limit?: number
           description?: string | null
@@ -861,6 +864,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "campaigns_meta_template_id_fkey"
             columns: ["meta_template_id"]
@@ -1167,6 +1177,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversations_connection_id_fkey"
             columns: ["connection_id"]
             isOneToOne: false
@@ -1192,13 +1209,6 @@ export type Database = {
             columns: ["queue_id"]
             isOneToOne: false
             referencedRelation: "queues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversations_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "recurring_campaigns"
             referencedColumns: ["id"]
           },
         ]
@@ -2603,6 +2613,7 @@ export type Database = {
       recurring_campaigns: {
         Row: {
           actual_cost: number | null
+          connection_id: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -2623,6 +2634,7 @@ export type Database = {
         }
         Insert: {
           actual_cost?: number | null
+          connection_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -2643,6 +2655,7 @@ export type Database = {
         }
         Update: {
           actual_cost?: number | null
+          connection_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -2661,7 +2674,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recurring_campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       round_robin_state: {
         Row: {
@@ -2694,6 +2715,7 @@ export type Database = {
       }
       send_queue: {
         Row: {
+          connection_id: string | null
           contact_id: string
           content: string | null
           conversation_id: string
@@ -2713,6 +2735,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          connection_id?: string | null
           contact_id: string
           content?: string | null
           conversation_id: string
@@ -2732,6 +2755,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          connection_id?: string | null
           contact_id?: string
           content?: string | null
           conversation_id?: string
@@ -2751,6 +2775,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "send_queue_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "send_queue_contact_id_fkey"
             columns: ["contact_id"]
@@ -3300,6 +3331,7 @@ export type Database = {
       claim_send_queue_batch: {
         Args: { p_limit?: number }
         Returns: {
+          connection_id: string | null
           contact_id: string
           content: string | null
           conversation_id: string
@@ -3331,7 +3363,9 @@ export type Database = {
       get_campaign_funnel: { Args: { p_campaign_id: string }; Returns: Json }
       get_csat_survey_by_token: {
         Args: { p_token: string }
-        Returns: { already_responded: boolean }[]
+        Returns: {
+          already_responded: boolean
+        }[]
       }
       get_or_create_conversation_state: {
         Args: { p_conversation_id: string }
