@@ -413,24 +413,39 @@ async function sendWhatsApp(
   const cleanPhone = contact.phone_number.replace(/\D/g, "");
   const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
+  // Diagnostic log: mostra qual API está disponível e o que vem no config do dia
+  console.log(`[recurring-processor] sendWhatsApp DEBUG:`, {
+    has_meta: !!(settings?.meta_access_token && settings?.meta_phone_number_id),
+    has_evolution: !!(settings?.evolution_api_url && settings?.evolution_api_key && settings?.evolution_instance_name),
+    evolution_url: settings?.evolution_api_url || null,
+    evolution_instance: settings?.evolution_instance_name || null,
+    config_meta_template_id: config.meta_template_id || null,
+    config_template_id: config.template_id || null,
+    config_has_message: !!config.message,
+    contact_phone: formattedPhone,
+  });
+
+  // Normaliza: a UI salva meta_template_id, mas versões antigas usavam template_id
+  const templateId = config.meta_template_id || config.template_id || null;
+
   // Try Meta API first if configured
   if (settings?.meta_access_token && settings?.meta_phone_number_id) {
     try {
       const url = `https://graph.facebook.com/v21.0/${settings.meta_phone_number_id}/messages`;
       let payload: any;
 
-      // If template_id is set, send as template (required outside 24h window)
-      if (config.template_id) {
+      // If templateId is set, send as template (required outside 24h window)
+      if (templateId) {
         // Fetch template details from meta_templates
         const { data: template } = await supabase
           .from("meta_templates")
           .select("name, language_code, parameters_count, parameters_mapping")
-          .eq("id", config.template_id)
+          .eq("id", templateId)
           .single();
 
         if (!template) {
           // Template not found — skip Meta, fall through to Evolution
-          console.warn(`[recurring-processor] Template ${config.template_id} não encontrado, tentando Evolution`);
+          console.warn(`[recurring-processor] Template ${templateId} não encontrado na tabela meta_templates, tentando Evolution`);
         } else {
           console.log(`[recurring-processor] Sending template "${template.name}" (${template.language_code}) to ${formattedPhone}`);
 
