@@ -124,10 +124,22 @@ function simpleResponse(text: string, audioUrl: string | null): Response {
 
 // ── Handler principal ─────────────────────────────────────────────────────────
 serve(async (req) => {
+  // Log imediato — antes de qualquer operação assíncrona
+  // Aparece nos logs do Supabase Dashboard → Edge Functions → voice-call-twiml
+  console.log(`[voice-twiml] ▶ ${req.method} ${req.url}`)
+
   // Fallback global: qualquer erro não tratado retorna TwiML válido para o Twilio
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    // Variáveis de ambiente obrigatórias
+    if (!supabaseUrl || !serviceKey) {
+      console.error('[voice-twiml] FATAL: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausente')
+      return new Response(TWIML_ERROR_FALLBACK, { headers: XML_HEADERS })
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey)
 
     const url = new URL(req.url)
     const contactId = url.searchParams.get('contact') || null
@@ -292,12 +304,24 @@ serve(async (req) => {
     }
 
     // ── 3. TWIML INICIAL — primeira chamada do Twilio ──────────────────────
+    // IMPORTANTE: o & entre parâmetros da query string DEVE ser &amp; dentro de
+    // atributos XML. O Twilio parseia TwiML como XML — & não escapado = XML inválido
+    // = "I'm sorry, an application error has occurred".
     const dtmfWebhookUrl =
-      `${supabaseUrl}/functions/v1/voice-call-twiml?dtmf=1&contact=${contactId ?? ''}`
+      `${supabaseUrl}/functions/v1/voice-call-twiml?dtmf=1&amp;contact=${contactId ?? ''}`
+
+    console.log(`[voice-twiml] TwiML inicial: dtmfUrl="${dtmfWebhookUrl}", voiceMode=${voiceMode}`)
 
     // Modo B: gera áudio ElevenLabs para a mensagem inicial
     // Timeout fora do Gather usa sempre Twilio TTS (evita latência extra na chamada inicial)
     const initialAudioUrl = await generateElevenLabsAudio(MSG_INITIAL, s, supabase)
+
+    await saveLog(supabase, {
+      source: 'voice-call-twiml',
+      level: 'info',
+      message: `TwiML inicial gerado: voice_mode=${voiceMode}, contact=${contactId}`,
+      metadata: { contact_id: contactId, voice_mode: voiceMode, has_audio_url: !!initialAudioUrl },
+    })
 
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -313,8 +337,9 @@ serve(async (req) => {
     )
 
   } catch (err: any) {
-    // Exceção não esperada — loga e retorna TwiML mínimo para o Twilio não quebrar
-    console.error('[voice-twiml] Unhandled error:', err?.message || String(err))
+    // Exceção não esperada — loga stack completo e retorna TwiML mínimo para o Twilio não quebrar
+    console.error('[voice-twiml] ❌ UNHANDLED ERROR:', err?.message || String(err))
+    console.error('[voice-twiml] Stack:', err?.stack || '(sem stack)')
     return new Response(TWIML_ERROR_FALLBACK, { headers: XML_HEADERS })
   }
 })
