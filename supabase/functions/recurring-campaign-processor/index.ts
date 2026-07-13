@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { saveLog } from "../_shared/logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -138,7 +139,6 @@ serve(async (req) => {
             const whatsappSettings = await resolveCampaignWhatsAppSettings(supabase, campaign, ninaSettings);
             sendResult = await sendWhatsApp(contact, dayConfig, whatsappSettings, supabase);
           } else if (dayConfig.type === "sms") {
-            // SMS not implemented yet
             sendResult = { success: false, error: "SMS não implementado ainda" };
           } else if (dayConfig.type === "call") {
             sendResult = await sendCall(contact, dayConfig, supabase, supabaseUrl);
@@ -148,6 +148,26 @@ serve(async (req) => {
         } catch (err: any) {
           sendResult = { success: false, error: err.message || "Erro desconhecido" };
         }
+
+        // Persist result to system_logs so it's queryable via SQL
+        await saveLog(supabase, {
+          source: "recurring-campaign-processor",
+          level: sendResult.success ? "info" : "error",
+          message: sendResult.success
+            ? `Envio OK: ${dayConfig.type} → ${contactName} (campanha: ${campaign.name}, dia ${cc.current_day})`
+            : `Falha: ${dayConfig.type} → ${contactName} (campanha: ${campaign.name}, dia ${cc.current_day}): ${sendResult.error}`,
+          metadata: {
+            campaign_id: campaign.id,
+            campaign_name: campaign.name,
+            contact_id: cc.contact_id,
+            contact_name: contactName,
+            contact_phone: contact.phone_number,
+            day: cc.current_day,
+            type: dayConfig.type,
+            success: sendResult.success,
+            error: sendResult.error || null,
+          },
+        });
 
         // Update day status
         const updatedDayStatuses = {
@@ -436,16 +456,19 @@ async function sendWhatsApp(
 
       // If templateId is set, send as template (required outside 24h window)
       if (templateId) {
-        // Fetch template details from meta_templates
+        // Fetch template details from meta_templates (only approved templates work in Meta API)
         const { data: template } = await supabase
           .from("meta_templates")
-          .select("name, language_code, parameters_count, parameters_mapping")
+          .select("name, language_code, parameters_count, parameters_mapping, status")
           .eq("id", templateId)
           .single();
 
         if (!template) {
           // Template not found — skip Meta, fall through to Evolution
           console.warn(`[recurring-processor] Template ${templateId} não encontrado na tabela meta_templates, tentando Evolution`);
+        } else if (template.status !== "approved") {
+          console.warn(`[recurring-processor] Template "${template.name}" está com status "${template.status}" (não aprovado) — não pode ser enviado pela Meta API`);
+          return { success: false, error: `Template "${template.name}" não está aprovado pela Meta (status: ${template.status}). Aguarde aprovação ou escolha outro template.` };
         } else {
           console.log(`[recurring-processor] Sending template "${template.name}" (${template.language_code}) to ${formattedPhone}`);
 
