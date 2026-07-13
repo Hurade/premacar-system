@@ -90,8 +90,8 @@ serve(async (req) => {
     const contactName = contact.name || contact.call_name || 'Cliente'
     const personalizedMessage = resolvedMessage.replace(/\{\{nome\}\}/g, contactName)
 
-    // 4. URL do TwiML — passa mensagem direto via query param (TTS no Twilio)
-    const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?message=${encodeURIComponent(personalizedMessage)}&contact=${contactId}`
+    // 4. URL do TwiML — fluxo interativo com Gather/DTMF definido em voice-call-twiml
+    const twimlUrl = `${supabaseUrl}/functions/v1/voice-call-twiml?contact=${contactId}`
 
     // 5. Fazer ligação via Twilio
     const cleanPhone = contact.phone_number.replace(/\D/g, '')
