@@ -208,7 +208,7 @@ export function ConnectionsManager() {
             Conexões WhatsApp
           </h3>
           <p className="text-sm text-slate-400 mt-0.5">
-            {realConnections.length} de {MAX_CONNECTIONS} conexões configuradas
+            {realConnections.length} {realConnections.length === 1 ? 'conexão configurada' : 'conexões configuradas'}
           </p>
         </div>
         <Button
