@@ -203,6 +203,7 @@ serve(async (req) => {
               .update({
                 current_day: cc.current_day + 1,
                 day_statuses: updatedDayStatuses,
+                connection_id: campaign.connection_id ?? null,
                 updated_at: new Date().toISOString(),
               } as any)
               .eq("id", cc.id);
@@ -213,6 +214,7 @@ serve(async (req) => {
               .update({
                 status: "success",
                 day_statuses: updatedDayStatuses,
+                connection_id: campaign.connection_id ?? null,
                 success_at: new Date().toISOString(),
                 completed_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),

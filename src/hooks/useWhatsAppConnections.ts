@@ -13,10 +13,15 @@ export interface WhatsAppConnection {
   meta_phone_number_id: string | null;
   meta_access_token: string | null;
   meta_business_account_id: string | null;
+  meta_app_secret: string | null;
+  meta_verify_token: string | null;
   default_queue_id: string | null;
   is_active: boolean;
   is_connected: boolean;
+  is_default: boolean;
   last_connected_at: string | null;
+  qr_code: string | null;
+  qr_code_expires_at: string | null;
   user_id: string | null;
   created_at: string;
   updated_at: string;
@@ -38,7 +43,7 @@ export function useWhatsAppConnections() {
       if (error) throw error;
       const list: WhatsAppConnection[] = (data || []) as unknown as WhatsAppConnection[];
 
-      // If no entries yet, check nina_settings for a legacy connection
+      // Se não há conexões cadastradas, detecta credenciais legadas em nina_settings
       if (list.length === 0) {
         const { data: ns } = await supabase
           .from('nina_settings')
@@ -55,13 +60,18 @@ export function useWhatsAppConnections() {
             meta_phone_number_id: ns.meta_phone_number_id,
             meta_access_token: ns.meta_access_token,
             meta_business_account_id: ns.meta_business_account_id ?? null,
+            meta_app_secret: null,
+            meta_verify_token: null,
             default_queue_id: null,
             evolution_instance_name: null,
             evolution_api_key: null,
             evolution_base_url: null,
             is_active: true,
             is_connected: true,
+            is_default: true,
             last_connected_at: null,
+            qr_code: null,
+            qr_code_expires_at: null,
             user_id: null,
             created_at: '',
             updated_at: '',
@@ -78,10 +88,15 @@ export function useWhatsAppConnections() {
             meta_phone_number_id: null,
             meta_access_token: null,
             meta_business_account_id: null,
+            meta_app_secret: null,
+            meta_verify_token: null,
             default_queue_id: null,
             is_active: true,
             is_connected: true,
+            is_default: true,
             last_connected_at: null,
+            qr_code: null,
+            qr_code_expires_at: null,
             user_id: null,
             created_at: '',
             updated_at: '',
@@ -145,6 +160,33 @@ export function useWhatsAppConnections() {
     }
   }, [fetchConnections]);
 
+  // Define uma conexão como padrão (remove is_default das outras do mesmo user)
+  const setDefaultConnection = useCallback(async (id: string) => {
+    try {
+      const conn = connections.find(c => c.id === id);
+      if (!conn || conn.id.startsWith('__legacy_')) return;
+
+      // Remove default das outras
+      await supabase
+        .from('whatsapp_connections')
+        .update({ is_default: false } as any)
+        .eq('is_active', true)
+        .neq('id', id);
+
+      // Define esta como default
+      await supabase
+        .from('whatsapp_connections')
+        .update({ is_default: true } as any)
+        .eq('id', id);
+
+      toast.success(`${conn.name} definida como conexão padrão`);
+      await fetchConnections();
+    } catch (error: any) {
+      toast.error('Erro ao definir padrão: ' + error.message);
+    }
+  }, [connections, fetchConnections]);
+
+  // Testa a conexão e atualiza is_connected no banco
   const testConnection = useCallback(async (id: string) => {
     const conn = connections.find(c => c.id === id);
     if (!conn) return false;
@@ -159,22 +201,24 @@ export function useWhatsAppConnections() {
           },
         });
         if (error) throw error;
-        const isConnected = data?.connected === true;
-        
+        // test-evolution-connection retorna { success, is_connected, instance_status }
+        const isConnected = data?.is_connected === true;
+
         await supabase
           .from('whatsapp_connections')
-          .update({ 
-            is_connected: isConnected, 
-            last_connected_at: isConnected ? new Date().toISOString() : null 
+          .update({
+            is_connected: isConnected,
+            last_connected_at: isConnected ? new Date().toISOString() : null,
           } as any)
           .eq('id', id);
-        
+
         await fetchConnections();
-        
+
         if (isConnected) {
           toast.success(`${conn.name}: Conectado!`);
         } else {
-          toast.error(`${conn.name}: Desconectado`);
+          const status = data?.instance_status || 'desconectado';
+          toast.error(`${conn.name}: ${status}`);
         }
         return isConnected;
       } else {
@@ -185,18 +229,18 @@ export function useWhatsAppConnections() {
           },
         });
         if (error) throw error;
-        const isConnected = data?.connected === true;
-        
+        const isConnected = data?.connected === true || data?.is_connected === true;
+
         await supabase
           .from('whatsapp_connections')
-          .update({ 
-            is_connected: isConnected, 
-            last_connected_at: isConnected ? new Date().toISOString() : null 
+          .update({
+            is_connected: isConnected,
+            last_connected_at: isConnected ? new Date().toISOString() : null,
           } as any)
           .eq('id', id);
-        
+
         await fetchConnections();
-        
+
         if (isConnected) {
           toast.success(`${conn.name}: Conectado!`);
         } else {
@@ -210,6 +254,23 @@ export function useWhatsAppConnections() {
     }
   }, [connections, fetchConnections]);
 
+  // Busca QR code para uma conexão Evolution não conectada
+  const getQrCode = useCallback(async (id: string): Promise<{ base64: string | null; already_connected?: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-evolution-qr-code', {
+        body: { connection_id: id },
+      });
+      if (error) throw error;
+      if (data?.already_connected) {
+        await fetchConnections();
+        return { base64: null, already_connected: true };
+      }
+      return { base64: data?.base64 ?? null, error: data?.error };
+    } catch (error: any) {
+      return { base64: null, error: error.message };
+    }
+  }, [fetchConnections]);
+
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
@@ -222,5 +283,7 @@ export function useWhatsAppConnections() {
     updateConnection,
     deleteConnection,
     testConnection,
+    setDefaultConnection,
+    getQrCode,
   };
 }

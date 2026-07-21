@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import type { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
 import { api } from '@/services/api';
 
@@ -29,6 +29,7 @@ interface ConnectionModalProps {
 export function ConnectionModal({ connection, onClose, onSave }: ConnectionModalProps) {
   const [saving, setSaving] = useState(false);
   const [queues, setQueues] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
   const [data, setData] = useState({
     name: connection?.name || '',
     phone_number: connection?.phone_number || '',
@@ -39,12 +40,18 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
     meta_phone_number_id: connection?.meta_phone_number_id || '',
     meta_access_token: connection?.meta_access_token || '',
     meta_business_account_id: connection?.meta_business_account_id || '',
+    meta_app_secret: connection?.meta_app_secret || '',
+    meta_verify_token: connection?.meta_verify_token || '',
     default_queue_id: connection?.default_queue_id ?? null as string | null,
   });
 
   useEffect(() => {
-    api.fetchQueues().then((data: any) => setQueues(data)).catch(() => {});
+    api.fetchQueues().then((d: any) => setQueues(d)).catch(() => {});
   }, []);
+
+  const metaWebhookUrl = supabaseUrl
+    ? `${supabaseUrl}/functions/v1/meta-webhook`
+    : '';
 
   const handleSave = async () => {
     if (!data.name || !data.phone_number) return;
@@ -56,7 +63,7 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-slate-700 max-w-lg">
+      <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">
             {connection ? 'Editar Conexão' : 'Nova Conexão WhatsApp'}
@@ -119,7 +126,7 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
               </SelectContent>
             </Select>
             <p className="text-xs text-slate-500">
-              Conversas novas nesta conexão já nascem nessa fila (ex: número dedicado de Suporte)
+              Conversas novas nesta conexão entram automaticamente nessa fila
             </p>
           </div>
 
@@ -161,6 +168,15 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
 
           {data.api_type === 'meta_official' && (
             <>
+              {metaWebhookUrl && (
+                <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 space-y-1">
+                  <p className="text-xs font-medium text-cyan-400 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" />
+                    URL do Webhook (configure no Meta Business Manager)
+                  </p>
+                  <p className="text-xs font-mono text-slate-300 break-all">{metaWebhookUrl}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Phone Number ID *</Label>
                 <Input
@@ -191,6 +207,33 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
                   }
                   placeholder="1234567890"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>App Secret</Label>
+                <Input
+                  type="password"
+                  value={data.meta_app_secret}
+                  onChange={(e) =>
+                    setData({ ...data, meta_app_secret: e.target.value })
+                  }
+                  placeholder="Usado para verificar assinatura do webhook"
+                />
+                <p className="text-xs text-slate-500">
+                  Encontrado em Meta for Developers → seu app → App Secret
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Verify Token</Label>
+                <Input
+                  value={data.meta_verify_token}
+                  onChange={(e) =>
+                    setData({ ...data, meta_verify_token: e.target.value })
+                  }
+                  placeholder="Token personalizado para verificação do webhook"
+                />
+                <p className="text-xs text-slate-500">
+                  Defina qualquer string — use o mesmo valor ao configurar o webhook no Meta
+                </p>
               </div>
             </>
           )}
