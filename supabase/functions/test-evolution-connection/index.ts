@@ -17,113 +17,63 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: false,
         error: 'Campos obrigatórios: api_url, api_key, instance_name'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Validate URL format
     if (!api_url.startsWith('http://') && !api_url.startsWith('https://')) {
       return new Response(JSON.stringify({
         success: false,
         error: 'URL deve começar com http:// ou https://'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Validate API key length
-    if (api_key.length < 10) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'API Key deve ter no mínimo 10 caracteres'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.log(`[TestEvolutionConnection] Testing connection to ${api_url} for instance ${instance_name}`);
-
-    // Clean URL (remove trailing slash)
     const baseUrl = api_url.replace(/\/$/, '');
+    console.log(`[TestEvolution] Checking connectionState for instance "${instance_name}" at ${baseUrl}`);
 
-    // Test connection by fetching instance info
-    const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
+    // Endpoint direto: GET /instance/connectionState/{instance}
+    // Retorna: { instance: { instanceName, state } } ou { state: 'open' | 'connecting' | 'close' }
+    const response = await fetch(`${baseUrl}/instance/connectionState/${instance_name}`, {
       method: 'GET',
-      headers: {
-        'apikey': api_key,
-        'Content-Type': 'application/json'
-      }
+      headers: { 'apikey': api_key, 'Content-Type': 'application/json' },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[TestEvolutionConnection] API error: ${response.status} - ${errorText}`);
-      
+      console.error(`[TestEvolution] API ${response.status}:`, errorText);
       return new Response(JSON.stringify({
         success: false,
-        error: `Erro na API: ${response.status}`,
-        details: errorText
-      }), {
-        status: 200, // Return 200 so frontend can handle gracefully
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        error: `Evolution API retornou ${response.status}`,
+        details: errorText,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const instances = await response.json();
-    console.log(`[TestEvolutionConnection] Found ${instances?.length || 0} instances`);
+    const data = await response.json();
+    console.log(`[TestEvolution] Response:`, JSON.stringify(data));
 
-    // Find the specific instance
-    const instance = Array.isArray(instances) 
-      ? instances.find((inst: any) => inst.instance?.instanceName === instance_name || inst.instanceName === instance_name)
-      : null;
+    // Normaliza resposta — a Evolution API v1/v2 pode retornar formatos diferentes
+    const state: string =
+      data?.instance?.state ||
+      data?.state ||
+      data?.connectionStatus ||
+      data?.instance?.connectionStatus ||
+      'unknown';
 
-    if (!instance) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: `Instância "${instance_name}" não encontrada`,
-        available_instances: Array.isArray(instances) 
-          ? instances.map((inst: any) => inst.instance?.instanceName || inst.instanceName).filter(Boolean)
-          : []
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Get connection status
-    const instanceData = instance.instance || instance;
-    const connectionStatus = instanceData?.state || instanceData?.connectionStatus || 'unknown';
-    const isConnected = connectionStatus === 'open' || connectionStatus === 'connected';
-
-    console.log(`[TestEvolutionConnection] Instance found: ${instance_name}, status: ${connectionStatus}`);
+    const isConnected = state === 'open';
 
     return new Response(JSON.stringify({
       success: true,
-      instance_name: instance_name,
-      instance_status: connectionStatus,
       is_connected: isConnected,
-      message: isConnected 
-        ? 'Instância conectada e pronta para uso!' 
-        : `Instância encontrada, mas status: ${connectionStatus}`
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      instance_status: state,
+      message: isConnected
+        ? 'Instância conectada e pronta para uso!'
+        : `Instância encontrada, status: ${state}`,
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('[TestEvolutionConnection] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    
+    console.error('[TestEvolution] Error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: errorMessage
-    }), {
-      status: 200, // Return 200 so frontend can handle gracefully
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

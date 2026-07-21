@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus, Megaphone, Layers, Star, ScrollText, History } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
-import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
 import SystemRoadmap from './SystemRoadmap';
 import IntegrationSettings from './integrations/IntegrationSettings';
 import { ConnectionsManager } from './connections/ConnectionsManager';
@@ -28,7 +27,6 @@ interface OutletContext {
 const Settings: React.FC = () => {
   const { companyName, isAdmin } = useCompanySettings();
   const agentRef = useRef<AgentSettingsRef>(null);
-  const apiRef = useRef<ApiSettingsRef>(null);
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'agent');
   const { resetWizard } = useOnboardingStatus();
@@ -42,27 +40,19 @@ const Settings: React.FC = () => {
   const handleSave = async () => {
     if (activeTab === 'agent') {
       await agentRef.current?.save();
-    } else if (activeTab === 'connections') {
-      await apiRef.current?.save();
     }
   };
 
   const handleCancel = () => {
     if (activeTab === 'agent') {
       agentRef.current?.cancel();
-    } else if (activeTab === 'connections') {
-      apiRef.current?.cancel();
     }
   };
 
-  const isSaving = activeTab === 'agent'
-    ? agentRef.current?.isSaving
-    : activeTab === 'connections'
-    ? apiRef.current?.isSaving
-    : false;
+  const isSaving = activeTab === 'agent' ? agentRef.current?.isSaving : false;
 
-  // Tabs where the global Save/Cancel buttons are shown
-  const hasSaveButton = activeTab === 'agent' || activeTab === 'connections';
+  // Apenas a aba Agente tem botões Salvar/Cancelar globais
+  const hasSaveButton = activeTab === 'agent';
 
   return (
     <div className="p-8 max-w-5xl mx-auto h-full overflow-y-auto bg-slate-950 text-slate-50 custom-scrollbar">
@@ -202,16 +192,7 @@ const Settings: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="connections">
-          <div className="space-y-10">
-            {/* API Credentials — Evolution + Meta */}
-            <ApiSettings ref={apiRef} />
-
-            {/* Divider */}
-            <div className="border-t border-slate-800" />
-
-            {/* Connected numbers managed individually */}
-            <ConnectionsManager />
-          </div>
+          <ConnectionsManager />
         </TabsContent>
 
         <TabsContent value="integrations">
