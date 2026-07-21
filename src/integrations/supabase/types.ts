@@ -477,6 +477,7 @@ export type Database = {
         Row: {
           campaign_id: string
           completed_at: string | null
+          connection_id: string | null
           contact_id: string
           created_at: string | null
           current_day: number | null
@@ -492,6 +493,7 @@ export type Database = {
         Insert: {
           campaign_id: string
           completed_at?: string | null
+          connection_id?: string | null
           contact_id: string
           created_at?: string | null
           current_day?: number | null
@@ -507,6 +509,7 @@ export type Database = {
         Update: {
           campaign_id?: string
           completed_at?: string | null
+          connection_id?: string | null
           contact_id?: string
           created_at?: string | null
           current_day?: number | null
@@ -525,6 +528,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_contacts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
             referencedColumns: ["id"]
           },
           {
@@ -3177,10 +3187,13 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_connected: boolean | null
+          is_default: boolean | null
           last_connected_at: string | null
           meta_access_token: string | null
+          meta_app_secret: string | null
           meta_business_account_id: string | null
           meta_phone_number_id: string | null
+          meta_verify_token: string | null
           name: string
           phone_number: string
           qr_code: string | null
@@ -3198,10 +3211,13 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_connected?: boolean | null
+          is_default?: boolean | null
           last_connected_at?: string | null
           meta_access_token?: string | null
+          meta_app_secret?: string | null
           meta_business_account_id?: string | null
           meta_phone_number_id?: string | null
+          meta_verify_token?: string | null
           name: string
           phone_number: string
           qr_code?: string | null
@@ -3219,10 +3235,13 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_connected?: boolean | null
+          is_default?: boolean | null
           last_connected_at?: string | null
           meta_access_token?: string | null
+          meta_app_secret?: string | null
           meta_business_account_id?: string | null
           meta_phone_number_id?: string | null
+          meta_verify_token?: string | null
           name?: string
           phone_number?: string
           qr_code?: string | null
