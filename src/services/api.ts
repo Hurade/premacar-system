@@ -1600,7 +1600,7 @@ export const api = {
    * Send a message (insert into send_queue for human messages)
    * Returns the ID of the created message
    */
-  sendMessage: async (conversationId: string, content: string): Promise<string> => {
+  sendMessage: async (conversationId: string, content: string, replyToId?: string | null): Promise<string> => {
     console.log(`[API] Sending message to conversation ${conversationId}`);
 
     // Get conversation to find contact_id
@@ -1624,7 +1624,8 @@ export const api = {
         type: 'text',
         from_type: 'human',
         status: 'processing',
-        sent_at: new Date().toISOString()
+        sent_at: new Date().toISOString(),
+        reply_to_id: replyToId ?? null
       })
       .select('id')
       .single();
@@ -1673,6 +1674,24 @@ export const api = {
     }
 
     return msgData.id;
+  },
+
+  /**
+   * Apaga uma mensagem — sempre remove do nosso sistema; se for uma
+   * mensagem nossa numa conversa Evolution com whatsapp_message_id,
+   * tenta (best-effort) apagar também do lado do cliente.
+   */
+  deleteMessage: async (messageId: string): Promise<{ deletedOnWhatsapp: boolean }> => {
+    const { data, error } = await supabase.functions.invoke('delete-message', {
+      body: { message_id: messageId },
+    });
+
+    if (error) {
+      console.error('[API] Error deleting message:', error);
+      throw error;
+    }
+
+    return { deletedOnWhatsapp: !!data?.deletedOnWhatsapp };
   },
 
   /**

@@ -6,7 +6,7 @@ import {
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
   KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat,
-  History, ChevronDown, ChevronUp, Ban, ShieldCheck
+  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -64,13 +64,15 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, createConversation, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager } = useUserRole();
   const canSupervise = isAdmin || isManager;
   const signatureName = currentUserName || sdrName;
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<UIMessage | null>(null);
+  const [messageInfoFor, setMessageInfoFor] = useState<UIMessage | null>(null);
   const [showProfileInfo, setShowProfileInfo] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [availableTags, setAvailableTags] = useState<TagDefinition[]>([]);
@@ -150,6 +152,7 @@ const ChatInterface: React.FC = () => {
 
   useEffect(() => {
     setShowPriorHistory((activeChat?.messages.length ?? 0) === 0);
+    setReplyingTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChatId]);
 
@@ -407,6 +410,8 @@ const ChatInterface: React.FC = () => {
     let content = inputText.trim();
     setInputText('');
     setShowQuickRepliesPanel(false);
+    const replyToId = replyingTo?.id ?? null;
+    setReplyingTo(null);
 
     if (isInternalMode) {
       await sendInternalNote(activeChat.id, content, signatureName || undefined);
@@ -423,7 +428,34 @@ const ChatInterface: React.FC = () => {
       content = `${signatureName}:\n${content}`;
     }
 
-    await sendMessage(activeChat.id, content);
+    await sendMessage(activeChat.id, content, replyToId);
+  };
+
+  const handleReplyToMessage = (msg: UIMessage) => {
+    setReplyingTo(msg);
+    textareaRef.current?.focus();
+  };
+
+  const handleCopyMessage = async (msg: UIMessage) => {
+    try {
+      await navigator.clipboard.writeText(msg.content);
+      toast.success('Mensagem copiada');
+    } catch (err) {
+      console.error('[ChatInterface] Error copying message:', err);
+      toast.error('Não foi possível copiar');
+    }
+  };
+
+  const handleDeleteMessage = async (msg: UIMessage) => {
+    if (!activeChat) return;
+    if (!confirm('Apagar esta mensagem?')) return;
+    try {
+      const { deletedOnWhatsapp } = await deleteMessage(activeChat.id, msg.id);
+      toast.success(deletedOnWhatsapp ? 'Mensagem apagada também no WhatsApp' : 'Mensagem removida do sistema');
+    } catch (err) {
+      console.error('[ChatInterface] Error deleting message:', err);
+      toast.error('Erro ao apagar mensagem');
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -744,16 +776,28 @@ const ChatInterface: React.FC = () => {
   const renderMessageContent = (msg: UIMessage) => {
     if (msg.type === MessageType.IMAGE) {
       return (
-        <div className="mb-1 group relative">
-          <img 
-            src={msg.mediaUrl || msg.content} 
-            alt="Anexo" 
+        <div className="mb-1 group/img relative">
+          <img
+            src={msg.mediaUrl || msg.content}
+            alt="Anexo"
             className="rounded-lg max-w-full h-auto max-h-72 object-cover border border-slate-700/50 shadow-lg"
             loading="lazy"
             onError={(e) => {
               (e.target as HTMLImageElement).src = 'https://placehold.co/300x200/1e293b/cbd5e1?text=Erro+Imagem';
             }}
           />
+          {msg.mediaUrl && (
+            <a
+              href={msg.mediaUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Salvar anexo"
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-black/70"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       );
     }
@@ -841,6 +885,19 @@ const ChatInterface: React.FC = () => {
               {formatAudioTime(progress)} / {formatAudioTime(duration)}
             </span>
           </div>
+
+          {msg.mediaUrl && (
+            <a
+              href={msg.mediaUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Salvar anexo"
+              className={`shrink-0 ${msg.direction === MessageDirection.OUTGOING ? 'text-cyan-100 hover:text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Download className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       );
     }
@@ -1674,6 +1731,19 @@ const ChatInterface: React.FC = () => {
                                   : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700/50'
                               }`}
                             >
+                              {msg.replyToId && (() => {
+                                const repliedMsg = activeChat.messages.find(m => m.id === msg.replyToId);
+                                if (!repliedMsg) return null;
+                                const repliedIsOutgoing = repliedMsg.direction === MessageDirection.OUTGOING;
+                                return (
+                                  <div className={`mb-2 pl-2 py-1 border-l-2 rounded-r-md text-xs ${isOutgoing ? 'border-white/40 bg-black/10 text-white/80' : 'border-cyan-500/50 bg-slate-900/40 text-slate-400'}`}>
+                                    <p className="font-medium text-[11px] mb-0.5">
+                                      {repliedIsOutgoing ? (repliedMsg.fromType === 'nina' ? sdrName : 'Você') : activeChat.contactName}
+                                    </p>
+                                    <p className="truncate">{repliedMsg.content || '📎 Anexo'}</p>
+                                  </div>
+                                );
+                              })()}
                               {renderMessageContent(msg)}
                             </div>
 
@@ -1690,6 +1760,60 @@ const ChatInterface: React.FC = () => {
                                 msg.status === 'delivered' ? <CheckCheck className="w-3.5 h-3.5 text-slate-500" /> :
                                 <Check className="w-3.5 h-3.5 text-slate-500" />
                               )}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="text-slate-500 hover:text-white" title="Mais opções">
+                                    <MoreVertical className="w-3.5 h-3.5" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-52 p-2 bg-slate-900 border-slate-700" align={isOutgoing ? 'end' : 'start'}>
+                                  <div className="space-y-1">
+                                    <button
+                                      onClick={() => setMessageInfoFor(msg)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                    >
+                                      <Info className="w-4 h-4 text-slate-400" />
+                                      Dados da mensagem
+                                    </button>
+                                    <button
+                                      onClick={() => handleReplyToMessage(msg)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                    >
+                                      <Reply className="w-4 h-4 text-cyan-400" />
+                                      Responder
+                                    </button>
+                                    {msg.content && (
+                                      <button
+                                        onClick={() => handleCopyMessage(msg)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                      >
+                                        <Copy className="w-4 h-4 text-slate-400" />
+                                        Copiar
+                                      </button>
+                                    )}
+                                    {msg.mediaUrl && (
+                                      <a
+                                        href={msg.mediaUrl}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                      >
+                                        <Download className="w-4 h-4 text-slate-400" />
+                                        Salvar anexo
+                                      </a>
+                                    )}
+                                    <div className="h-px bg-slate-800 my-1"></div>
+                                    <button
+                                      onClick={() => handleDeleteMessage(msg)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-md transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Apagar
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           </div>
                         </div>
@@ -1731,6 +1855,24 @@ const ChatInterface: React.FC = () => {
               />
             ) : (
               <div className={`p-4 border-t backdrop-blur-sm z-10 relative ${isInternalMode ? 'bg-amber-950/60 border-amber-800/40' : 'bg-slate-900/90 border-slate-800'}`}>
+                {/* Reply preview strip */}
+                {replyingTo && (
+                  <div className="mb-2 flex items-center justify-between gap-2 pl-3 pr-2 py-2 border-l-2 border-cyan-500 bg-slate-800/60 rounded-r-lg">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-cyan-400">
+                        Respondendo a {replyingTo.direction === MessageDirection.INCOMING ? activeChat.contactName : (replyingTo.fromType === 'nina' ? sdrName : 'Você')}
+                      </p>
+                      <p className="text-xs text-slate-400 truncate">{replyingTo.content || '📎 Anexo'}</p>
+                    </div>
+                    <button
+                      onClick={() => setReplyingTo(null)}
+                      className="p-1 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 {/* Warning when window is about to expire */}
                 {activeChat.apiSource === 'meta' && windowStatus === 'open' && hoursRemaining < 2 && !isInternalMode && (
                   <div className="mb-2 text-center">
@@ -2346,6 +2488,50 @@ const ChatInterface: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Message Info Dialog */}
+      <Dialog open={!!messageInfoFor} onOpenChange={(open) => !open && setMessageInfoFor(null)}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Info className="w-5 h-5 text-cyan-400" />
+              Dados da mensagem
+            </DialogTitle>
+          </DialogHeader>
+          {messageInfoFor && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-500">Enviado em</span>
+                <span className="text-slate-200">{new Date(messageInfoFor.sentAt).toLocaleString('pt-BR')}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-500">Status</span>
+                <span className="text-slate-200">
+                  {messageInfoFor.status === 'read' ? 'Lida' : messageInfoFor.status === 'delivered' ? 'Entregue' : 'Enviada'}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-500">Remetente</span>
+                <span className="text-slate-200">
+                  {messageInfoFor.direction === MessageDirection.INCOMING
+                    ? 'Cliente'
+                    : messageInfoFor.fromType === 'nina' ? sdrName : (messageInfoFor.senderName || 'Atendente')}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-500">Fonte</span>
+                <span className="text-slate-200">{messageInfoFor.apiSource === 'meta' ? 'Meta' : 'Evolution'}</span>
+              </div>
+              {messageInfoFor.whatsappMessageId && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500 shrink-0">ID WhatsApp</span>
+                  <span className="text-slate-400 text-xs font-mono truncate">{messageInfoFor.whatsappMessageId}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* New Conversation Modal */}
       <Dialog open={showNewConversationModal} onOpenChange={(open) => {

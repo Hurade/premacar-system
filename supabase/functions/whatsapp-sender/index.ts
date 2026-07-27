@@ -178,13 +178,40 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
     .replace('@s.whatsapp.net', '')
     .replace(/\D/g, '');
 
+  // Resolve mensagem citada (resposta com "quote"), se houver — reply_to_id
+  // vive na própria mensagem já pré-criada (queueItem.message_id).
+  let quote: { whatsappMessageId: string | null; content: string; fromType: string } | null = null;
+  if (queueItem.message_id) {
+    const { data: currentMsg } = await supabase
+      .from('messages')
+      .select('reply_to_id')
+      .eq('id', queueItem.message_id)
+      .maybeSingle();
+
+    if (currentMsg?.reply_to_id) {
+      const { data: repliedMsg } = await supabase
+        .from('messages')
+        .select('whatsapp_message_id, content, from_type')
+        .eq('id', currentMsg.reply_to_id)
+        .maybeSingle();
+
+      if (repliedMsg) {
+        quote = {
+          whatsappMessageId: repliedMsg.whatsapp_message_id,
+          content: repliedMsg.content || '',
+          fromType: repliedMsg.from_type,
+        };
+      }
+    }
+  }
+
   let whatsappMessageId = null;
 
   // Route to appropriate API
   if (settings.api_type === 'meta') {
-    whatsappMessageId = await sendViaMeta(settings, recipient, queueItem);
+    whatsappMessageId = await sendViaMeta(settings, recipient, queueItem, quote);
   } else {
-    whatsappMessageId = await sendViaEvolution(settings, recipient, queueItem);
+    whatsappMessageId = await sendViaEvolution(settings, recipient, queueItem, quote);
   }
 
   console.log('[Sender] Message sent, ID:', whatsappMessageId);
@@ -235,7 +262,12 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
 }
 
 // Send via Meta WhatsApp Business API
-async function sendViaMeta(settings: any, recipient: string, queueItem: any): Promise<string | null> {
+async function sendViaMeta(
+  settings: any,
+  recipient: string,
+  queueItem: any,
+  quote?: { whatsappMessageId: string | null; content: string; fromType: string } | null
+): Promise<string | null> {
   const url = `https://graph.facebook.com/v18.0/${settings.meta_phone_number_id}/messages`;
   
   let payload: any;
@@ -297,6 +329,12 @@ async function sendViaMeta(settings: any, recipient: string, queueItem: any): Pr
       };
   }
 
+  // Reply citando a mensagem original (best-effort — se o whatsapp_message_id
+  // da mensagem citada não existir, envia normalmente sem o quote visual).
+  if (quote?.whatsappMessageId) {
+    payload.context = { message_id: quote.whatsappMessageId };
+  }
+
   console.log('[Sender] Meta API request:', { url, payload });
 
   const response = await fetch(url, {
@@ -319,7 +357,12 @@ async function sendViaMeta(settings: any, recipient: string, queueItem: any): Pr
 }
 
 // Send via Evolution API with automatic retry for transient errors
-async function sendViaEvolution(settings: any, recipient: string, queueItem: any): Promise<string | null> {
+async function sendViaEvolution(
+  settings: any,
+  recipient: string,
+  queueItem: any,
+  quote?: { whatsappMessageId: string | null; content: string; fromType: string } | null
+): Promise<string | null> {
   // Clean Evolution API URL (remove trailing slash)
   const baseUrl = settings.evolution_api_url.replace(/\/$/, '');
 
@@ -347,6 +390,19 @@ async function sendViaEvolution(settings: any, recipient: string, queueItem: any
     default:
       endpoint = `/message/sendText/${settings.evolution_instance_name}`;
       payload = { number: recipient, text: queueItem.content };
+  }
+
+  // Reply citando a mensagem original (best-effort — se o formato não for
+  // aceito pela versão da Evolution API, o envio segue normalmente).
+  if (quote?.whatsappMessageId) {
+    payload.quoted = {
+      key: {
+        remoteJid: `${recipient}@s.whatsapp.net`,
+        fromMe: quote.fromType !== 'user',
+        id: quote.whatsappMessageId,
+      },
+      message: { conversation: quote.content },
+    };
   }
 
   // Clean Evolution API key

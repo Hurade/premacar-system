@@ -516,7 +516,7 @@ export function useConversations() {
   }, [fetchConversations, fetchAndAddConversation]);
 
   // Send message
-  const sendMessage = useCallback(async (conversationId: string, content: string) => {
+  const sendMessage = useCallback(async (conversationId: string, content: string, replyToId?: string | null) => {
     if (!content.trim()) return;
 
     // Optimistic update with temporary ID
@@ -531,7 +531,9 @@ export function useConversations() {
       status: 'sent',
       fromType: 'human',
       mediaUrl: null,
-      whatsappMessageId: null
+      whatsappMessageId: null,
+      replyToId: replyToId ?? null,
+      apiSource: null
     };
 
     setConversations(prev => {
@@ -550,7 +552,7 @@ export function useConversations() {
 
     try {
       // The realtime handler will detect and replace the temp message automatically
-      await api.sendMessage(conversationId, content);
+      await api.sendMessage(conversationId, content, replyToId);
     } catch (err) {
       console.error('[useConversations] Error sending message:', err);
       toast.error('Erro ao enviar mensagem');
@@ -587,7 +589,9 @@ export function useConversations() {
       mediaUrl: null,
       whatsappMessageId: null,
       isInternal: true,
-      senderName
+      senderName,
+      replyToId: null,
+      apiSource: null
     };
 
     setConversations(prev =>
@@ -871,6 +875,19 @@ export function useConversations() {
     }
   }, []);
 
+  // Delete a single message (local + best-effort no WhatsApp do cliente)
+  const deleteMessage = useCallback(async (conversationId: string, messageId: string) => {
+    const result = await api.deleteMessage(messageId);
+
+    setConversations(prev => prev.map(conv => (
+      conv.id === conversationId
+        ? { ...conv, messages: conv.messages.filter(m => m.id !== messageId) }
+        : conv
+    )));
+
+    return result;
+  }, []);
+
   // Create new conversation for a contact
   const createConversation = useCallback(async (
     contactId: string,
@@ -935,6 +952,7 @@ export function useConversations() {
     toggleFavorite,
     finalizeConversation,
     deleteConversation,
+    deleteMessage,
     createConversation,
     refetch: fetchConversations
   };

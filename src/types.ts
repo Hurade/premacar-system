@@ -340,6 +340,8 @@ export interface UIMessage {
   whatsappMessageId: string | null;
   isInternal?: boolean;
   senderName?: string;
+  replyToId: string | null;
+  apiSource: string | null;
 }
 
 // ============= Utility Functions =============
@@ -403,7 +405,9 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     mediaUrl: resolveMediaUrl(msg.media_url, msg.api_source),
     whatsappMessageId: msg.whatsapp_message_id,
     isInternal: (msg.metadata as any)?.is_internal === true,
-    senderName: (msg.metadata as any)?.sender_name || undefined
+    senderName: (msg.metadata as any)?.sender_name || undefined,
+    replyToId: msg.reply_to_id,
+    apiSource: msg.api_source || null
   };
 }
 
