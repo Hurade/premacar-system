@@ -3196,6 +3196,7 @@ export type Database = {
           meta_verify_token: string | null
           name: string
           phone_number: string
+          provider: string
           qr_code: string | null
           qr_code_expires_at: string | null
           updated_at: string | null
@@ -3220,6 +3221,7 @@ export type Database = {
           meta_verify_token?: string | null
           name: string
           phone_number: string
+          provider?: string
           qr_code?: string | null
           qr_code_expires_at?: string | null
           updated_at?: string | null
@@ -3244,6 +3246,7 @@ export type Database = {
           meta_verify_token?: string | null
           name?: string
           phone_number?: string
+          provider?: string
           qr_code?: string | null
           qr_code_expires_at?: string | null
           updated_at?: string | null
