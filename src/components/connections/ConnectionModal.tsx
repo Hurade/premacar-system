@@ -327,7 +327,7 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
               <FormStep
                 provider={provider}
                 data={data}
-                onChange={setData}
+                onChange={setData as (d: Record<string, any>) => void}
                 queues={queues}
               />
               <div className="flex justify-end gap-2 mt-6">
