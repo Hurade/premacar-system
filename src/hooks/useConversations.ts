@@ -393,11 +393,11 @@ export function useConversations() {
           setRealtimeConnected(false);
           // Start polling fallback
           if (!pollingIntervalRef.current) {
-            console.log('[Realtime] 🔄 Starting polling fallback (every 10s)...');
+            console.log('[Realtime] 🔄 Starting polling fallback (every 4s)...');
             pollingIntervalRef.current = setInterval(() => {
               console.log('[Realtime] 📡 Polling for updates...');
               fetchConversations();
-            }, 10000);
+            }, 4000);
           }
           // Also attempt immediate fetch
           setTimeout(() => fetchConversations(), 2000);
@@ -410,7 +410,7 @@ export function useConversations() {
             pollingIntervalRef.current = setInterval(() => {
               console.log('[Realtime] 📡 Polling for updates...');
               fetchConversations();
-            }, 10000);
+            }, 4000);
           }
           setTimeout(() => fetchConversations(), 3000);
         }
@@ -489,11 +489,24 @@ export function useConversations() {
         }
       });
 
+    // Navegadores suspendem o websocket do Realtime quando a aba fica em
+    // background (tela bloqueada, troca de app no celular, etc). Ao voltar
+    // a ficar visível, força uma busca imediata em vez de esperar o próximo
+    // evento ou o ciclo de polling — é o cenário mais comum de "demora".
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[Realtime] 👁️ Aba voltou a ficar visível, sincronizando...');
+        fetchConversations();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Cleanup
     return () => {
       console.log('[Realtime] Cleaning up subscriptions');
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(conversationsChannel);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       // Clear polling interval on cleanup
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
