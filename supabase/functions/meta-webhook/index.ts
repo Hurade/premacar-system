@@ -503,6 +503,14 @@ async function processMetaWebhookAsync(
             .eq('id', contact.id);
         }
 
+        // Contato bloqueado: ignora a mensagem completamente (não salva, não
+        // cria/reabre conversa, não aciona a IA) — é como se o número não
+        // existisse mais pro sistema.
+        if (contact.is_blocked) {
+          console.log('[Meta Async] 🚫 Contato bloqueado, ignorando mensagem:', contact.id);
+          continue;
+        }
+
         // ═══════════════════════════════════════════
         // 2. BUSCAR OU CRIAR CONVERSA
         // ═══════════════════════════════════════════

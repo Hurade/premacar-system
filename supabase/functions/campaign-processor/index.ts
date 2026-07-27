@@ -474,6 +474,22 @@ serve(async (req) => {
       }
 
       const lead = leads[0] as Lead;
+
+      // Contato bloqueado: não envia, marca o lead como blacklisted pra não
+      // ficar tentando de novo a cada ciclo do processador.
+      const { data: leadContact } = await supabase
+        .from("contacts")
+        .select("is_blocked")
+        .eq("phone_number", lead.phone)
+        .maybeSingle();
+
+      if (leadContact?.is_blocked) {
+        console.log(`[campaign-processor] Contato bloqueado, marcando lead como blacklisted: ${lead.phone}`);
+        await supabase.from("campaign_leads").update({ status: "blacklisted" }).eq("id", lead.id);
+        results.push({ campaignId: campaignData.id, sent: false, reason: "contact_blocked" });
+        continue;
+      }
+
       let message = "";
       let sendResult: { success: boolean; messageId?: string; error?: string };
 

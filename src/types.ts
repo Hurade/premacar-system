@@ -305,6 +305,8 @@ export interface UIConversation {
   contactPhone: string;
   contactAvatar: string;
   contactEmail: string | null;
+  contactIsBlocked: boolean;
+  contactBlockedReason: string | null;
   status: ConversationStatus;
   isActive: boolean;
   assignedTeam: string | null;
@@ -361,6 +363,8 @@ export function transformDBToUIConversation(
     contactPhone: conv.contact?.phone_number || '',
     contactAvatar: conv.contact?.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.contact?.name || 'U')}&background=0ea5e9&color=fff`,
     contactEmail: conv.contact?.email || null,
+    contactIsBlocked: conv.contact?.is_blocked || false,
+    contactBlockedReason: conv.contact?.blocked_reason || null,
     status: conv.status,
     isActive: conv.is_active,
     assignedTeam: conv.assigned_team,

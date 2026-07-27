@@ -6,7 +6,7 @@ import {
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
   KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat,
-  History, ChevronDown, ChevronUp
+  History, ChevronDown, ChevronUp, Ban, ShieldCheck
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -487,6 +487,34 @@ const ChatInterface: React.FC = () => {
     } catch (error) {
       console.error('Error transferring connection:', error);
       toast.error('Erro ao transferir conexão');
+    }
+  };
+
+  const handleToggleContactBlock = async () => {
+    if (!activeChat) return;
+    const label = activeChat.contactName;
+
+    if (!activeChat.contactIsBlocked) {
+      if (!confirm(`Bloquear ${label}?\n\nMensagens recebidas desse número serão ignoradas e ele deixará de receber campanhas/disparos automáticos.`)) return;
+      const reason = window.prompt('Motivo do bloqueio (opcional):') || undefined;
+      try {
+        await api.toggleContactBlock(activeChat.contactId, true, reason);
+        toast.success('Contato bloqueado');
+        refetch();
+      } catch (error) {
+        console.error('Error blocking contact:', error);
+        toast.error('Erro ao bloquear contato');
+      }
+    } else {
+      if (!confirm(`Desbloquear ${label}?`)) return;
+      try {
+        await api.toggleContactBlock(activeChat.contactId, false);
+        toast.success('Contato desbloqueado');
+        refetch();
+      } catch (error) {
+        console.error('Error unblocking contact:', error);
+        toast.error('Erro ao desbloquear contato');
+      }
     }
   };
 
@@ -1378,6 +1406,14 @@ const ChatInterface: React.FC = () => {
                   <div className="ml-3">
                     <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                       {activeChat.contactName}
+                      {activeChat.contactIsBlocked && (
+                        <span
+                          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 border border-red-500/30 text-red-400"
+                          title={activeChat.contactBlockedReason || undefined}
+                        >
+                          Bloqueado
+                        </span>
+                      )}
                       {renderStatusBadge(activeChat.status)}
                       {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
                       {activeChat.apiSource === 'meta' && !windowLoading && (
@@ -1510,6 +1546,18 @@ const ChatInterface: React.FC = () => {
                       >
                         <Trash2 className="w-4 h-4" />
                         Excluir Conversa
+                      </button>
+                      <div className="h-px bg-slate-800 my-1"></div>
+                      <button
+                        onClick={handleToggleContactBlock}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                          activeChat.contactIsBlocked
+                            ? 'text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300'
+                            : 'text-red-400 hover:bg-red-500/20 hover:text-red-300'
+                        }`}
+                      >
+                        {activeChat.contactIsBlocked ? <ShieldCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                        {activeChat.contactIsBlocked ? 'Desbloquear Contato' : 'Bloquear Contato'}
                       </button>
                     </div>
                   </PopoverContent>
@@ -1658,6 +1706,19 @@ const ChatInterface: React.FC = () => {
             {isSpyMode ? (
               <div className="p-4 border-t border-cyan-800/40 bg-cyan-950/40 text-center text-xs text-cyan-300">
                 Modo supervisão ativo — envio de mensagens desabilitado nesta conversa.
+              </div>
+            ) : activeChat.contactIsBlocked ? (
+              <div className="p-4 border-t border-red-900/40 bg-red-950/40 flex items-center justify-between gap-3 text-xs text-red-300">
+                <span className="flex items-center gap-2">
+                  <Ban className="w-3.5 h-3.5" />
+                  Contato bloqueado — mensagens recebidas são ignoradas e o envio está desabilitado.
+                </span>
+                <button
+                  onClick={handleToggleContactBlock}
+                  className="text-red-300 hover:text-white underline shrink-0"
+                >
+                  Desbloquear
+                </button>
               </div>
             ) : activeChat.apiSource === 'meta' && !canSendFreeMessage ? (
               <WindowExpiredAlert

@@ -113,13 +113,22 @@ serve(async (req) => {
         // Get contact details
         const { data: contact } = await supabase
           .from("contacts")
-          .select("id, name, call_name, phone_number, email, oficina")
+          .select("id, name, call_name, phone_number, email, oficina, is_blocked")
           .eq("id", cc.contact_id)
           .single();
 
         if (!contact) {
           console.error(`[recurring-processor] Contact not found: ${cc.contact_id}`);
           failedCount++;
+          continue;
+        }
+
+        if (contact.is_blocked) {
+          console.log(`[recurring-processor] Contato bloqueado, cancelando na campanha: ${contact.id}`);
+          await supabase
+            .from("campaign_contacts")
+            .update({ status: "cancelled" })
+            .eq("id", cc.id);
           continue;
         }
 

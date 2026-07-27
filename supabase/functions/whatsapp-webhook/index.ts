@@ -343,6 +343,17 @@ serve(async (req) => {
           .eq('id', contact.id);
       }
 
+      // Contato bloqueado: ignora a mensagem completamente (não salva, não
+      // cria/reabre conversa, não aciona a IA) — é como se o número não
+      // existisse mais pro sistema.
+      if (contact.is_blocked) {
+        console.log('[Webhook] 🚫 Contato bloqueado, ignorando mensagem:', contact.id);
+        return new Response(JSON.stringify({ status: 'blocked' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       // 2. Get or create conversation (filter by api_source to support multi-API)
       let { data: conversation } = await supabase
         .from('conversations')

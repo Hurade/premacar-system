@@ -32,6 +32,7 @@ interface Contact {
   phone_number: string;
   name: string | null;
   tags: string[] | null;
+  is_blocked: boolean | null;
 }
 
 // Send a plain text message via Meta WhatsApp Business API
@@ -149,7 +150,7 @@ serve(async (req) => {
         // Fetch contact to check tags and phone
         const { data: contact } = await supabase
           .from("contacts")
-          .select("id, phone_number, name, tags")
+          .select("id, phone_number, name, tags, is_blocked")
           .eq("id", conv.contact_id)
           .maybeSingle();
 
@@ -160,6 +161,13 @@ serve(async (req) => {
         }
 
         const contactData = contact as Contact;
+
+        if (contactData.is_blocked) {
+          console.log(`[${SOURCE}] Contact ${contactData.phone_number} is blocked — skipping.`);
+          results.push({ conversationId: conv.id, sent: false, reason: "contact_blocked" });
+          continue;
+        }
+
         const currentTags = contactData.tags || [];
 
         // Skip if contact already received a follow-up in this cycle

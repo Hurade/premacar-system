@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail, History } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail, History, Ban, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from './ui/button';
@@ -7,6 +7,7 @@ import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { api } from '@/services/api';
 import FolderManager, { ContactFolder } from './contacts/FolderManager';
 import ImportContactsModal from './contacts/ImportContactsModal';
 import BulkActionsBar from './contacts/BulkActionsBar';
@@ -25,6 +26,8 @@ interface ContactRow {
   folder_id: string | null;
   folder?: ContactFolder;
   last_activity: string;
+  is_blocked: boolean;
+  blocked_reason: string | null;
 }
 
 type PageSize = 10 | 50 | 100 | 'all';
@@ -108,7 +111,9 @@ const Contacts: React.FC = () => {
           email,
           tags,
           folder_id,
-          last_activity
+          last_activity,
+          is_blocked,
+          blocked_reason
         `)
         .order('last_activity', { ascending: false });
 
@@ -279,6 +284,34 @@ const Contacts: React.FC = () => {
     }
   };
 
+  const handleToggleBlock = async (contact: ContactRow) => {
+    const willBlock = !contact.is_blocked;
+    const label = contact.name || contact.phone_number;
+
+    if (willBlock) {
+      if (!confirm(`Bloquear ${label}?\n\nMensagens recebidas desse número serão ignoradas e ele deixará de receber campanhas/disparos automáticos.`)) return;
+      const reason = window.prompt('Motivo do bloqueio (opcional):') || undefined;
+      try {
+        await api.toggleContactBlock(contact.id, true, reason);
+        toast.success('Contato bloqueado');
+        loadContacts();
+      } catch (error) {
+        console.error('Erro ao bloquear contato:', error);
+        toast.error('Erro ao bloquear contato');
+      }
+    } else {
+      if (!confirm(`Desbloquear ${label}?`)) return;
+      try {
+        await api.toggleContactBlock(contact.id, false);
+        toast.success('Contato desbloqueado');
+        loadContacts();
+      } catch (error) {
+        console.error('Erro ao desbloquear contato:', error);
+        toast.error('Erro ao desbloquear contato');
+      }
+    }
+  };
+
   const getFolderById = (folderId: string | null) => {
     return folders.find(f => f.id === folderId);
   };
@@ -417,6 +450,14 @@ const Contacts: React.FC = () => {
                             <span className="font-medium text-slate-200 group-hover:text-cyan-400 transition-colors">
                               {contact.name || 'Sem nome'}
                             </span>
+                            {contact.is_blocked && (
+                              <Badge
+                                className="px-1.5 py-0 text-[10px] font-medium bg-red-500/10 border-red-500/30 text-red-400"
+                                title={contact.blocked_reason || undefined}
+                              >
+                                Bloqueado
+                              </Badge>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-400">
@@ -513,6 +554,15 @@ const Contacts: React.FC = () => {
                               onClick={() => setHistoryContact(contact)}
                             >
                               <History className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={`h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${contact.is_blocked ? 'text-emerald-400 hover:text-emerald-300' : 'text-red-400 hover:text-red-300'}`}
+                              title={contact.is_blocked ? 'Desbloquear' : 'Bloquear'}
+                              onClick={() => handleToggleBlock(contact)}
+                            >
+                              {contact.is_blocked ? <ShieldCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                             </Button>
                           </div>
                         </td>

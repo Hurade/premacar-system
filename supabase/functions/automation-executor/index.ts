@@ -246,6 +246,11 @@ async function executeActions(
           if (!context.conversation_id || !context.contact?.id) {
             throw new Error('Sem conversa/contato para enviar mensagem');
           }
+          if (context.contact.is_blocked) {
+            console.log('[automation-executor] Contato bloqueado, pulando envio de mensagem:', context.contact.id);
+            results.push({ type: action.type, success: true });
+            continue;
+          }
           const { error } = await supabase.from('send_queue').insert({
             conversation_id: context.conversation_id,
             contact_id: context.contact.id,
