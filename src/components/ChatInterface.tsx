@@ -5,7 +5,8 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
-  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat
+  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat,
+  History, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -14,6 +15,7 @@ import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationS
 import { Badge } from './ui/badge';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
+import { useContactHistory } from '@/hooks/useContactHistory';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -44,6 +46,7 @@ import { useConversationWindow } from '@/hooks/useConversationWindow';
 import { WindowStatusBadge } from './chat/WindowStatusBadge';
 import { WindowExpiredAlert } from './chat/WindowExpiredAlert';
 import { PipelineDrawer } from './chat/PipelineDrawer';
+import { HistorySessionBlock } from './chat/HistorySessionBlock';
 import { VoiceCallsPanel } from './chat/VoiceCallsPanel';
 import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -137,6 +140,18 @@ const ChatInterface: React.FC = () => {
   const activeChat = conversations.find(c => c.id === selectedChatId);
   const isSpyMode = canSupervise && spyConversationId !== null && spyConversationId === selectedChatId;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Histórico de conversas anteriores do mesmo contato (outras conexões/filas/atendentes)
+  const [showPriorHistory, setShowPriorHistory] = useState(false);
+  const { sessions: priorHistorySessions, totalMessages: priorHistoryMessageCount } = useContactHistory(
+    activeChat?.contactId,
+    { excludeConversationId: activeChat?.id, enabled: !!activeChat }
+  );
+
+  useEffect(() => {
+    setShowPriorHistory((activeChat?.messages.length ?? 0) === 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChatId]);
 
   const handleExportConversation = (chat: UIConversation) => {
     const header = 'Data,Remetente,Tipo,Conteudo\n';
@@ -1485,6 +1500,33 @@ const ChatInterface: React.FC = () => {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-0">
+              {priorHistorySessions.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowPriorHistory(prev => !prev)}
+                    className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:bg-slate-800 transition-colors text-xs font-medium"
+                  >
+                    <span className="flex items-center gap-2">
+                      <History className="w-3.5 h-3.5" />
+                      Histórico anterior · {priorHistorySessions.length} {priorHistorySessions.length === 1 ? 'conversa' : 'conversas'} · {priorHistoryMessageCount} {priorHistoryMessageCount === 1 ? 'mensagem' : 'mensagens'}
+                    </span>
+                    {showPriorHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+
+                  {showPriorHistory && (
+                    <div className="mt-4 space-y-5">
+                      {priorHistorySessions.map(session => (
+                        <HistorySessionBlock key={session.conversationId} session={session} muted />
+                      ))}
+                      <div className="flex items-center gap-3 py-2">
+                        <div className="flex-1 h-px bg-slate-800" />
+                        <span className="text-[10px] text-slate-600 uppercase tracking-wider">Conversa atual</span>
+                        <div className="flex-1 h-px bg-slate-800" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {activeChat.messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
                   <MessageSquare className="w-16 h-16 mb-4 opacity-30" />

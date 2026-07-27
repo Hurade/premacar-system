@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from './ui/button';
@@ -12,6 +12,7 @@ import ImportContactsModal from './contacts/ImportContactsModal';
 import BulkActionsBar from './contacts/BulkActionsBar';
 import AddContactModal from './contacts/AddContactModal';
 import EditContactModal from './contacts/EditContactModal';
+import { ContactHistoryModal } from './contacts/ContactHistoryModal';
 import TagManager, { TagDefinition } from './contacts/TagManager';
 
 interface ContactRow {
@@ -39,6 +40,7 @@ const Contacts: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRow | null>(null);
+  const [historyContact, setHistoryContact] = useState<ContactRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(50);
   const [currentPage, setCurrentPage] = useState(1);
@@ -494,14 +496,23 @@ const Contacts: React.FC = () => {
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant="ghost"
-                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                               title="Iniciar Conversa"
                               onClick={() => handleStartConversation(contact.id, contact.phone_number)}
                             >
                               <MessageSquare className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Histórico"
+                              onClick={() => setHistoryContact(contact)}
+                            >
+                              <History className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>
@@ -647,6 +658,14 @@ const Contacts: React.FC = () => {
           loadContacts();
           loadFolders();
         }}
+      />
+
+      {/* Contact history modal */}
+      <ContactHistoryModal
+        isOpen={!!historyContact}
+        onClose={() => setHistoryContact(null)}
+        contactId={historyContact?.id ?? null}
+        contactName={historyContact?.name ?? null}
       />
     </div>
   );
