@@ -817,6 +817,38 @@ const ChatInterface: React.FC = () => {
       );
     }
 
+    if (msg.type === MessageType.VIDEO) {
+      return msg.mediaUrl ? (
+        <video controls src={msg.mediaUrl} className="rounded-lg max-w-full max-h-72 border border-slate-700/50" />
+      ) : (
+        <p className="leading-relaxed whitespace-pre-wrap italic text-slate-400">Vídeo indisponível</p>
+      );
+    }
+
+    if (msg.type === MessageType.DOCUMENT) {
+      const isLikelyFileName = !!msg.content && msg.content.length < 80 && /\.[a-z0-9]{2,5}$/i.test(msg.content);
+      return msg.mediaUrl ? (
+        <a
+          href={msg.mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          download
+          className="flex items-center gap-3 min-w-[200px] hover:opacity-90 transition-opacity"
+        >
+          <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 shrink-0">
+            <Download className="w-4 h-4" />
+          </div>
+          <span className="text-sm underline underline-offset-2 break-all">
+            {isLikelyFileName ? msg.content : 'Abrir anexo'}
+          </span>
+        </a>
+      ) : (
+        <p className="leading-relaxed whitespace-pre-wrap italic text-slate-400">
+          {isLikelyFileName ? msg.content : 'Anexo indisponível'}
+        </p>
+      );
+    }
+
     return <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>;
   };
 
@@ -1289,8 +1321,10 @@ const ChatInterface: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.AUDIO ? '🎵 Áudio' : 
+                    {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' :
+                     chat.messages[chat.messages.length - 1]?.type === MessageType.AUDIO ? '🎵 Áudio' :
+                     chat.messages[chat.messages.length - 1]?.type === MessageType.VIDEO ? '🎥 Vídeo' :
+                     chat.messages[chat.messages.length - 1]?.type === MessageType.DOCUMENT ? '📄 Documento' :
                      chat.lastMessage || 'Sem mensagens'}
                   </p>
                   

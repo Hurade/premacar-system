@@ -430,8 +430,14 @@ async function processMetaWebhookAsync(
             console.log('[Meta Async] 📇 Contato compartilhado:', messageContent);
             break;
           }
+          case 'unsupported':
+            // A Meta usa este tipo quando não consegue repassar a mídia via API
+            // (ex: mídia "ver uma vez"). Não há conteúdo para recuperar.
+            messageContent = '[Mídia não suportada pelo WhatsApp — o conteúdo não pôde ser recuperado]';
+            console.log('[Meta Async] 🚫 Mídia não suportada pela Meta API');
+            break;
           default:
-            messageContent = `[mensagem do tipo: ${messageType}]`;
+            messageContent = `[Mensagem recebida em formato não suportado pelo sistema — tipo: ${messageType}]`;
             console.log('[Meta Async] ❓ Tipo desconhecido:', messageType);
         }
 

@@ -471,7 +471,7 @@ serve(async (req) => {
         messageType = 'text';
         console.log('[Webhook] 📇 Múltiplos contatos:', messageContent);
       } else {
-        messageContent = '[mensagem não suportada]';
+        messageContent = '[Mensagem recebida em formato não suportado pelo sistema]';
       }
 
       // 4. Create message with api_source

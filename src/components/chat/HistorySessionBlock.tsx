@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Share2, User, Bot } from 'lucide-react';
+import { Layers, Share2, User, Bot, Download } from 'lucide-react';
 import { HistorySession } from '@/hooks/useContactHistory';
 import { UIMessage, MessageDirection, MessageType } from '@/types';
 
@@ -30,6 +30,34 @@ function renderHistoryMessageContent(msg: UIMessage) {
       <audio controls src={msg.mediaUrl} className="max-w-[240px] h-9" />
     ) : (
       <span className="italic text-slate-400">Áudio indisponível</span>
+    );
+  }
+
+  if (msg.type === MessageType.VIDEO) {
+    return msg.mediaUrl ? (
+      <video controls src={msg.mediaUrl} className="rounded-lg max-w-full max-h-56 border border-slate-700/50" />
+    ) : (
+      <span className="italic text-slate-400">Vídeo indisponível</span>
+    );
+  }
+
+  if (msg.type === MessageType.DOCUMENT) {
+    const isLikelyFileName = !!msg.content && msg.content.length < 80 && /\.[a-z0-9]{2,5}$/i.test(msg.content);
+    return msg.mediaUrl ? (
+      <a
+        href={msg.mediaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        download
+        className="flex items-center gap-2 min-w-[180px] hover:opacity-90 transition-opacity"
+      >
+        <Download className="w-4 h-4 shrink-0" />
+        <span className="text-sm underline underline-offset-2 break-all">
+          {isLikelyFileName ? msg.content : 'Abrir anexo'}
+        </span>
+      </a>
+    ) : (
+      <span className="italic text-slate-400">{isLikelyFileName ? msg.content : 'Anexo indisponível'}</span>
     );
   }
 
