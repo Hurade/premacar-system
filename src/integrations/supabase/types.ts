@@ -17,8 +17,6 @@ export type Database = {
       agent_configs: {
         Row: {
           ai_activation_delay_minutes: number
-          ai_model: string | null
-          ai_provider_id: string | null
           created_at: string
           description: string | null
           icon: string | null
@@ -36,8 +34,6 @@ export type Database = {
         }
         Insert: {
           ai_activation_delay_minutes?: number
-          ai_model?: string | null
-          ai_provider_id?: string | null
           created_at?: string
           description?: string | null
           icon?: string | null
@@ -55,8 +51,6 @@ export type Database = {
         }
         Update: {
           ai_activation_delay_minutes?: number
-          ai_model?: string | null
-          ai_provider_id?: string | null
           created_at?: string
           description?: string | null
           icon?: string | null
@@ -73,13 +67,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "agent_configs_ai_provider_id_fkey"
-            columns: ["ai_provider_id"]
-            isOneToOne: false
-            referencedRelation: "ai_providers"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "agent_configs_trigger_campaign_id_fkey"
             columns: ["trigger_campaign_id"]
@@ -136,51 +123,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      ai_providers: {
-        Row: {
-          api_key_secret_name: string
-          base_url: string
-          created_at: string
-          fast_model: string
-          id: string
-          is_active: boolean
-          is_default: boolean
-          kind: string
-          name: string
-          premium_model: string | null
-          smart_model: string
-          updated_at: string
-        }
-        Insert: {
-          api_key_secret_name: string
-          base_url: string
-          created_at?: string
-          fast_model: string
-          id?: string
-          is_active?: boolean
-          is_default?: boolean
-          kind: string
-          name: string
-          premium_model?: string | null
-          smart_model: string
-          updated_at?: string
-        }
-        Update: {
-          api_key_secret_name?: string
-          base_url?: string
-          created_at?: string
-          fast_model?: string
-          id?: string
-          is_active?: boolean
-          is_default?: boolean
-          kind?: string
-          name?: string
-          premium_model?: string | null
-          smart_model?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       announcement_reads: {
         Row: {
@@ -955,39 +897,6 @@ export type Database = {
           },
         ]
       }
-      connection_systems: {
-        Row: {
-          connection_id: string
-          created_at: string
-          system_id: string
-        }
-        Insert: {
-          connection_id: string
-          created_at?: string
-          system_id: string
-        }
-        Update: {
-          connection_id?: string
-          created_at?: string
-          system_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "connection_systems_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "whatsapp_connections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connection_systems_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "systems"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       contact_custom_field_values: {
         Row: {
           contact_id: string
@@ -1212,7 +1121,6 @@ export type Database = {
           last_message_at: string
           metadata: Json | null
           nina_context: Json | null
-          origem_classificada: string | null
           protocol_number: string | null
           queue_id: string | null
           started_at: string
@@ -1240,7 +1148,6 @@ export type Database = {
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
-          origem_classificada?: string | null
           protocol_number?: string | null
           queue_id?: string | null
           started_at?: string
@@ -1268,7 +1175,6 @@ export type Database = {
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
-          origem_classificada?: string | null
           protocol_number?: string | null
           queue_id?: string | null
           started_at?: string
@@ -1837,7 +1743,6 @@ export type Database = {
           file_name: string | null
           file_type: string | null
           id: string
-          queue_id: string | null
           status: string
           storage_path: string | null
           title: string
@@ -1851,7 +1756,6 @@ export type Database = {
           file_name?: string | null
           file_type?: string | null
           id?: string
-          queue_id?: string | null
           status?: string
           storage_path?: string | null
           title: string
@@ -1865,22 +1769,13 @@ export type Database = {
           file_name?: string | null
           file_type?: string | null
           id?: string
-          queue_id?: string | null
           status?: string
           storage_path?: string | null
           title?: string
           updated_at?: string
           uploaded_by?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "knowledge_documents_queue_id_fkey"
-            columns: ["queue_id"]
-            isOneToOne: false
-            referencedRelation: "queues"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       leads_comerciais: {
         Row: {
@@ -2698,45 +2593,6 @@ export type Database = {
           },
         ]
       }
-      queue_members: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          queue_id: string
-          team_member_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          queue_id: string
-          team_member_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          queue_id?: string
-          team_member_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "queue_members_queue_id_fkey"
-            columns: ["queue_id"]
-            isOneToOne: false
-            referencedRelation: "queues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "queue_members_team_member_id_fkey"
-            columns: ["team_member_id"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       queues: {
         Row: {
           color: string
@@ -2996,36 +2852,6 @@ export type Database = {
         }
         Relationships: []
       }
-      systems: {
-        Row: {
-          created_at: string
-          greeting_label: string
-          id: string
-          is_active: boolean
-          name: string
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          greeting_label: string
-          id?: string
-          is_active?: boolean
-          name: string
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          greeting_label?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       tag_definitions: {
         Row: {
           category: string
@@ -3142,7 +2968,6 @@ export type Database = {
           id: string
           last_active: string | null
           name: string
-          notification_phone: string | null
           role: Database["public"]["Enums"]["member_role"]
           status: Database["public"]["Enums"]["member_status"]
           team_id: string | null
@@ -3158,7 +2983,6 @@ export type Database = {
           id?: string
           last_active?: string | null
           name: string
-          notification_phone?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           status?: Database["public"]["Enums"]["member_status"]
           team_id?: string | null
@@ -3174,7 +2998,6 @@ export type Database = {
           id?: string
           last_active?: string | null
           name?: string
-          notification_phone?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           status?: Database["public"]["Enums"]["member_status"]
           team_id?: string | null
@@ -3617,7 +3440,6 @@ export type Database = {
         Args: {
           match_count?: number
           match_threshold?: number
-          p_queue_id?: string
           query_embedding: string
         }
         Returns: {
