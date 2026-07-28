@@ -25,11 +25,30 @@ export interface WhatsAppConnection {
   user_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Sistemas/marcas que esta conexão representa (ex: Automax Frotas + Oficina + Maxsig na mesma conexão). Carregado via connection_systems. */
+  system_ids?: string[];
+}
+
+export interface SystemOption {
+  id: string;
+  slug: string;
+  name: string;
+  greeting_label: string;
 }
 
 export function useWhatsAppConnections() {
   const [connections, setConnections] = useState<WhatsAppConnection[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const fetchSystems = useCallback(async () => {
+    const { data, error } = await supabase.from('systems').select('*').eq('is_active', true).order('name');
+    if (error) {
+      console.error('Erro ao carregar sistemas:', error);
+      return;
+    }
+    setSystems((data || []) as unknown as SystemOption[]);
+  }, []);
 
   const fetchConnections = useCallback(async () => {
     try {
@@ -42,6 +61,22 @@ export function useWhatsAppConnections() {
 
       if (error) throw error;
       const list: WhatsAppConnection[] = (data || []) as unknown as WhatsAppConnection[];
+
+      if (list.length > 0) {
+        const { data: links } = await supabase
+          .from('connection_systems')
+          .select('connection_id, system_id')
+          .in('connection_id', list.map((c) => c.id));
+        const byConnection = new Map<string, string[]>();
+        for (const link of links || []) {
+          const arr = byConnection.get((link as any).connection_id) || [];
+          arr.push((link as any).system_id);
+          byConnection.set((link as any).connection_id, arr);
+        }
+        for (const conn of list) {
+          conn.system_ids = byConnection.get(conn.id) || [];
+        }
+      }
 
       // Se não há conexões cadastradas, detecta credenciais legadas em nina_settings
       if (list.length === 0) {
@@ -112,13 +147,27 @@ export function useWhatsAppConnections() {
     }
   }, []);
 
+  // system_ids não é coluna de whatsapp_connections — vive em connection_systems
+  // (N:N, uma conexão pode representar mais de um sistema/marca).
+  const syncConnectionSystems = useCallback(async (connectionId: string, systemIds: string[] | undefined) => {
+    if (!systemIds) return;
+    await supabase.from('connection_systems').delete().eq('connection_id', connectionId);
+    if (systemIds.length > 0) {
+      await supabase.from('connection_systems').insert(systemIds.map((system_id) => ({ connection_id: connectionId, system_id })));
+    }
+  }, []);
+
   const createConnection = useCallback(async (data: Partial<WhatsAppConnection>) => {
     try {
-      const { error } = await supabase
+      const { system_ids, ...connectionData } = data;
+      const { data: created, error } = await supabase
         .from('whatsapp_connections')
-        .insert(data as any);
+        .insert(connectionData as any)
+        .select('id')
+        .single();
 
       if (error) throw error;
+      if (created) await syncConnectionSystems(created.id, system_ids);
       toast.success('Conexão criada com sucesso!');
       await fetchConnections();
       return true;
@@ -126,16 +175,18 @@ export function useWhatsAppConnections() {
       toast.error('Erro ao criar conexão: ' + error.message);
       return false;
     }
-  }, [fetchConnections]);
+  }, [fetchConnections, syncConnectionSystems]);
 
   const updateConnection = useCallback(async (id: string, data: Partial<WhatsAppConnection>) => {
     try {
+      const { system_ids, ...connectionData } = data;
       const { error } = await supabase
         .from('whatsapp_connections')
-        .update(data as any)
+        .update(connectionData as any)
         .eq('id', id);
 
       if (error) throw error;
+      await syncConnectionSystems(id, system_ids);
       toast.success('Conexão atualizada!');
       await fetchConnections();
       return true;
@@ -143,7 +194,7 @@ export function useWhatsAppConnections() {
       toast.error('Erro ao atualizar: ' + error.message);
       return false;
     }
-  }, [fetchConnections]);
+  }, [fetchConnections, syncConnectionSystems]);
 
   const deleteConnection = useCallback(async (id: string) => {
     try {
@@ -273,10 +324,12 @@ export function useWhatsAppConnections() {
 
   useEffect(() => {
     fetchConnections();
-  }, [fetchConnections]);
+    fetchSystems();
+  }, [fetchConnections, fetchSystems]);
 
   return {
     connections,
+    systems,
     loading,
     refetch: fetchConnections,
     createConnection,

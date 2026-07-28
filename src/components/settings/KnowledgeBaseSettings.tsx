@@ -3,6 +3,7 @@ import { Upload, FileText, RefreshCw, Trash2, Loader2, CheckCircle2, XCircle, Cl
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '../Button';
+import { api } from '@/services/api';
 import {
   useKnowledgeDocuments,
   useUploadKnowledgeDocument,
@@ -29,6 +30,9 @@ const KnowledgeBaseSettings: React.FC = () => {
   const [ragEnabled, setRagEnabled] = useState(false);
   const [ragLoading, setRagLoading] = useState(true);
   const [ragSaving, setRagSaving] = useState(false);
+  const [queues, setQueues] = useState<Array<{ id: string; name: string }>>([]);
+  const [uploadQueueId, setUploadQueueId] = useState<string>('__global__');
+  const [queueFilter, setQueueFilter] = useState<string>('__all__');
 
   useEffect(() => {
     (async () => {
@@ -43,6 +47,7 @@ const KnowledgeBaseSettings: React.FC = () => {
       }
       setRagLoading(false);
     })();
+    api.fetchQueues().then((d: any) => setQueues(d)).catch(() => {});
   }, []);
 
   const toggleRag = async () => {
@@ -77,9 +82,19 @@ const KnowledgeBaseSettings: React.FC = () => {
       return;
     }
 
-    await uploadMutation.mutateAsync({ file, title: file.name });
+    await uploadMutation.mutateAsync({
+      file,
+      title: file.name,
+      queueId: uploadQueueId === '__global__' ? null : uploadQueueId,
+    });
     e.target.value = '';
   };
+
+  const visibleDocuments = (documents || []).filter((doc) => {
+    if (queueFilter === '__all__') return true;
+    if (queueFilter === '__global__') return !doc.queue_id;
+    return doc.queue_id === queueFilter;
+  });
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -110,41 +125,83 @@ const KnowledgeBaseSettings: React.FC = () => {
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <div>
             <h3 className="text-sm font-semibold text-slate-200">Documentos</h3>
             <p className="text-xs text-slate-500 mt-1">PDFs, planilhas (XLSX/CSV) ou texto — catálogos, FAQs, tabelas de planos.</p>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.xlsx,.xls,.csv,.txt"
-            className="hidden"
-            onChange={handleFileSelected}
-          />
-          <Button
-            variant="primary"
-            className="gap-2"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadMutation.isPending}
+          <div className="flex items-center gap-2">
+            <select
+              value={uploadQueueId}
+              onChange={(e) => setUploadQueueId(e.target.value)}
+              title="A qual fila este documento pertence"
+              className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-slate-300"
+            >
+              <option value="__global__">Global (todos os agentes)</option>
+              {queues.map((q) => (
+                <option key={q.id} value={q.id}>{q.name}</option>
+              ))}
+            </select>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.xlsx,.xls,.csv,.txt"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+            <Button
+              variant="primary"
+              className="gap-2"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadMutation.isPending}
+            >
+              {uploadMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              Enviar documento
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs text-slate-500">Filtrar:</span>
+          <button
+            type="button"
+            onClick={() => setQueueFilter('__all__')}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium border ${queueFilter === '__all__' ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
           >
-            {uploadMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Enviar documento
-          </Button>
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => setQueueFilter('__global__')}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium border ${queueFilter === '__global__' ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+          >
+            Global
+          </button>
+          {queues.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              onClick={() => setQueueFilter(q.id)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border ${queueFilter === q.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+            >
+              {q.name}
+            </button>
+          ))}
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 className="w-5 h-5 animate-spin" />
           </div>
-        ) : !documents?.length ? (
+        ) : !visibleDocuments.length ? (
           <div className="border border-dashed border-slate-800 rounded-xl py-12 text-center text-slate-500 text-sm">
             Nenhum documento enviado ainda.
           </div>
         ) : (
           <div className="space-y-2">
-            {documents.map((doc) => {
+            {visibleDocuments.map((doc) => {
               const status = STATUS_LABEL[doc.status];
+              const docQueueName = queues.find((q) => q.id === doc.queue_id)?.name;
               return (
                 <div
                   key={doc.id}
@@ -156,6 +213,7 @@ const KnowledgeBaseSettings: React.FC = () => {
                       <p className="text-sm text-slate-200 truncate">{doc.title}</p>
                       <p className="text-xs text-slate-500">
                         {doc.chunk_count > 0 ? `${doc.chunk_count} trechos indexados` : 'Sem trechos indexados'}
+                        {' · '}{docQueueName || 'Global'}
                         {doc.status === 'error' && doc.error_message ? ` — ${doc.error_message}` : ''}
                       </p>
                     </div>

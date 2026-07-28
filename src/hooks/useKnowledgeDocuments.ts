@@ -13,6 +13,8 @@ export interface KnowledgeDocument {
   chunk_count: number;
   created_at: string;
   updated_at: string;
+  /** Fila que esta base de conhecimento serve (null = global, compartilhada por todos os agentes) */
+  queue_id: string | null;
 }
 
 // knowledge_documents/knowledge_chunks ainda não estão no types.ts gerado
@@ -45,7 +47,7 @@ export function useUploadKnowledgeDocument() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ file, title }: { file: File; title: string }) => {
+    mutationFn: async ({ file, title, queueId }: { file: File; title: string; queueId?: string | null }) => {
       const fileType = inferFileType(file.name);
       const storagePath = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
@@ -62,6 +64,7 @@ export function useUploadKnowledgeDocument() {
           file_type: fileType,
           storage_path: storagePath,
           status: 'pending',
+          queue_id: queueId || null,
         })
         .select()
         .single();

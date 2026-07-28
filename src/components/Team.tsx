@@ -15,18 +15,21 @@ const Team: React.FC = () => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teams, setTeams] = useState<TeamType[]>([]);
   const [functions, setFunctions] = useState<TeamFunction[]>([]);
+  const [queues, setQueues] = useState<Array<{ id: string; name: string; color: string }>>([]);
   const [openDealsByOwner, setOpenDealsByOwner] = useState<Record<string, number>>({});
   const [scheduleMember, setScheduleMember] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    email: '', 
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
     role: 'agent',
     team_id: '',
     function_id: '',
-    weight: 1
+    weight: 1,
+    notification_phone: '',
+    queue_ids: [] as string[],
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -38,7 +41,9 @@ const Team: React.FC = () => {
     status: 'invited' as 'active' | 'invited' | 'disabled',
     team_id: '',
     function_id: '',
-    weight: 1
+    weight: 1,
+    notification_phone: '',
+    queue_ids: [] as string[],
   });
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -55,14 +60,16 @@ const Team: React.FC = () => {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [membersData, teamsData, functionsData] = await Promise.all([
+      const [membersData, teamsData, functionsData, queuesData] = await Promise.all([
         api.fetchTeam(),
         api.fetchTeams(),
-        api.fetchTeamFunctions()
+        api.fetchTeamFunctions(),
+        api.fetchQueues(),
       ]);
       setMembers(membersData);
       setTeams(teamsData);
       setFunctions(functionsData);
+      setQueues(queuesData);
       await loadOpenDealsByOwner();
     } catch (error) {
       console.error("Erro ao carregar dados da equipe", error);
@@ -132,7 +139,7 @@ const Team: React.FC = () => {
       if (userId) {
         // Upsert: o trigger handle_new_user já pode ter criado o registro por email;
         // garantimos que os dados do formulário (nome, role, time, função) prevaleçam.
-        const { error: upsertError } = await supabase.from('team_members').upsert({
+        const { data: upsertedMember, error: upsertError } = await supabase.from('team_members').upsert({
           user_id: userId,
           name: formData.name,
           email: formData.email,
@@ -140,9 +147,13 @@ const Team: React.FC = () => {
           team_id: formData.team_id || null,
           function_id: formData.function_id || null,
           weight: formData.weight || 1,
+          notification_phone: formData.notification_phone.trim() || null,
           status: 'active' as const,
-        }, { onConflict: 'email' });
+        }, { onConflict: 'email' }).select('id').single();
         if (upsertError) throw upsertError;
+        if (upsertedMember && formData.queue_ids.length > 0) {
+          await api.setQueueIdsForMember(upsertedMember.id, formData.queue_ids);
+        }
       }
 
       toast.success('Usuário criado com sucesso!');
@@ -150,7 +161,7 @@ const Team: React.FC = () => {
       setShowModal(false);
       setNewPassword('');
       setConfirmPassword('');
-      setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1 });
+      setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1, notification_phone: '', queue_ids: [] });
       await loadAllData();
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
@@ -181,8 +192,9 @@ const Team: React.FC = () => {
     }
   };
 
-  const handleEditClick = (member: TeamMember) => {
+  const handleEditClick = async (member: TeamMember) => {
     setEditingMember(member);
+    const queueIds = await api.fetchQueueIdsByMember(member.id);
     setEditFormData({
       name: member.name,
       email: member.email,
@@ -190,7 +202,9 @@ const Team: React.FC = () => {
       status: member.status,
       team_id: member.team_id || '',
       function_id: member.function_id || '',
-      weight: member.weight || 1
+      weight: member.weight || 1,
+      notification_phone: member.notification_phone || '',
+      queue_ids: queueIds,
     });
     setNewPassword('');
     setConfirmPassword('');
@@ -209,8 +223,10 @@ const Team: React.FC = () => {
         status: editFormData.status,
         team_id: editFormData.team_id || null,
         function_id: editFormData.function_id || null,
-        weight: editFormData.weight
+        weight: editFormData.weight,
+        notification_phone: editFormData.notification_phone.trim() || null,
       });
+      await api.setQueueIdsForMember(editingMember.id, editFormData.queue_ids);
 
       // Sync email change to auth system if email changed
       const emailChanged = editFormData.email !== editingMember.email;
@@ -688,6 +704,42 @@ const Team: React.FC = () => {
                         />
                     </div>
 
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">WhatsApp para notificação de transferências</label>
+                        <input
+                            type="text"
+                            placeholder="Ex: 5548999998888"
+                            value={formData.notification_phone}
+                            onChange={(e) => setFormData({...formData, notification_phone: e.target.value})}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                        />
+                        <p className="text-xs text-slate-500">Número que recebe o aviso quando uma conversa é transferida para uma fila deste atendente</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Filas atendidas</label>
+                        <div className="flex flex-wrap gap-2">
+                            {queues.map((q) => {
+                                const selected = formData.queue_ids.includes(q.id);
+                                return (
+                                    <button
+                                        key={q.id}
+                                        type="button"
+                                        onClick={() => setFormData({
+                                            ...formData,
+                                            queue_ids: selected ? formData.queue_ids.filter((id) => id !== q.id) : [...formData.queue_ids, q.id],
+                                        })}
+                                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                            selected ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        {q.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     <div className="pt-4 flex gap-3">
                         <Button type="button" variant="ghost" onClick={() => { setShowModal(false); setNewPassword(''); setConfirmPassword(''); }} className="flex-1 border border-slate-700 hover:bg-slate-800">Cancelar</Button>
                         <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200">Criar Usuário</Button>
@@ -816,6 +868,42 @@ const Team: React.FC = () => {
                             onChange={(e) => setEditFormData({...editFormData, weight: parseInt(e.target.value)})}
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
                         />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">WhatsApp para notificação de transferências</label>
+                        <input
+                            type="text"
+                            placeholder="Ex: 5548999998888"
+                            value={editFormData.notification_phone}
+                            onChange={(e) => setEditFormData({...editFormData, notification_phone: e.target.value})}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                        />
+                        <p className="text-xs text-slate-500">Número que recebe o aviso quando uma conversa é transferida para uma fila deste atendente</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Filas atendidas</label>
+                        <div className="flex flex-wrap gap-2">
+                            {queues.map((q) => {
+                                const selected = editFormData.queue_ids.includes(q.id);
+                                return (
+                                    <button
+                                        key={q.id}
+                                        type="button"
+                                        onClick={() => setEditFormData({
+                                            ...editFormData,
+                                            queue_ids: selected ? editFormData.queue_ids.filter((id) => id !== q.id) : [...editFormData.queue_ids, q.id],
+                                        })}
+                                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                            selected ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        {q.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Password Change Section - Admin only */}

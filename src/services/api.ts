@@ -520,7 +520,8 @@ export const api = {
       weight: m.weight,
       user_id: m.user_id || null,
       team: m.team as any,
-      function: m.function as any
+      function: m.function as any,
+      notification_phone: (m as any).notification_phone || null
     }));
   },
 
@@ -581,6 +582,7 @@ export const api = {
     team_id: string | null;
     function_id: string | null;
     weight: number;
+    notification_phone: string | null;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')
@@ -1947,6 +1949,41 @@ export const api = {
     if (error) {
       console.error('[API] Error deleting queue:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Filas atendidas por um membro da equipe (substitui o antigo enum
+   * team_assignment — agora é um vínculo real fila ↔ pessoa, com telefone
+   * de notificação vivendo em team_members.notification_phone)
+   */
+  fetchQueueIdsByMember: async (teamMemberId: string): Promise<string[]> => {
+    const { data, error } = await supabase
+      .from('queue_members')
+      .select('queue_id')
+      .eq('team_member_id', teamMemberId)
+      .eq('is_active', true);
+    if (error) {
+      console.error('[API] Error fetching queue_members:', error);
+      return [];
+    }
+    return (data || []).map((r: any) => r.queue_id);
+  },
+
+  setQueueIdsForMember: async (teamMemberId: string, queueIds: string[]): Promise<void> => {
+    const { error: deleteError } = await supabase.from('queue_members').delete().eq('team_member_id', teamMemberId);
+    if (deleteError) {
+      console.error('[API] Error clearing queue_members:', deleteError);
+      throw deleteError;
+    }
+    if (queueIds.length > 0) {
+      const { error: insertError } = await supabase
+        .from('queue_members')
+        .insert(queueIds.map((queue_id) => ({ queue_id, team_member_id: teamMemberId })));
+      if (insertError) {
+        console.error('[API] Error setting queue_members:', insertError);
+        throw insertError;
+      }
     }
   },
 

@@ -19,6 +19,12 @@ import {
 } from '@/components/ui/tooltip';
 import PromptGeneratorSheet from '@/components/settings/PromptGeneratorSheet';
 import { DEFAULT_NINA_PROMPT } from '@/prompts/default-nina-prompt';
+import { DEFAULT_ATENDIMENTO_PROMPT } from '@/prompts/atendimento-prompt';
+import { DEFAULT_COMERCIAL_PROMPT } from '@/prompts/comercial-prompt';
+import { DEFAULT_SUPORTE_PROMPT } from '@/prompts/suporte-prompt';
+import { DEFAULT_CS_PROMPT } from '@/prompts/cs-prompt';
+import { DEFAULT_FINANCEIRO_PROMPT } from '@/prompts/financeiro-prompt';
+import { DEFAULT_RH_PROMPT } from '@/prompts/rh-prompt';
 
 type TriggerType = 'default' | 'queue' | 'campaign';
 type ModelMode = 'flash' | 'pro' | 'pro3' | 'adaptive';
@@ -33,6 +39,8 @@ interface AgentConfig {
   trigger_campaign_id: string | null;
   system_prompt: string;
   model_mode: ModelMode;
+  ai_provider_id: string | null;
+  ai_model: string | null;
   message_breaking_enabled: boolean;
   ai_activation_delay_minutes: number;
   priority: number;
@@ -48,10 +56,23 @@ const DEFAULT_CONFIG: AgentConfig = {
   trigger_campaign_id: null,
   system_prompt: '',
   model_mode: 'flash',
+  ai_provider_id: null,
+  ai_model: null,
   message_breaking_enabled: true,
   ai_activation_delay_minutes: 5,
   priority: 50,
   is_active: true,
+};
+
+// Prompt-padrão por fila (setores canônicos criados na reformulação
+// multi-sistema) — o botão "Restaurar Padrão" usa o nome da fila
+// selecionada para saber qual template oferecer.
+const QUEUE_PROMPT_TEMPLATES: Record<string, string> = {
+  comercial: DEFAULT_COMERCIAL_PROMPT,
+  suporte: DEFAULT_SUPORTE_PROMPT,
+  cs: DEFAULT_CS_PROMPT,
+  financeiro: DEFAULT_FINANCEIRO_PROMPT,
+  rh: DEFAULT_RH_PROMPT,
 };
 
 const TRIGGER_TYPE_LABELS: Record<TriggerType, string> = {
@@ -61,11 +82,17 @@ const TRIGGER_TYPE_LABELS: Record<TriggerType, string> = {
 };
 
 const MODEL_OPTIONS: { value: ModelMode; label: string; icon: string; desc: string }[] = [
-  { value: 'flash', icon: '⚡', label: 'Flash', desc: 'Rápido e econômico' },
-  { value: 'pro', icon: '🧠', label: 'Pro 2.5', desc: 'Mais inteligente' },
-  { value: 'pro3', icon: '🚀', label: 'Pro 3', desc: 'Mais recente' },
-  { value: 'adaptive', icon: '🎯', label: 'Adaptativo', desc: 'Por contexto' },
+  { value: 'flash', icon: '⚡', label: 'Rápido', desc: 'fast_model do provedor' },
+  { value: 'pro', icon: '🧠', label: 'Avançado', desc: 'smart_model do provedor' },
+  { value: 'pro3', icon: '🚀', label: 'Premium', desc: 'premium_model do provedor' },
+  { value: 'adaptive', icon: '🎯', label: 'Adaptativo', desc: 'Escolhe pelo contexto' },
 ];
+
+interface AIProviderOption {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
 
 const DYNAMIC_VARIABLES = [
   { var: '{{ data_hora }}', desc: 'Data e hora atual' },
@@ -95,12 +122,15 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
   const [queues, setQueues] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [providers, setProviders] = useState<AIProviderOption[]>([]);
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const { campaigns } = useRecurringCampaigns({});
 
   useEffect(() => {
     if (open) {
       api.fetchQueues().then((data: any) => setQueues(data)).catch(() => {});
+      supabase.from('ai_providers').select('id, name, is_default').eq('is_active', true).order('name')
+        .then(({ data }) => setProviders((data || []) as AIProviderOption[]));
       if (agentId) {
         loadAgent(agentId);
       } else {
@@ -147,6 +177,8 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
         trigger_campaign_id: config.trigger_type === 'campaign' ? config.trigger_campaign_id : null,
         system_prompt: config.system_prompt,
         model_mode: config.model_mode,
+        ai_provider_id: config.ai_provider_id,
+        ai_model: config.ai_model?.trim() || null,
         message_breaking_enabled: config.message_breaking_enabled,
         ai_activation_delay_minutes: config.ai_activation_delay_minutes,
         priority: config.trigger_type === 'campaign' ? 100 : config.trigger_type === 'queue' ? 50 : 0,
@@ -178,7 +210,16 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
   };
 
   const handleRestoreDefault = () => {
-    setConfig(prev => ({ ...prev, system_prompt: DEFAULT_NINA_PROMPT }));
+    let template = DEFAULT_NINA_PROMPT;
+    if (config.trigger_type === 'default') {
+      template = DEFAULT_ATENDIMENTO_PROMPT;
+    } else if (config.trigger_type === 'queue' && config.trigger_queue_id) {
+      const queueName = queues.find(q => q.id === config.trigger_queue_id)?.name?.toLowerCase();
+      if (queueName && QUEUE_PROMPT_TEMPLATES[queueName]) {
+        template = QUEUE_PROMPT_TEMPLATES[queueName];
+      }
+    }
+    setConfig(prev => ({ ...prev, system_prompt: template }));
     toast.success('Prompt restaurado para o padrão');
   };
 
@@ -358,6 +399,21 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
             <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 space-y-4">
               <h3 className="text-sm font-semibold text-slate-300">Modelo e Comportamento</h3>
 
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 block">Provedor de IA</label>
+                <select
+                  value={config.ai_provider_id ?? ''}
+                  onChange={e => setConfig(prev => ({ ...prev, ai_provider_id: e.target.value || null }))}
+                  className="h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                >
+                  <option value="">Padrão da conta{providers.find(p => p.is_default) ? ` (${providers.find(p => p.is_default)!.name})` : ''}</option>
+                  {providers.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.is_default ? ' — padrão' : ''}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Gerencie provedores (OpenAI, Anthropic, Gemini, etc.) em Configurações → Provedores de IA.</p>
+              </div>
+
               <div className="grid grid-cols-4 gap-2">
                 {MODEL_OPTIONS.map(opt => (
                   <button
@@ -375,6 +431,27 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                     <span className="text-[10px] opacity-70 text-center">{opt.desc}</span>
                   </button>
                 ))}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1.5 block flex items-center gap-1">
+                  Modelo específico (opcional)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3 h-3 text-slate-600 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-[200px]">Preencha para travar um modelo exato (ex: "gpt-4o", "claude-sonnet-4-5"), ignorando os botões Rápido/Avançado/Premium/Adaptativo acima.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  value={config.ai_model ?? ''}
+                  onChange={e => setConfig(prev => ({ ...prev, ai_model: e.target.value }))}
+                  placeholder="Deixe em branco para usar o modo selecionado acima"
+                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                />
               </div>
 
               <div>

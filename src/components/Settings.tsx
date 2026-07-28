@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus, Megaphone, Layers, Star, ScrollText, History } from 'lucide-react';
+import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus, Megaphone, Layers, Star, ScrollText, History, Cpu } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import SystemRoadmap from './SystemRoadmap';
@@ -8,6 +8,7 @@ import { ConnectionsManager } from './connections/ConnectionsManager';
 import { MetaTemplatesManager } from './broadcasts/MetaTemplates';
 import QuickRepliesSettings from './settings/QuickRepliesSettings';
 import KnowledgeBaseSettings from './settings/KnowledgeBaseSettings';
+import AIProvidersSettings from './settings/AIProvidersSettings';
 import CustomFieldsSettings from './settings/CustomFieldsSettings';
 import AnnouncementsSettings from './settings/AnnouncementsSettings';
 import Filas from '@/pages/Filas';
@@ -119,6 +120,10 @@ const Settings: React.FC = () => {
               <Database className="w-4 h-4" />
               Base de Conhecimento
             </TabsTrigger>
+            <TabsTrigger value="ai-providers" className="gap-2">
+              <Cpu className="w-4 h-4" />
+              Provedores de IA
+            </TabsTrigger>
             <TabsTrigger value="custom-fields" className="gap-2">
               <ListPlus className="w-4 h-4" />
               Campos Personalizados
@@ -207,6 +212,9 @@ const Settings: React.FC = () => {
         </TabsContent>
         <TabsContent value="knowledge">
           <KnowledgeBaseSettings />
+        </TabsContent>
+        <TabsContent value="ai-providers">
+          <AIProvidersSettings />
         </TabsContent>
         <TabsContent value="custom-fields">
           <CustomFieldsSettings />

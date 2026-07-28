@@ -15,10 +15,9 @@ import { Button } from '@/components/ui/button';
 import {
   useWhatsAppConnections,
   WhatsAppConnection,
+  SystemOption,
 } from '@/hooks/useWhatsAppConnections';
 import { ConnectionModal } from './ConnectionModal';
-
-const MAX_CONNECTIONS = 4;
 
 // ── Ícone do provider ─────────────────────────────────────────────────────────
 function ProviderIcon({ apiType, size = 'md' }: { apiType: string; size?: 'sm' | 'md' }) {
@@ -60,6 +59,7 @@ function StatusBadge({ connected }: { connected: boolean }) {
 // ── Card de conexão ────────────────────────────────────────────────────────────
 interface CardProps {
   conn: WhatsAppConnection;
+  systems: SystemOption[];
   testingId: string | null;
   onEdit: () => void;
   onTest: () => void;
@@ -67,7 +67,10 @@ interface CardProps {
   onDelete: () => void;
 }
 
-function ConnectionCard({ conn, testingId, onEdit, onTest, onSetDefault, onDelete }: CardProps) {
+function ConnectionCard({ conn, systems, testingId, onEdit, onTest, onSetDefault, onDelete }: CardProps) {
+  const connSystemNames = (conn.system_ids || [])
+    .map((id) => systems.find((s) => s.id === id)?.name)
+    .filter(Boolean) as string[];
   const isLegacy = conn.id.startsWith('__legacy_');
   const isTesting = testingId === conn.id;
   const label = conn.api_type === 'evolution' ? 'Evolution API' : 'Meta Oficial';
@@ -107,6 +110,15 @@ function ConnectionCard({ conn, testingId, onEdit, onTest, onSetDefault, onDelet
             </>
           )}
         </div>
+        {connSystemNames.length > 0 && (
+          <div className="flex items-center gap-1 mt-1 flex-wrap">
+            {connSystemNames.map((name) => (
+              <span key={name} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/15 text-purple-300 border border-purple-500/25">
+                {name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Ações */}
@@ -164,6 +176,7 @@ function ConnectionCard({ conn, testingId, onEdit, onTest, onSetDefault, onDelet
 export function ConnectionsManager() {
   const {
     connections,
+    systems,
     loading,
     createConnection,
     updateConnection,
@@ -177,7 +190,6 @@ export function ConnectionsManager() {
   const [testingId, setTestingId] = useState<string | null>(null);
 
   const realConnections = connections.filter(c => !c.id.startsWith('__legacy_'));
-  const canAddMore = realConnections.length < MAX_CONNECTIONS;
 
   const handleTest = async (id: string) => {
     setTestingId(id);
@@ -213,7 +225,6 @@ export function ConnectionsManager() {
         </div>
         <Button
           onClick={() => { setEditingConnection(null); setModalOpen(true); }}
-          disabled={!canAddMore}
           size="sm"
           className="gap-2"
         >
@@ -221,12 +232,6 @@ export function ConnectionsManager() {
           Nova Conexão
         </Button>
       </div>
-
-      {!canAddMore && (
-        <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
-          Limite de {MAX_CONNECTIONS} conexões atingido.
-        </div>
-      )}
 
       {/* Lista */}
       {connections.length === 0 ? (
@@ -241,6 +246,7 @@ export function ConnectionsManager() {
             <ConnectionCard
               key={conn.id}
               conn={conn}
+              systems={systems}
               testingId={testingId}
               onEdit={() => { setEditingConnection(conn); setModalOpen(true); }}
               onTest={() => handleTest(conn.id)}
@@ -262,6 +268,7 @@ export function ConnectionsManager() {
       {modalOpen && (
         <ConnectionModal
           connection={editingConnection}
+          systems={systems}
           onClose={() => { setModalOpen(false); setEditingConnection(null); }}
           onSave={handleSave}
         />

@@ -17,13 +17,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Info, ArrowLeft, Server, CheckCircle } from 'lucide-react';
-import type { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
+import type { WhatsAppConnection, SystemOption } from '@/hooks/useWhatsAppConnections';
 import { api } from '@/services/api';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
 
 interface ConnectionModalProps {
   connection: WhatsAppConnection | null;
+  systems: SystemOption[];
   onClose: () => void;
   onSave: (data: Partial<WhatsAppConnection>) => Promise<boolean>;
 }
@@ -78,14 +79,22 @@ interface FormStepProps {
   data: Record<string, any>;
   onChange: (d: Record<string, any>) => void;
   queues: Array<{ id: string; name: string }>;
+  systems: SystemOption[];
 }
 
-function FormStep({ provider, data, onChange, queues }: FormStepProps) {
+function FormStep({ provider, data, onChange, queues, systems }: FormStepProps) {
   const metaWebhookUrl = SUPABASE_URL
     ? `${SUPABASE_URL}/functions/v1/meta-webhook`
     : '';
 
   const set = (key: string, value: any) => onChange({ ...data, [key]: value });
+
+  const selectedSystemIds: string[] = data.system_ids || [];
+  const toggleSystem = (id: string) => {
+    set('system_ids', selectedSystemIds.includes(id)
+      ? selectedSystemIds.filter((s) => s !== id)
+      : [...selectedSystemIds, id]);
+  };
 
   return (
     <div className="space-y-4">
@@ -126,6 +135,32 @@ function FormStep({ provider, data, onChange, queues }: FormStepProps) {
           </SelectContent>
         </Select>
         <p className="text-xs text-slate-500">Novas conversas entram automaticamente nessa fila</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Sistema(s)/Marca(s)</Label>
+        <div className="flex flex-wrap gap-2">
+          {systems.map((s) => {
+            const selected = selectedSystemIds.includes(s.id);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => toggleSystem(s.id)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  selected
+                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                {s.name}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-slate-500">
+          Qual(is) sistema(s)/marca(s) chegam por este número — usado pela Cris para se apresentar certo e escolher o conteúdo certo. Selecione mais de um se esta conexão for compartilhada (ex: Automax Frotas + Oficina + Maxsig no mesmo número).
+        </p>
       </div>
 
       {/* Campos Evolution */}
@@ -243,7 +278,7 @@ function FormStep({ provider, data, onChange, queues }: FormStepProps) {
 }
 
 // ── Modal principal ──────────────────────────────────────────────────────────
-export function ConnectionModal({ connection, onClose, onSave }: ConnectionModalProps) {
+export function ConnectionModal({ connection, systems, onClose, onSave }: ConnectionModalProps) {
   const isEditing = !!connection;
   const [saving, setSaving] = useState(false);
   const [queues, setQueues] = useState<Array<{ id: string; name: string; color: string }>>([]);
@@ -267,6 +302,7 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
     meta_app_secret: connection?.meta_app_secret || '',
     meta_verify_token: connection?.meta_verify_token || '',
     default_queue_id: connection?.default_queue_id ?? null as string | null,
+    system_ids: connection?.system_ids || [] as string[],
   });
 
   useEffect(() => {
@@ -329,6 +365,7 @@ export function ConnectionModal({ connection, onClose, onSave }: ConnectionModal
                 data={data}
                 onChange={setData as (d: Record<string, any>) => void}
                 queues={queues}
+                systems={systems}
               />
               <div className="flex justify-end gap-2 mt-6">
                 <Button variant="ghost" onClick={onClose}>

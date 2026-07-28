@@ -33,6 +33,7 @@ export interface TeamMember {
   user_id?: string | null;
   team?: Team;
   function?: TeamFunction;
+  notification_phone?: string | null;
 }
 
 export interface Team {

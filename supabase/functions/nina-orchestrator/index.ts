@@ -1,13 +1,25 @@
 import { createClient } from "npm:@supabase/supabase-js@2.47.10";
 import { downloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
 import { generateEmbedding } from "../_shared/embeddings.ts";
+import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
+import { callAIProvider, resolveModelAndTemperature, type AIProviderRow } from "../_shared/ai-providers.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+// Mapa fixo slug ↔ nome da fila (queues.name). Setores são fixos no
+// produto (Comercial/Suporte/CS/Financeiro/RH) — não precisa de tabela
+// própria para isso, só uma tradução do slug usado pelas tools de IA para
+// o nome exibido na tela de Filas.
+const SECTOR_QUEUE_NAMES: Record<string, string> = {
+  comercial: 'Comercial',
+  suporte: 'Suporte',
+  cs: 'CS',
+  financeiro: 'Financeiro',
+  rh: 'RH',
+};
 
 // Tool definitions
 const updateContactInfoTool = {
@@ -35,25 +47,57 @@ const updateContactInfoTool = {
   }
 };
 
-const handoffToHumanTool = {
+// Usada pelo agente Atendimento (trigger_type='default') para rotear a
+// conversa para o setor certo. Só define conversations.queue_id — a
+// conversa CONTINUA em modo IA (status='nina'), agora tratada pelo agente
+// especializado daquela fila na próxima mensagem.
+const routeToSectorTool = {
   type: "function",
   function: {
-    name: "request_demo_handoff",
-    description: "Acionar quando o lead pede para falar com um humano/atendente real, quando há um problema complexo que a IA não consegue resolver, OU quando o lead CONFIRMA que quer agendar uma demonstração. Para agendamento, marque is_scheduling=true — NUNCA confirme um horário específico como já agendado; a equipe comercial confirma manualmente depois.",
+    name: "route_to_sector",
+    description: "Encaminhar a conversa para o setor certo (comercial, suporte, cs, financeiro ou rh), assim que identificar o que o cliente precisa. Não tenta resolver nada — só roteia.",
+    parameters: {
+      type: "object",
+      properties: {
+        queue_slug: {
+          type: "string",
+          enum: ["comercial", "suporte", "cs", "financeiro", "rh"],
+          description: "Setor identificado para a solicitação do cliente"
+        },
+        reason: {
+          type: "string",
+          description: "Resumo breve do que o cliente pediu, para o agente do setor já ter contexto"
+        }
+      },
+      required: ["queue_slug", "reason"]
+    }
+  }
+};
+
+// Usada pelos agentes de setor (trigger_type='queue') depois de identificar
+// a solicitação — encerra o atendimento por IA e avisa os atendentes reais
+// daquela fila (queue_members), notificados pela própria conexão de origem
+// da conversa (não mais um número fixo global).
+const transferToHumanTool = {
+  type: "function",
+  function: {
+    name: "transfer_to_human",
+    description: "Encerrar o atendimento por IA e transferir a conversa para o atendente humano da fila atual, notificando-o. Chamar depois de identificar/qualificar a solicitação do cliente.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
-          description: "Motivo da transferência: por que o lead precisa falar com um humano agora, ou por que quer agendar uma demonstração"
+          description: "Resumo do que o cliente precisa, para o atendente humano continuar sem perder contexto"
+        },
+        origem: {
+          type: "string",
+          enum: ["campanha", "disparo", "organico", "inbound", "outbound"],
+          description: "Só para a fila Comercial: classificação da origem do contato"
         },
         preferred_time: {
           type: "string",
-          description: "Horário/dia que o lead mencionou preferir (se informou). Ex: 'terça de manhã', 'qualquer horário', 'entre 14h e 16h'"
-        },
-        is_scheduling: {
-          type: "boolean",
-          description: "true quando o motivo da transferência é o lead querendo agendar uma demonstração (em vez de um problema/pedido para falar com humano)"
+          description: "Horário/dia que o cliente mencionou preferir, se for sobre agendamento (ex: 'terça de manhã')"
         }
       },
       required: ["reason"]
@@ -113,6 +157,55 @@ async function selectAgentConfig(
     .maybeSingle();
 
   return data ?? null;
+}
+
+// Provedor de IA do agente selecionado; cai para o provider marcado
+// is_default se o agente não tiver um específico ou a linha tiver sido
+// removida (nunca deixa o pipeline sem provider).
+async function resolveAgentProvider(
+  supabase: ReturnType<typeof createClient>,
+  agentProviderId: string | null
+): Promise<AIProviderRow | null> {
+  if (agentProviderId) {
+    const { data } = await supabase.from('ai_providers').select('*').eq('id', agentProviderId).eq('is_active', true).maybeSingle();
+    if (data) return data as AIProviderRow;
+  }
+  const { data } = await supabase.from('ai_providers').select('*').eq('is_default', true).eq('is_active', true).maybeSingle();
+  return (data as AIProviderRow) ?? null;
+}
+
+// Contexto de sistema/marca da conversa, resolvido a partir da conexão de
+// origem (whatsapp_connections → connection_systems → systems). Uma
+// conexão pode representar mais de um sistema (ex: "Geral Automax" atende
+// Frotas + Oficina + Maxsig) — sistema_nome/sistema_saudacao usam o
+// primeiro, e sistemas_possiveis lista todos, para o agente Atendimento
+// não forçar o cliente a se identificar antes da hora.
+interface SystemContext {
+  sistema_nome: string;
+  sistema_saudacao: string;
+  sistemas_possiveis: string;
+}
+
+async function resolveSystemContext(
+  supabase: ReturnType<typeof createClient>,
+  connectionId: string | null
+): Promise<SystemContext> {
+  const fallback: SystemContext = { sistema_nome: '', sistema_saudacao: 'nossa empresa', sistemas_possiveis: '' };
+  if (!connectionId) return fallback;
+
+  const { data } = await supabase
+    .from('connection_systems')
+    .select('system:systems(name, greeting_label)')
+    .eq('connection_id', connectionId);
+
+  const systems = (data || []).map((row: any) => row.system).filter(Boolean);
+  if (systems.length === 0) return fallback;
+
+  return {
+    sistema_nome: systems[0].name,
+    sistema_saudacao: systems[0].greeting_label,
+    sistemas_possiveis: systems.map((s: any) => s.name).join(', '),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -291,6 +384,11 @@ Deno.serve(async (req) => {
 
         const systemPrompt = agentConfig?.system_prompt || getDefaultSystemPrompt();
 
+        // Provedor de IA do agente selecionado (ver migration
+        // 20260728120000_multisector_agent_structure.sql) — cai para o
+        // provider marcado is_default se o agente não tiver um específico.
+        const provider = await resolveAgentProvider(supabase, agentConfig?.ai_provider_id ?? null);
+
         // Prompt/modelo/comportamento vêm inteiramente do agente selecionado
         // (system_prompt_override/ai_model_mode/message_breaking_enabled/
         // ai_activation_delay_minutes saíram de nina_settings — unificados
@@ -302,9 +400,9 @@ Deno.serve(async (req) => {
           ai_activation_delay_minutes: agentConfig?.ai_activation_delay_minutes ?? 5,
         };
 
-        console.log(`[Nina] Agent selected: ${agentConfig?.name ?? 'nina_settings fallback'} (trigger: ${agentConfig?.trigger_type ?? 'none'})`);
+        console.log(`[Nina] Agent selected: ${agentConfig?.name ?? 'nina_settings fallback'} (trigger: ${agentConfig?.trigger_type ?? 'none'}, provider: ${provider?.name ?? 'none'})`);
 
-        await processQueueItem(supabase, lovableApiKey, item, systemPrompt, mergedSettings);
+        await processQueueItem(supabase, lovableApiKey, item, systemPrompt, mergedSettings, agentConfig, provider);
         
         await supabase
           .from('nina_processing_queue')
@@ -515,23 +613,46 @@ function parseTimeToMinutes(timeStr: string): number {
   return hours * 60 + minutes;
 }
 
-async function handoffToHuman(
+// Agente Atendimento → agente de setor. Só define a fila e mantém a
+// conversa em modo IA — o agente especializado daquela fila assume a
+// partir da próxima mensagem (seleção de agente por conversations.queue_id,
+// ver selectAgentConfig).
+async function routeToSector(
   supabase: any,
   conversation: any,
-  args: { reason: string; preferred_time?: string; is_scheduling?: boolean }
+  args: { queue_slug: string; reason: string }
 ): Promise<{ success: boolean; error?: string }> {
-  console.log('[Nina] Handoff to human requested:', args);
+  console.log('[Nina] Route to sector requested:', args);
+
+  const queueName = SECTOR_QUEUE_NAMES[args.queue_slug];
+  if (!queueName) {
+    console.error('[Nina] Unknown queue_slug in route_to_sector:', args.queue_slug);
+    return { success: false, error: 'unknown_queue_slug' };
+  }
+
+  const { data: queue } = await supabase.from('queues').select('id').eq('name', queueName).maybeSingle();
+  if (!queue) {
+    console.error('[Nina] Queue not found for route_to_sector:', queueName);
+    return { success: false, error: 'queue_not_found' };
+  }
+
+  await supabase.from('conversations').update({ queue_id: queue.id }).eq('id', conversation.id);
+  console.log(`[Nina] Conversation ${conversation.id} routed to queue "${queueName}"`);
+  return { success: true };
+}
+
+// Agente de setor → atendente humano. Marca a conversa como 'human',
+// notifica todos os atendentes ativos da fila (queue_members) via a
+// PRÓPRIA conexão de origem da conversa (não mais um número/instância
+// fixo em nina_settings — cada conexão notifica com suas credenciais).
+async function transferToHuman(
+  supabase: any,
+  conversation: any,
+  args: { reason: string; origem?: string; preferred_time?: string }
+): Promise<{ success: boolean; error?: string; notified?: number }> {
+  console.log('[Nina] Transfer to human requested:', args);
 
   try {
-    const { data: notifSettings } = await supabase
-      .from('nina_settings')
-      .select('scheduling_notify_commercial, scheduling_notify_phone, evolution_api_url, evolution_api_key, evolution_instance_name, scheduling_notify_evolution_instance')
-      .limit(1)
-      .single();
-
-    // Prefer the contact already embedded in conversation (from the join at query time).
-    // Fall back to a fresh query only if not available, and include call_name which
-    // is the field Cris populates via update_contact_info during the conversation.
     let contact = conversation.contact ?? null;
     if (!contact && conversation.contact_id) {
       const { data: freshContact } = await supabase
@@ -542,93 +663,113 @@ async function handoffToHuman(
       contact = freshContact;
     }
 
-    // call_name is set by Cris during qualification; name may be null for auto-created contacts
     const displayName = contact?.call_name || contact?.name || null;
     const displayPhone = contact?.phone_number || null;
 
-    console.log('[Nina] Contact for notification:', {
-      contact_id: conversation.contact_id,
-      has_contact: !!contact,
-      call_name: contact?.call_name,
-      name: contact?.name,
-      phone_number: contact?.phone_number,
-      displayName,
-      displayPhone,
-    });
+    const updatePayload: Record<string, unknown> = { status: 'human' };
+    if (args.origem) updatePayload.origem_classificada = args.origem;
+    await supabase.from('conversations').update(updatePayload).eq('id', conversation.id);
+    console.log('[Nina] Conversation switched to human mode', { queue_id: conversation.queue_id, origem: args.origem });
 
-    // Switch conversation to human mode
-    await supabase
-      .from('conversations')
-      .update({ status: 'human' })
-      .eq('id', conversation.id);
-
-    console.log('[Nina] Conversation switched to human mode');
-
-    // Tag the contact
-    const handoffTag = args.is_scheduling ? 'AGENDAMENTO-PENDENTE' : 'DEMO-SOLICITADA';
-    const currentTags = contact?.tags || [];
+    // Tag do contato: TRANSFERIDO-<FILA> (fallback genérico se a fila não
+    // estiver carregada na conversa por algum motivo)
+    let queueName = 'ATENDIMENTO';
+    if (conversation.queue_id) {
+      const { data: queue } = await supabase.from('queues').select('name').eq('id', conversation.queue_id).maybeSingle();
+      if (queue?.name) queueName = queue.name;
+    }
+    const handoffTag = `TRANSFERIDO-${queueName.toUpperCase().replace(/\s+/g, '-')}`;
+    const currentTags: string[] = contact?.tags || [];
     if (!currentTags.includes(handoffTag)) {
-      await supabase
-        .from('contacts')
-        .update({ tags: [...currentTags, handoffTag] })
-        .eq('id', conversation.contact_id);
+      await supabase.from('contacts').update({ tags: [...currentTags, handoffTag] }).eq('id', conversation.contact_id);
     }
 
-    // Send commercial notification
-    if (notifSettings?.scheduling_notify_commercial && notifSettings?.scheduling_notify_phone) {
-      const instance = notifSettings.scheduling_notify_evolution_instance || notifSettings.evolution_instance_name;
+    if (!conversation.queue_id) {
+      console.warn('[Nina] transfer_to_human sem queue_id na conversa — sem destinatário para notificar');
+      return { success: true, error: 'no_queue', notified: 0 };
+    }
 
-      const notifMessage = args.is_scheduling
-        ? `🔔 Novo lead para agendar demo!
+    // Atendentes ativos da fila com telefone de notificação cadastrado
+    const { data: members } = await supabase
+      .from('queue_members')
+      .select('team_member:team_members(name, notification_phone)')
+      .eq('queue_id', conversation.queue_id)
+      .eq('is_active', true);
 
-Nome: ${displayName || 'Sem nome'}
-Telefone: ${displayPhone || 'Não informado'}${contact?.company ? `\nEmpresa: ${contact.company}` : ''}
-Contexto: ${args.reason}
+    const recipients = (members || [])
+      .map((m: any) => m.team_member)
+      .filter((tm: any) => tm?.notification_phone);
 
-Entre em contato para confirmar data e horário.`
-        : `🔔 *Novo Lead Qualificado - PremaCar*
+    if (recipients.length === 0) {
+      console.warn(`[Nina] Fila "${queueName}" sem atendentes com telefone de notificação cadastrado`);
+      return { success: true, error: 'no_recipients', notified: 0 };
+    }
 
-👤 *Nome:* ${displayName || 'Sem nome'}
+    const notifMessage = `🔔 *Nova conversa transferida — ${queueName}*
+
+👤 *Cliente:* ${displayName || 'Sem nome'}
 📱 *Telefone:* ${displayPhone || 'Não informado'}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
+${args.origem ? `\n📊 *Origem:* ${args.origem}` : ''}
 
 📋 *Contexto:*
 ${args.reason}
+${args.preferred_time ? `\n🕒 *Preferência de horário:* ${args.preferred_time}` : ''}
 
-👉 *Ação:* Entre em contato via WhatsApp — há uma conversa aguardando atendimento.
+_A conversa já está em modo humano no sistema._`;
 
-_A conversa já foi transferida para modo humano no sistema._`;
-
+    let notified = 0;
+    for (const recipient of recipients) {
       try {
-        const response = await fetch(
-          `${notifSettings.evolution_api_url}/message/sendText/${instance}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': notifSettings.evolution_api_key },
-            body: JSON.stringify({
-              number: notifSettings.scheduling_notify_phone.replace(/\D/g, ''),
-              text: notifMessage
-            })
-          }
-        );
-
-        if (response.ok) {
-          console.log('[Nina] Commercial notification sent successfully');
-          return { success: true };
-        } else {
-          console.error('[Nina] Notification send failed:', response.status);
-          return { success: true, error: 'notification_failed' };
-        }
+        const sent = await sendInternalNotification(supabase, conversation.connection_id ?? null, recipient.notification_phone, notifMessage);
+        if (sent) notified++;
       } catch (err) {
-        console.error('[Nina] Error sending notification:', err);
-        return { success: true, error: 'notification_error' };
+        console.error(`[Nina] Falha ao notificar ${recipient.name}:`, err);
       }
-    } else {
-      console.warn('[Nina] Commercial notification not configured — handoff done without notification');
-      return { success: true, error: 'not_configured' };
     }
+
+    return { success: true, notified };
   } catch (err) {
-    console.error('[Nina] Error in handoff:', err);
+    console.error('[Nina] Error in transfer_to_human:', err);
     return { success: false, error: String(err) };
+  }
+}
+
+// Envia um texto simples via a conexão de origem da conversa (Evolution ou
+// Meta, conforme resolveSendCredentials) — usado só para as notificações
+// internas de transferência, não passa pelo send_queue (não é uma mensagem
+// do atendimento, é um aviso interno para o atendente).
+async function sendInternalNotification(
+  supabase: any,
+  connectionId: string | null,
+  toPhone: string,
+  text: string
+): Promise<boolean> {
+  try {
+    const creds = await resolveSendCredentials(supabase, { connectionId, apiSource: 'evolution' });
+    const cleanPhone = toPhone.replace(/\D/g, '');
+
+    if (creds.api_type === 'meta') {
+      const response = await fetch(`https://graph.facebook.com/v18.0/${creds.meta_phone_number_id}/messages`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${creds.meta_access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp', recipient_type: 'individual', to: cleanPhone,
+          type: 'text', text: { body: text },
+        }),
+      });
+      return response.ok;
+    }
+
+    const baseUrl = (creds.evolution_api_url || '').replace(/\/$/, '');
+    const response = await fetch(`${baseUrl}/message/sendText/${creds.evolution_instance_name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': creds.evolution_api_key || '' },
+      body: JSON.stringify({ number: cleanPhone, text }),
+    });
+    return response.ok;
+  } catch (err) {
+    console.error('[Nina] Error sending internal notification:', err);
+    return false;
   }
 }
 
@@ -802,7 +943,8 @@ async function cancelAppointmentFromAI(
 // MAIN PROCESSING FUNCTION
 // ═══════════════════════════════════════════
 async function processQueueItem(
-  supabase: any, lovableApiKey: string, item: any, systemPrompt: string, settings: any
+  supabase: any, lovableApiKey: string, item: any, systemPrompt: string, settings: any,
+  agentConfig: any, provider: AIProviderRow | null
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -889,10 +1031,12 @@ async function processQueueItem(
 
   // ═══════════════════════════════════════════
   // SCHEDULING AUTO-TRIGGER: Lead respondeu com dia/horário após AI perguntar
-  // sobre agendamento — aciona direto o handoff (sem prometer horário
-  // específico), evitando esperar mais um turno da IA.
+  // sobre agendamento — aciona direto a transferência (sem prometer horário
+  // específico), evitando esperar mais um turno da IA. Só se aplica à fila
+  // Comercial (é onde existe o fluxo de agendar demonstração).
   // ═══════════════════════════════════════════
-  if (settings.ai_scheduling_enabled !== false) {
+  const isComercialQueue = agentConfig?.trigger_type === 'queue' && agentConfig?.name === 'Comercial';
+  if (isComercialQueue && settings.ai_scheduling_enabled !== false) {
     const { data: lastNinaMsgRaw } = await supabase
       .from('messages')
       .select('content')
@@ -915,8 +1059,8 @@ async function processQueueItem(
     const userGavTimePreference = TIME_PATTERNS.some(p => p.test(message.content || ''));
 
     if (aiAskedAboutTime && userGavTimePreference) {
-      console.log('[Nina] 📅 SCHEDULING AUTO-TRIGGER: lead respondeu com preferência de horário, acionando handoff diretamente');
-      await handoffToHuman(supabase, conversation, {
+      console.log('[Nina] 📅 SCHEDULING AUTO-TRIGGER: lead respondeu com preferência de horário, acionando transferência diretamente');
+      await transferToHuman(supabase, conversation, {
         reason: 'Lead confirmou interesse em agendar demonstração e informou preferência de horário.',
         preferred_time: message.content || undefined,
       });
@@ -1061,6 +1205,7 @@ async function processQueueItem(
           query_embedding: queryEmbedding,
           match_threshold: 0.72,
           match_count: 4,
+          p_queue_id: conversation.queue_id ?? null,
         });
         if (matchError) {
           console.error('[Nina] Erro buscando base de conhecimento:', matchError);
@@ -1074,6 +1219,8 @@ async function processQueueItem(
       console.error('[Nina] Erro no fluxo de RAG:', ragError);
     }
   }
+
+  const systemContext = await resolveSystemContext(supabase, conversation.connection_id ?? null);
 
   const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa, message.content || '', knowledgeChunks);
 
@@ -1102,53 +1249,45 @@ async function processQueueItem(
   const hasHistory = origemConversa?.origem === 'retorno';
 
   const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact, origemConversa, {
-    dealData, settings, conversationStatus: conversation.status, totalMessages: totalMessages || 0, hasHistory,
+    dealData, settings, conversationStatus: conversation.status, totalMessages: totalMessages || 0, hasHistory, systemContext,
   });
 
-  console.log('[Nina] Calling Lovable AI...');
+  if (!provider) {
+    throw new Error('Nenhum provedor de IA configurado (ai_providers vazio ou sem is_default)');
+  }
+  console.log(`[Nina] Calling AI provider "${provider.name}"...`);
 
-  const aiSettings = getModelSettings(settings, conversationHistory, message, conversation.contact, clientMemory);
+  const aiSettings = resolveModelAndTemperature(
+    provider, settings?.ai_model_mode || 'flash', agentConfig?.ai_model, conversationHistory, message, clientMemory
+  );
 
-  const tools: any[] = [];
-  tools.push(handoffToHumanTool);
-  tools.push(updateContactInfoTool);
-
-  const requestBody: any = {
-    model: aiSettings.model,
-    messages: [
-      { role: 'system', content: processedPrompt },
-      ...conversationHistory
-    ],
-    temperature: aiSettings.temperature,
-    max_tokens: 1000
-  };
-
-  if (tools.length > 0) {
-    requestBody.tools = tools;
-    requestBody.tool_choice = "auto";
+  // route_to_sector é só do agente Atendimento (trigger_type='default');
+  // transfer_to_human é dos agentes de setor (trigger_type='queue') — cada
+  // agente só recebe a ferramenta que faz sentido para o seu papel.
+  const tools: any[] = [updateContactInfoTool];
+  if (agentConfig?.trigger_type === 'default') {
+    tools.push(routeToSectorTool);
+  } else {
+    tools.push(transferToHumanTool);
   }
 
-  const aiResponse = await fetch(LOVABLE_AI_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${lovableApiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!aiResponse.ok) {
-    const errorText = await aiResponse.text();
-    console.error('[Nina] AI response error:', aiResponse.status, errorText);
-    if (aiResponse.status === 429) throw new Error('Rate limit exceeded, will retry later');
-    if (aiResponse.status === 402) throw new Error('Payment required - please add credits');
-    throw new Error(`AI error: ${aiResponse.status}`);
+  let aiResult;
+  try {
+    aiResult = await callAIProvider(provider, {
+      systemPrompt: processedPrompt,
+      messages: conversationHistory,
+      tools,
+      model: aiSettings.model,
+      temperature: aiSettings.temperature,
+      maxTokens: 1000,
+    });
+  } catch (err) {
+    console.error('[Nina] AI provider error:', err);
+    throw err;
   }
 
-  const aiData = await aiResponse.json();
-  const aiMessage = aiData.choices?.[0]?.message;
-  let aiContent = aiMessage?.content || '';
-  const toolCalls = aiMessage?.tool_calls || [];
+  let aiContent = aiResult.content;
+  const toolCalls = aiResult.toolCalls;
 
   console.log('[Nina] AI response received, content length:', aiContent?.length || 0, ', tool_calls:', toolCalls.length);
 
@@ -1157,22 +1296,25 @@ async function processQueueItem(
   const toolResults: { toolCall: any; result: any }[] = [];
 
   for (const toolCall of toolCalls) {
-    if (toolCall.function?.name === 'request_demo_handoff') {
+    if (toolCall.function?.name === 'route_to_sector') {
       try {
         const args = JSON.parse(toolCall.function.arguments);
-        const handoffResult = await handoffToHuman(supabase, conversation, args);
+        const routeResult = await routeToSector(supabase, conversation, args);
+        toolResults.push({ toolCall, result: routeResult });
+      } catch (parseError) {
+        console.error('[Nina] Error parsing route_to_sector:', parseError);
+      }
+    }
 
-        if (args.is_scheduling) {
-          aiContent = (aiContent || 'Perfeito! Em breve nosso time comercial vai entrar em contato com você para confirmar data e horário. Qualquer dúvida, é só chamar! 😊');
-        } else if (handoffResult.success) {
-          aiContent = (aiContent || 'Vou te conectar com um de nossos consultores agora. Eles vão te atender em breve! 😊');
-        } else {
-          aiContent = (aiContent || 'Vou te passar para nossa equipe. Eles entrarão em contato em breve!');
-        }
+    if (toolCall.function?.name === 'transfer_to_human') {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        const handoffResult = await transferToHuman(supabase, conversation, args);
+        aiContent = aiContent || 'Vou te passar para nossa equipe. Eles entrarão em contato em breve! 😊';
         handoffDone = true;
         toolResults.push({ toolCall, result: handoffResult });
       } catch (parseError) {
-        console.error('[Nina] Error parsing request_demo_handoff:', parseError);
+        console.error('[Nina] Error parsing transfer_to_human:', parseError);
       }
     }
 
@@ -1195,9 +1337,9 @@ async function processQueueItem(
   // de qualificação e a IA "esquece" o que estava perguntando).
   if (!aiContent && toolCalls.length > 0 && !handoffDone && toolResults.length > 0) {
     try {
-      const followUpMessages = [
-        ...requestBody.messages,
-        aiMessage,
+      const followUpMessages: any[] = [
+        ...conversationHistory,
+        aiResult.rawAssistantMessage || { role: 'assistant', content: '' },
         ...toolResults.map(({ toolCall, result }) => ({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -1205,27 +1347,15 @@ async function processQueueItem(
         })),
       ];
 
-      const followUpResponse = await fetch(LOVABLE_AI_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${lovableApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: aiSettings.model,
-          messages: followUpMessages,
-          temperature: aiSettings.temperature,
-          max_tokens: 1000,
-        }),
+      const followUpResult = await callAIProvider(provider, {
+        systemPrompt: processedPrompt,
+        messages: followUpMessages,
+        model: aiSettings.model,
+        temperature: aiSettings.temperature,
+        maxTokens: 1000,
       });
-
-      if (followUpResponse.ok) {
-        const followUpData = await followUpResponse.json();
-        aiContent = followUpData.choices?.[0]?.message?.content || '';
-        console.log('[Nina] Follow-up completion after tool call, content length:', aiContent.length);
-      } else {
-        console.error('[Nina] Follow-up completion error:', followUpResponse.status, await followUpResponse.text());
-      }
+      aiContent = followUpResult.content || '';
+      console.log('[Nina] Follow-up completion after tool call, content length:', aiContent.length);
     } catch (err) {
       console.error('[Nina] Error in follow-up completion after tool call:', err);
     }
@@ -1242,8 +1372,8 @@ async function processQueueItem(
   if (!aiContent) {
     console.warn('[Nina] Empty AI response, using fallback');
     const fallbackIntent = detectExplicitIntent(message.content || '');
-    if (fallbackIntent.has && fallbackIntent.desc.includes('demonstração')) {
-      await handoffToHuman(supabase, conversation, {
+    if (isComercialQueue && fallbackIntent.has && fallbackIntent.desc.includes('demonstração')) {
+      await transferToHuman(supabase, conversation, {
         reason: 'Lead demonstrou interesse em agendar demonstração (resposta vazia da IA).',
       });
       aiContent = 'Vou verificar a agenda e já te retorno confirmando o horário! 😊';
@@ -1431,7 +1561,7 @@ REGRA CRÍTICA:
 - Nunca pressione para fechar — deixe o interesse surgir naturalmente
 
 AGENDAMENTO DE DEMO:
-- Quando o lead CONFIRMAR que quer agendar, chame a tool request_demo_handoff com is_scheduling=true
+- Quando o lead CONFIRMAR que quer agendar, chame a tool transfer_to_human
 - NUNCA confirme um horário específico como já agendado — a equipe comercial confirma manualmente depois
 - Responda apenas algo como "Perfeito! Vou verificar a agenda e já te retorno confirmando o horário"
 - Não chame a tool se o lead ainda não confirmou interesse em agendar
@@ -1524,7 +1654,7 @@ async function detectarOrigemConversa(
 
 function processPromptTemplate(
   prompt: string, contact: any, origemConversa?: { origem: string; detalhes: string },
-  extraContext?: { dealData?: any; settings?: any; conversationStatus?: string; totalMessages?: number; hasHistory?: boolean; }
+  extraContext?: { dealData?: any; settings?: any; conversationStatus?: string; totalMessages?: number; hasHistory?: boolean; systemContext?: SystemContext; }
 ): string {
   const now = new Date();
   const brOptions: Intl.DateTimeFormatOptions = { timeZone: 'America/Sao_Paulo' };
@@ -1549,6 +1679,7 @@ function processPromptTemplate(
     'hora': timeFormatter.format(now),
     'dia_semana': weekdayFormatter.format(now),
     'cliente_nome': contact?.name || contact?.call_name || 'Cliente',
+    'cliente_nome_com_virgula': (contact?.name || contact?.call_name) ? `, ${contact.name || contact.call_name}` : '',
     'cliente_telefone': contact?.phone_number || '',
     'cliente_email': contact?.email || '',
     'cliente_tags': (contact?.tags || []).join(', '),
@@ -1564,6 +1695,9 @@ function processPromptTemplate(
     'agente_nome': extraContext?.settings?.sdr_name || '',
     'total_mensagens': String(extraContext?.totalMessages || 0),
     'conversa_status': extraContext?.conversationStatus || '',
+    'sistema_nome': extraContext?.systemContext?.sistema_nome || '',
+    'sistema_saudacao': extraContext?.systemContext?.sistema_saudacao || 'nossa empresa',
+    'sistemas_possiveis': extraContext?.systemContext?.sistemas_possiveis || '',
   };
   
   return prompt.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, varName) => variables[varName] || match);
@@ -1646,7 +1780,7 @@ ${origemConversa.origem === 'retorno' ? `
 ATENÇÃO: O lead acabou de expressar intenção explícita: "${intent.desc}".
 - NÃO use saudação genérica como "Olá! Como posso ajudar?"
 - Responda DIRETAMENTE à solicitação
-- Se quiser agendar demo: confirme o interesse, colete tipo de estabelecimento (se ainda não tem), e quando tiver informação suficiente, chame a tool request_demo_handoff com is_scheduling=true (nunca confirme um horário específico sozinho)
+- Se quiser agendar demo: confirme o interesse, colete tipo de estabelecimento (se ainda não tem), e quando tiver informação suficiente, chame a tool transfer_to_human (nunca confirme um horário específico sozinho)
 - Seja objetivo e mostre que entendeu o pedido
 </intencao_explicita>`;
   }
@@ -1700,39 +1834,6 @@ function breakMessageIntoChunks(content: string): string[] {
   return chunks;
 }
 
-function getModelSettings(settings: any, conversationHistory: any[], message: any, contact: any, clientMemory: any): { model: string; temperature: number } {
-  const modelMode = settings?.ai_model_mode || 'flash';
-  
-  switch (modelMode) {
-    case 'flash': return { model: 'google/gemini-2.5-flash', temperature: 0.7 };
-    case 'pro': return { model: 'google/gemini-2.5-pro', temperature: 0.7 };
-    case 'pro3': return { model: 'google/gemini-3-pro-preview', temperature: 0.7 };
-    case 'adaptive': return getAdaptiveSettings(conversationHistory, message, contact, clientMemory);
-    default: return { model: 'google/gemini-2.5-flash', temperature: 0.7 };
-  }
-}
-
-function getAdaptiveSettings(conversationHistory: any[], message: any, contact: any, clientMemory: any): { model: string; temperature: number } {
-  const messageCount = conversationHistory.length;
-  const userContent = message.content?.toLowerCase() || '';
-  
-  const isComplaintKeywords = ['problema', 'erro', 'não funciona', 'reclamação', 'péssimo', 'horrível'];
-  const isSalesKeywords = ['preço', 'valor', 'desconto', 'comprar', 'contratar', 'plano'];
-  const isTechnicalKeywords = ['como funciona', 'integração', 'api', 'configurar', 'instalar'];
-  const isUrgentKeywords = ['urgente', 'agora', 'rápido', 'emergência'];
-
-  const isComplaint = isComplaintKeywords.some(k => userContent.includes(k));
-  const isSales = isSalesKeywords.some(k => userContent.includes(k));
-  const isTechnical = isTechnicalKeywords.some(k => userContent.includes(k));
-  const isUrgent = isUrgentKeywords.some(k => userContent.includes(k));
-  
-  const qualificationScore = clientMemory?.lead_profile?.qualification_score || 0;
-
-  if (isComplaint || isUrgent) return { model: 'google/gemini-2.5-pro', temperature: 0.3 };
-  if (isSales && qualificationScore > 50) return { model: 'google/gemini-2.5-flash', temperature: 0.5 };
-  if (isTechnical) return { model: 'google/gemini-2.5-pro', temperature: 0.4 };
-  if (messageCount < 5) return { model: 'google/gemini-2.5-flash', temperature: 0.8 };
-  if (messageCount > 15) return { model: 'google/gemini-2.5-flash', temperature: 0.5 };
-
-  return { model: 'google/gemini-2.5-flash', temperature: 0.7 };
-}
+// Seleção de modelo/temperatura (fixo ou adaptive) foi movida para
+// _shared/ai-providers.ts (resolveModelAndTemperature) — agora é relativa
+// ao provider configurado no agente, não mais hardcoded para Gemini.
