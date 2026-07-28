@@ -124,7 +124,10 @@ const Contacts: React.FC = () => {
       const { data, error } = await query;
       if (error) throw error;
       
-      setContacts(data || []);
+      setContacts((data || []).map(c => ({
+        ...c,
+        is_blocked: c.is_blocked ?? false,
+      })) as ContactRow[]);
     } catch (error) {
       console.error('Erro ao carregar contatos:', error);
       toast.error('Erro ao carregar contatos');
