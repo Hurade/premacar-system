@@ -152,6 +152,16 @@ async function extractText(buffer: ArrayBuffer, fileType: string | null): Promis
     }
   }
 
+  if (type === 'html' || type === 'htm') {
+    try {
+      const html = new TextDecoder('utf-8').decode(buffer);
+      return htmlToText(html);
+    } catch (err) {
+      console.error('[KnowledgeIngest] Erro extraindo HTML:', err);
+      return null;
+    }
+  }
+
   // csv / txt / fallback: trata como texto plano
   try {
     return new TextDecoder('utf-8').decode(buffer);
@@ -159,6 +169,48 @@ async function extractText(buffer: ArrayBuffer, fileType: string | null): Promis
     console.error('[KnowledgeIngest] Erro decodificando texto:', err);
     return null;
   }
+}
+
+const HTML_ENTITIES: Record<string, string> = {
+  nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+  eacute: 'é', aacute: 'á', iacute: 'í', oacute: 'ó', uacute: 'ú',
+  atilde: 'ã', otilde: 'õ', ccedil: 'ç', ntilde: 'ñ',
+  Eacute: 'É', Aacute: 'Á', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú', Atilde: 'Ã', Otilde: 'Õ', Ccedil: 'Ç',
+  ecirc: 'ê', ocirc: 'ô', acirc: 'â', mdash: '—', ndash: '–', hellip: '…', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
+};
+
+// Extrai texto legível de documentação HTML exportada de wikis (formato usado
+// nos manuais de Suporte e no mapeamento de tarefas de CS) — remove
+// script/style por completo, preserva quebras de bloco (parágrafo, item de
+// lista, cabeçalho, linha de tabela) como novas linhas antes de descartar as
+// tags, e decodifica entidades HTML comuns.
+function htmlToText(html: string): string {
+  let text = html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<(br|hr)\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|tr|h[1-6]|section|article|table|blockquote)>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<h[1-6][^>]*>/gi, '\n\n## ')
+    .replace(/<[^>]+>/g, ' ');
+
+  text = text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, code) => {
+    if (code[0] === '#') {
+      const codePoint = code[1]?.toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      if (!Number.isNaN(codePoint)) {
+        try { return String.fromCodePoint(codePoint); } catch { return match; }
+      }
+      return match;
+    }
+    return HTML_ENTITIES[code] ?? match;
+  });
+
+  return text
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // Chunking simples por caractere com overlap, respeitando quebras de parágrafo

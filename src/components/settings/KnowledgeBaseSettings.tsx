@@ -74,10 +74,10 @@ const KnowledgeBaseSettings: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowedExt = ['pdf', 'xlsx', 'xls', 'csv', 'txt'];
+    const allowedExt = ['pdf', 'xlsx', 'xls', 'csv', 'txt', 'html', 'htm'];
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     if (!allowedExt.includes(ext)) {
-      toast.error('Formato não suportado. Use PDF, XLSX, CSV ou TXT.');
+      toast.error('Formato não suportado. Use PDF, XLSX, CSV, TXT ou HTML.');
       e.target.value = '';
       return;
     }
@@ -128,7 +128,7 @@ const KnowledgeBaseSettings: React.FC = () => {
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <div>
             <h3 className="text-sm font-semibold text-slate-200">Documentos</h3>
-            <p className="text-xs text-slate-500 mt-1">PDFs, planilhas (XLSX/CSV) ou texto — catálogos, FAQs, tabelas de planos.</p>
+            <p className="text-xs text-slate-500 mt-1">PDFs, planilhas (XLSX/CSV), texto ou HTML — catálogos, FAQs, tabelas de planos, páginas de wiki exportadas.</p>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -145,7 +145,7 @@ const KnowledgeBaseSettings: React.FC = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.xlsx,.xls,.csv,.txt"
+              accept=".pdf,.xlsx,.xls,.csv,.txt,.html,.htm"
               className="hidden"
               onChange={handleFileSelected}
             />

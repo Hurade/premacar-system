@@ -40,6 +40,7 @@ function inferFileType(fileName: string): string {
   if (ext === 'pdf') return 'pdf';
   if (ext === 'xlsx' || ext === 'xls') return 'xlsx';
   if (ext === 'csv') return 'csv';
+  if (ext === 'html' || ext === 'htm') return 'html';
   return 'txt';
 }
 
