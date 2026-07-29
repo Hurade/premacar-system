@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -774,6 +775,23 @@ async function processMetaWebhookAsync(
           console.log('[Meta Async] - Timestamp original:', new Date(timestamp).toISOString());
           console.log('[Meta Async] - Hora atual:', new Date().toISOString());
           console.log('[Meta Async] - Mensagem salva no histórico mas NÃO será processada pela IA');
+
+          // Sem isso, a mensagem fica salva no histórico sem nenhum sinal
+          // visível de que ninguém (IA ou humano) vai responder — tag para
+          // aparecer na lista de contatos e alguém revisar manualmente.
+          const { data: contactTagsData } = await supabase
+            .from('contacts')
+            .select('tags')
+            .eq('id', contact.id)
+            .maybeSingle();
+          const currentContactTags: string[] = contactTagsData?.tags || [];
+          if (!currentContactTags.includes('MSG-ANTIGA-SEM-IA')) {
+            await supabase
+              .from('contacts')
+              .update({ tags: [...currentContactTags, 'MSG-ANTIGA-SEM-IA'] })
+              .eq('id', contact.id);
+          }
+
           continue; // Salva a mensagem mas pula o processamento da IA
         }
 
@@ -853,21 +871,11 @@ async function processMetaWebhookAsync(
                 console.log('[Meta Async] ✅ Adicionado à fila');
               }
 
-              // Trigger nina-orchestrator
+              // Trigger nina-orchestrator (com retry — item já está na fila,
+              // então uma falha de rede aqui não pode deixá-lo preso em 'pending')
               console.log('[Meta Async] 🔔 Disparando nina-orchestrator...');
-              try {
-                const response = await fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseServiceKey}`
-                  },
-                  body: JSON.stringify({ triggered_by: 'meta-webhook-immediate' })
-                });
-                console.log('[Meta Async] ✅ nina-orchestrator triggered:', response.status);
-              } catch (err) {
-                console.error('[Meta Async] ❌ Erro ao chamar nina-orchestrator:', err);
-              }
+              const triggered = await triggerNinaOrchestrator(supabaseUrl, supabaseServiceKey, 'meta-webhook-immediate');
+              console.log(triggered ? '[Meta Async] ✅ nina-orchestrator triggered' : '[Meta Async] ❌ Falha ao disparar nina-orchestrator após retry');
             } else {
               // Use grouping queue
               const processAfter = new Date(Date.now() + groupingDelay).toISOString();

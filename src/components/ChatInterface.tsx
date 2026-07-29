@@ -11,11 +11,12 @@ import {
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, ApiSource, formatDateSeparator } from '../types';
+import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, ApiSource, formatDateSeparator } from '../types';
 import { Badge } from './ui/badge';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
 import { useContactHistory } from '@/hooks/useContactHistory';
+import { useTagDefinitions, useCreateTagDefinition } from '@/hooks/useTagDefinitions';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -64,7 +65,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager } = useUserRole();
   const canSupervise = isAdmin || isManager;
@@ -75,7 +76,9 @@ const ChatInterface: React.FC = () => {
   const [messageInfoFor, setMessageInfoFor] = useState<UIMessage | null>(null);
   const [showProfileInfo, setShowProfileInfo] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [availableTags, setAvailableTags] = useState<TagDefinition[]>([]);
+  const { data: availableTagsData } = useTagDefinitions();
+  const availableTags = availableTagsData || [];
+  const createTagDefinition = useCreateTagDefinition();
   const [isTagSelectorOpen, setIsTagSelectorOpen] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [notesValue, setNotesValue] = useState('');
@@ -211,13 +214,8 @@ const ChatInterface: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Load tag definitions and team members
+  // Load team members
   useEffect(() => {
-    api.fetchTagDefinitions().then(setAvailableTags).catch(err => {
-      console.error('Error loading tags:', err);
-      toast.error('Erro ao carregar tags');
-    });
-
     api.fetchTeam().then(setTeamMembers).catch(err => {
       console.error('Error loading team members:', err);
     });
@@ -372,34 +370,19 @@ const ChatInterface: React.FC = () => {
 
   const handleToggleTag = async (tagKey: string) => {
     if (!activeChat) return;
-    
-    const currentTags = activeChat.tags || [];
-    const newTags = currentTags.includes(tagKey)
-      ? currentTags.filter(t => t !== tagKey)
-      : [...currentTags, tagKey];
-    
-    try {
-      await api.updateContactTags(activeChat.contactId, newTags);
-      toast.success('Tag atualizada');
-    } catch (error) {
-      console.error('Error updating tag:', error);
-      toast.error('Erro ao atualizar tag');
-    }
+    await toggleContactTag(activeChat.id, tagKey);
   };
 
   const handleCreateTag = async (tag: { key: string; label: string; color: string; category: string }) => {
     try {
-      const newTag = await api.createTagDefinition(tag);
-      setAvailableTags(prev => [...prev, newTag]);
-      toast.success('Tag criada com sucesso');
-      
+      const newTag = await createTagDefinition.mutateAsync(tag);
+
       // Adicionar a tag ao contato automaticamente
       if (activeChat) {
-        await handleToggleTag(tag.key);
+        await toggleContactTag(activeChat.id, newTag.key);
       }
     } catch (error) {
       console.error('Error creating tag:', error);
-      toast.error('Erro ao criar tag');
     }
   };
 

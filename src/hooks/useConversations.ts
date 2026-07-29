@@ -737,6 +737,37 @@ export function useConversations() {
     }
   }, [conversations]);
 
+  // Toggle a tag on the conversation's contact. Optimistic update (mesmo
+  // padrão de assignQueue/toggleFavorite) — antes disso, o toggle só
+  // gravava no banco sem atualizar `conversations`, então a UI só refletia
+  // a mudança depois de um F5. Ler `conv.tags` sempre pelo estado mais
+  // recente (via callback com deps em `conversations`) também evita que
+  // dois toggles em sequência rápida partam da mesma base desatualizada e
+  // um sobrescreva o outro.
+  const toggleContactTag = useCallback(async (conversationId: string, tagKey: string) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv) return;
+
+    const previousTags = conv.tags || [];
+    const newTags = previousTags.includes(tagKey)
+      ? previousTags.filter(t => t !== tagKey)
+      : [...previousTags, tagKey];
+
+    setConversations(prev => prev.map(c => (
+      c.id === conversationId ? { ...c, tags: newTags } : c
+    )));
+
+    try {
+      await api.updateContactTags(conv.contactId, newTags);
+    } catch (err) {
+      console.error('[useConversations] Error toggling contact tag:', err);
+      toast.error('Erro ao atualizar tag');
+      setConversations(prev => prev.map(c => (
+        c.id === conversationId ? { ...c, tags: previousTags } : c
+      )));
+    }
+  }, [conversations]);
+
   // Assign conversation to a queue (categorização/roteamento por setor)
   const assignQueue = useCallback(async (conversationId: string, queueId: string | null) => {
     const conv = conversations.find(c => c.id === conversationId);
@@ -948,6 +979,7 @@ export function useConversations() {
     markAsRead,
     assignConversation,
     assignQueue,
+    toggleContactTag,
     transferConnection,
     toggleFavorite,
     finalizeConversation,

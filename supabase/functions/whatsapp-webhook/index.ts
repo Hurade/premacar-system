@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -542,6 +543,22 @@ serve(async (req) => {
       // Skip AI processing for old messages (re-delivery protection)
       if (skipAIProcessing) {
         console.log('[Webhook] ⏭️ Skipping AI processing - old message (re-delivery)');
+
+        // Sem isso, a mensagem fica salva no histórico sem nenhum sinal
+        // visível de que ninguém (IA ou humano) vai responder — tag para
+        // aparecer na lista de contatos e alguém revisar manualmente.
+        const { data: contactTagsData } = await supabase
+          .from('contacts')
+          .select('tags')
+          .eq('id', contact.id)
+          .maybeSingle();
+        const currentContactTags: string[] = contactTagsData?.tags || [];
+        if (!currentContactTags.includes('MSG-ANTIGA-SEM-IA')) {
+          await supabase
+            .from('contacts')
+            .update({ tags: [...currentContactTags, 'MSG-ANTIGA-SEM-IA'] })
+            .eq('id', contact.id);
+        }
       } else if (!groupingEnabled) {
         // Grouping disabled - process immediately via nina-orchestrator
         console.log('[Webhook] Grouping disabled, processing immediately');
@@ -570,15 +587,11 @@ serve(async (req) => {
               console.error('[Webhook] Error queuing for Nina:', ninaQueueError);
             }
           } else {
+            // Item já está na fila — retry aqui evita que uma falha de rede
+            // transitória o deixe preso em 'pending' até a próxima mensagem
+            // do mesmo contato (o que pode nunca acontecer).
             EdgeRuntime.waitUntil(
-              fetch(`${supabaseUrl}/functions/v1/nina-orchestrator`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`
-                },
-                body: JSON.stringify({ triggered_by: 'whatsapp-webhook-immediate' })
-              }).catch(err => console.error('[Webhook] Error triggering nina-orchestrator:', err))
+              triggerNinaOrchestrator(supabaseUrl, supabaseServiceKey, 'whatsapp-webhook-immediate')
             );
           }
         }

@@ -3028,9 +3028,11 @@ export type Database = {
       }
       tag_definitions: {
         Row: {
+          ai_instruction: string | null
           category: string
           color: string
           created_at: string
+          has_action: boolean
           id: string
           is_active: boolean
           key: string
@@ -3039,9 +3041,11 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          ai_instruction?: string | null
           category?: string
           color?: string
           created_at?: string
+          has_action?: boolean
           id?: string
           is_active?: boolean
           key: string
@@ -3050,9 +3054,11 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          ai_instruction?: string | null
           category?: string
           color?: string
           created_at?: string
+          has_action?: boolean
           id?: string
           is_active?: boolean
           key?: string

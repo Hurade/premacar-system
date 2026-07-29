@@ -1222,7 +1222,26 @@ async function processQueueItem(
 
   const systemContext = await resolveSystemContext(supabase, conversation.connection_id ?? null);
 
-  const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa, message.content || '', knowledgeChunks);
+  // ═══════════════════════════════════════════
+  // AÇÕES DE TAG: tags do contato podem carregar uma instrução para a IA
+  // (ex: tag "Cliente" → não perguntar de novo se a pessoa é cliente).
+  // Configurável em Configurações > Tags (tag_definitions.has_action).
+  // ═══════════════════════════════════════════
+  let tagInstructions: string[] = [];
+  const contactTags: string[] = conversation.contact?.tags || [];
+  if (contactTags.length > 0) {
+    const { data: actionTags } = await supabase
+      .from('tag_definitions')
+      .select('key, ai_instruction')
+      .eq('has_action', true)
+      .not('ai_instruction', 'is', null)
+      .in('key', contactTags);
+    tagInstructions = (actionTags || [])
+      .map((t: any) => t.ai_instruction)
+      .filter((instruction: string | null) => !!instruction?.trim());
+  }
+
+  const enhancedSystemPrompt = buildEnhancedPrompt(systemPrompt, conversation.contact, clientMemory, origemConversa, message.content || '', knowledgeChunks, tagInstructions);
 
   // Dispara o motor de automação (gatilho 'new_message') em background — a
   // mensagem já está resolvida (mídia/RAG), então condições sobre o conteúdo
@@ -1725,7 +1744,7 @@ function detectExplicitIntent(msg: string): { has: boolean; desc: string } {
   return { has: false, desc: '' };
 }
 
-function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any, origemConversa?: { origem: string; detalhes: string }, latestUserMessage = '', knowledgeChunks: string[] = []): string {
+function buildEnhancedPrompt(basePrompt: string, contact: any, memory: any, origemConversa?: { origem: string; detalhes: string }, latestUserMessage = '', knowledgeChunks: string[] = [], tagInstructions: string[] = []): string {
   const intent = detectExplicitIntent(latestUserMessage);
   let contextInfo = '';
 
@@ -1758,6 +1777,12 @@ ${origemConversa.origem === 'retorno' ? `
     if (contact.name) contextInfo += `\n- Nome: ${contact.name}`;
     if (contact.call_name) contextInfo += ` (trate por: ${contact.call_name})`;
     if (contact.tags?.length) contextInfo += `\n- Tags: ${contact.tags.join(', ')}`;
+  }
+
+  if (tagInstructions.length > 0) {
+    contextInfo += `\n\n<instrucoes_por_tag>
+${tagInstructions.map((instruction) => `- ${instruction}`).join('\n')}
+</instrucoes_por_tag>`;
   }
 
   if (memory && Object.keys(memory).length > 0) {

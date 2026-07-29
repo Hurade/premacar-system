@@ -177,6 +177,8 @@ export interface TagDefinition {
   color: string;
   category: string;
   is_active: boolean;
+  has_action: boolean;
+  ai_instruction: string | null;
   created_at: string;
   updated_at: string;
 }
