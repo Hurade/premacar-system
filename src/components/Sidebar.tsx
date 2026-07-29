@@ -212,7 +212,14 @@ const SidebarContent = () => {
     </>;
 };
 const AppSidebar: React.FC = () => {
-  const [open, setOpen] = useState(true);
+  // `open` controla duas coisas diferentes com o mesmo booleano: "sidebar
+  // expandida" no desktop e "menu (drawer) aberto" no celular. Default true
+  // fixo fazia o drawer mobile nascer com estado "aberto" por baixo dos
+  // panos antes de qualquer toque, causando sobreposição visual e o botão
+  // de hambúrguer parecendo não abrir nada (na prática, fechava um drawer
+  // que nunca tinha sido corretamente aberto). No celular o padrão precisa
+  // ser fechado; no desktop, mantém expandida como sempre foi.
+  const [open, setOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   return <Sidebar open={open} setOpen={setOpen}>
       <SidebarBody className="justify-between gap-10 bg-card/50 backdrop-blur-xl border-r border-border/50">
         <SidebarContent />
