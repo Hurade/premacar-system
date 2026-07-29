@@ -3619,34 +3619,20 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
-      match_documents:
-        | {
-            Args: {
-              match_count?: number
-              match_threshold?: number
-              query_embedding: string
-            }
-            Returns: {
-              content: string
-              document_id: string
-              id: string
-              similarity: number
-            }[]
-          }
-        | {
-            Args: {
-              match_count?: number
-              match_threshold?: number
-              p_queue_id?: string
-              query_embedding: string
-            }
-            Returns: {
-              content: string
-              document_id: string
-              id: string
-              similarity: number
-            }[]
-          }
+      match_documents: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_queue_id?: string
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          document_id: string
+          id: string
+          similarity: number
+        }[]
+      }
       merge_contacts: {
         Args: { p_duplicate_id: string; p_primary_id: string }
         Returns: undefined
