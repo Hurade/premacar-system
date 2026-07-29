@@ -66,7 +66,7 @@ const VariationModal: React.FC<VariationModalProps> = ({ campaignId, existing, u
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg bg-slate-900 border-slate-700">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700">
         <DialogHeader>
           <DialogTitle>{existing ? 'Editar Variação' : 'Nova Variação'}</DialogTitle>
         </DialogHeader>

@@ -84,8 +84,8 @@ const Broadcasts: React.FC = () => {
       </div>
 
       {/* Tabs Content */}
-      <div className="flex-1 overflow-hidden mt-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden mt-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full min-h-0 flex flex-col">
           <div className="px-6 pt-4 border-b border-border/50 flex-shrink-0">
             <TabsList className="bg-secondary/50">
               <TabsTrigger value="campaigns" className="flex items-center gap-2">
@@ -107,7 +107,7 @@ const Broadcasts: React.FC = () => {
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 min-h-0 overflow-auto">
             <TabsContent value="campaigns" className="h-full m-0 p-6">
               <BroadcastCampaignsList onNewCampaign={() => setActiveTab('new')} />
             </TabsContent>

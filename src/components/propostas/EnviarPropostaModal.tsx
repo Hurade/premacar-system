@@ -215,7 +215,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg bg-card border-border/50">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-card border-border/50">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Enviar Proposta

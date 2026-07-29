@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail, History, Ban, ShieldCheck } from 'lucide-react';
+import { Search, Upload, MessageSquare, Loader2, Phone, Users, Folder, UserPlus, UserX, Tag as TagIcon, ChevronLeft, ChevronRight, Pencil, Mail, History, Ban, ShieldCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from './ui/button';
@@ -47,6 +47,7 @@ const Contacts: React.FC = () => {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(50);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showMobileFolders, setShowMobileFolders] = useState(false);
   const navigate = useNavigate();
   const { isAdmin, isManager } = useUserRole();
 
@@ -324,16 +325,32 @@ const Contacts: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full bg-slate-950 text-slate-50">
-      {/* Sidebar with folders and tags */}
-      <div className="w-64 p-4 border-r border-slate-800 flex-shrink-0 overflow-y-auto space-y-6">
+    <div className="flex h-full bg-slate-950 text-slate-50 relative">
+      {/* Sidebar with folders and tags — sempre visível a partir de md;
+          em telas menores fica escondida e abre como painel sobre a tela
+          (senão os w-64 fixos espremem a lista de contatos num celular) */}
+      <div
+        className={`w-64 p-4 border-slate-800 flex-shrink-0 overflow-y-auto space-y-6 bg-slate-950 md:relative md:block md:border-r ${
+          showMobileFolders ? 'fixed inset-0 z-40 block' : 'hidden'
+        }`}
+      >
+        <div className="flex items-center justify-between md:hidden mb-2">
+          <h3 className="text-sm font-semibold text-slate-300">Pastas e Tags</h3>
+          <button onClick={() => setShowMobileFolders(false)} className="p-2 text-slate-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
         <FolderManager
           folders={folders}
           selectedFolderId={selectedFolderId}
-          onSelectFolder={setSelectedFolderId}
+          onSelectFolder={(id) => {
+            setSelectedFolderId(id);
+            setShowMobileFolders(false);
+          }}
           onFoldersChange={loadFolders}
         />
-        
+
         <div className="border-t border-slate-800 pt-4">
           <TagManager
             tags={tagDefinitions}
@@ -343,7 +360,14 @@ const Contacts: React.FC = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 p-8 overflow-y-auto">
+      <div className="flex-1 p-4 sm:p-8 overflow-y-auto min-w-0">
+        <button
+          onClick={() => setShowMobileFolders(true)}
+          className="md:hidden mb-4 flex items-center gap-2 text-sm text-slate-300 border border-slate-700 rounded-lg px-3 py-2"
+        >
+          <Folder className="w-4 h-4" />
+          Pastas e Tags
+        </button>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Contatos</h2>

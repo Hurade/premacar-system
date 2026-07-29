@@ -73,7 +73,7 @@ const TwilioConfigModal: React.FC<TwilioConfigModalProps> = ({ open, onClose, cu
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg bg-slate-900 border-slate-800 text-white">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-800 text-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">📞 Configurar Twilio</DialogTitle>
         </DialogHeader>

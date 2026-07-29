@@ -66,7 +66,7 @@ export function FollowUpModal({ open, onClose, proposta }: FollowUpModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-card border-border/50">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-border/50">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-primary" />

@@ -99,7 +99,7 @@ const AppLayout: React.FC = () => {
           <NotificationBell />
         </div>
 
-        <div className="flex-1 w-full h-full relative">
+        <div className="flex-1 min-h-0 w-full h-full relative">
           <Outlet context={{ showOnboarding, setShowOnboarding }} />
         </div>
       </main>

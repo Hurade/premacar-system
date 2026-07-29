@@ -423,7 +423,7 @@ const Kanban: React.FC = () => {
             return (
               <div 
                 key={column.id}
-                className={`w-72 flex flex-col h-full rounded-xl border backdrop-blur-sm ${
+                className={`w-72 flex flex-col h-full min-h-0 rounded-xl border backdrop-blur-sm ${
                   isWonColumn 
                     ? 'bg-emerald-950/40 border-emerald-700/50' 
                     : isLostColumn 
@@ -471,7 +471,7 @@ const Kanban: React.FC = () => {
                 </div>
 
                 {/* Column Body */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                   {columnDeals.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
                       <MessageSquare className="w-8 h-8 text-slate-700" />
