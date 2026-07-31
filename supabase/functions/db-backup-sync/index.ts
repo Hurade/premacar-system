@@ -26,6 +26,10 @@ const TABLES_TO_SYNC: { name: string; tsCol: string }[] = [
   { name: "team_members", tsCol: "updated_at" },
 ];
 
+// Colunas que nunca devem sair do Lovable Cloud (chaves de API / tokens)
+const SECRET_COLUMN_PATTERN =
+  /(api_key|access_token|auth_token|secret|password|refresh_token|private_key)/i;
+
 // Only plain identifiers are ever interpolated into SQL; values are always
 // sent as bound parameters (postgres.js), never string-concatenated.
 const SAFE_IDENT = /^[a-z_][a-z0-9_]*$/i;
