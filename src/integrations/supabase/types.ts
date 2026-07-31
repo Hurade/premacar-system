@@ -3478,6 +3478,10 @@ export type Database = {
     }
     Functions: {
       assign_next_owner_round_robin: { Args: never; Returns: string }
+      atualizar_status_proposta_publica: {
+        Args: { p_motivo?: string; p_slug: string; p_status: string }
+        Returns: boolean
+      }
       can_send_ai_message: {
         Args: { p_conversation_id: string }
         Returns: boolean
@@ -3591,6 +3595,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_proposta_publica: { Args: { p_slug: string }; Returns: Json }
       get_recurring_campaign_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
@@ -3607,6 +3612,7 @@ export type Database = {
         Args: { p_campaign_id: string; p_counter: string; p_lead_id: string }
         Returns: undefined
       }
+      is_active_team_member: { Args: { _user_id: string }; Returns: boolean }
       is_team_member_available_now: {
         Args: { p_team_member_id: string }
         Returns: boolean
