@@ -28,6 +28,42 @@ const TWIML_ERROR_FALLBACK = `<?xml version="1.0" encoding="UTF-8"?>
 
 const XML_HEADERS = { 'Content-Type': 'text/xml' }
 
+// ── Validação da assinatura X-Twilio-Signature (HMAC-SHA1 + base64) ─────────
+async function validateTwilioSignature(
+  authToken: string,
+  requestUrl: string,
+  params: Record<string, string>,
+  signature: string | null,
+): Promise<boolean> {
+  if (!signature) return false
+
+  const sortedKeys = Object.keys(params).sort()
+  const buildPayload = (u: string) =>
+    u + sortedKeys.map((k) => k + params[k]).join('')
+
+  // Candidatos de URL: a assinatura é calculada sobre a URL exata chamada
+  const candidates = new Set<string>([requestUrl, requestUrl.replace(/^http:/, 'https:')])
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(authToken),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  )
+
+  for (const candidate of candidates) {
+    const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(buildPayload(candidate)))
+    const expected = btoa(String.fromCharCode(...new Uint8Array(mac)))
+    if (expected.length === signature.length) {
+      let diff = 0
+      for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i)
+      if (diff === 0) return true
+    }
+  }
+  return false
+}
+
 // ── Helper: escapar caracteres XML ───────────────────────────────────────────
 function xmlEscape(s: string): string {
   return s
@@ -217,12 +253,9 @@ serve(async (req) => {
 
     // ── 2. DTMF — lead teclou um dígito ───────────────────────────────────
     if (isDtmf) {
-      let digit = '', callSid = ''
-      try {
-        const fd = await req.formData()
-        digit = (fd.get('Digits') as string) || ''
-        callSid = (fd.get('CallSid') as string) || ''
-      } catch { /* timeout do Gather — Twilio chama action sem body */ }
+      const digit = params['Digits'] || ''
+      const callSid = params['CallSid'] || ''
+
 
       console.log(`[voice-twiml] DTMF: digit="${digit}", callSid="${callSid}", contact="${contactId}"`)
 
