@@ -127,6 +127,7 @@ Deno.serve(async (req) => {
           query = query.gte(tableConfig.tsCol, lastSync);
         }
 
+
         // Handle pagination (Supabase limit is 1000)
         let allRows: Record<string, unknown>[] = [];
         let offset = 0;
