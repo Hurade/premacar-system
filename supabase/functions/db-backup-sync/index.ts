@@ -142,6 +142,15 @@ Deno.serve(async (req) => {
           offset += PAGE_SIZE;
         }
 
+        // Nunca replicar credenciais para o banco externo
+        allRows = allRows.map((row) => {
+          const clean: Record<string, unknown> = { ...row };
+          for (const col of Object.keys(clean)) {
+            if (SECRET_COLUMN_PATTERN.test(col)) clean[col] = null;
+          }
+          return clean;
+        });
+
         if (allRows.length === 0) {
           results[table] = { count: 0, status: "skipped" };
           continue;
