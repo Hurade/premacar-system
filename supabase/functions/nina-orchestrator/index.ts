@@ -287,15 +287,46 @@ Deno.serve(async (req) => {
         });
 
         if (canSend === false) {
-          console.log(`[Nina] ❌ ANTI-SPAM: Blocked for conversation ${item.conversation_id} - waiting for user response or cooldown`);
-          await supabase
-            .from('nina_processing_queue')
-            .update({ 
-              status: 'completed', 
-              processed_at: new Date().toISOString(),
-              error_message: 'Anti-spam: blocked (waiting response or cooldown)'
-            })
-            .eq('id', item.id);
+          // O bloqueio de 30s de cooldown é transitório (a IA acabou de
+          // responder) — descartar a mensagem aqui faz o cliente nunca
+          // receber resposta se mandar duas mensagens em sequência rápida.
+          // Só tratamos como definitivo (completed) quando é is_waiting_response
+          // ou o limite de mensagens/hora, que exigem uma nova mensagem do
+          // usuário (ou a virada da hora) pra liberar.
+          const { data: control } = await supabase
+            .from('ai_message_control')
+            .select('last_ai_message_at, is_waiting_response, message_count_last_hour, hour_window_start')
+            .eq('conversation_id', item.conversation_id)
+            .maybeSingle();
+
+          const onlyCooldown = control
+            && control.is_waiting_response === false
+            && !(control.message_count_last_hour > 15
+                 && (Date.now() - new Date(control.hour_window_start).getTime()) < 60 * 60 * 1000);
+
+          if (onlyCooldown) {
+            const retryAt = new Date(new Date(control.last_ai_message_at).getTime() + 30 * 1000 + 1000);
+            console.log(`[Nina] ⏳ ANTI-SPAM: Cooldown for conversation ${item.conversation_id} - rescheduling for ${retryAt.toISOString()}`);
+            await supabase
+              .from('nina_processing_queue')
+              .update({
+                status: 'pending',
+                scheduled_for: retryAt.toISOString(),
+                error_message: 'Anti-spam: rescheduled after cooldown'
+              })
+              .eq('id', item.id);
+          } else {
+            console.log(`[Nina] ❌ ANTI-SPAM: Blocked for conversation ${item.conversation_id} - waiting for user response or hourly limit`);
+            await supabase
+              .from('nina_processing_queue')
+              .update({
+                status: 'completed',
+                processed_at: new Date().toISOString(),
+                error_message: 'Anti-spam: blocked (waiting response or hourly limit)'
+              })
+              .eq('id', item.id);
+          }
+
           continue;
         }
 
