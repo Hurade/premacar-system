@@ -62,16 +62,33 @@ export function usePropostaBySlug(slug: string | undefined) {
   return useQuery({
     queryKey: ['propostas_comerciais', 'slug', slug],
     queryFn: async () => {
+      // Acesso público via RPC (a tabela não é exposta ao público)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('propostas_comerciais')
-        .select(`*, lead:leads_comerciais(*), plano:planos_propostas(*)`)
-        .eq('slug', slug)
-        .single()
+      const { data, error } = await (supabase as any).rpc('get_proposta_publica', { p_slug: slug })
       if (error) throw error
+      if (!data) throw new Error('Proposta não encontrada')
       return data as Proposta
     },
     enabled: !!slug,
+  })
+}
+
+/** Atualização de status feita pelo cliente na página pública (sem login). */
+export function usePropostaPublicaStatus(slug: string | undefined) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ status, motivo_recusa }: { status: 'visualizada' | 'aceita' | 'recusada'; motivo_recusa?: string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc('atualizar_status_proposta_publica', {
+        p_slug: slug,
+        p_status: status,
+        p_motivo: motivo_recusa ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propostas_comerciais', 'slug', slug] })
+    },
   })
 }
 
