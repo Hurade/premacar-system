@@ -15,11 +15,13 @@ const DEFAULT_GROUPING_DELAY_MS = 20000;
 
 // Validate Meta webhook signature using Web Crypto API
 async function validateMetaSignature(body: string, signature: string | null, appSecret: string): Promise<boolean> {
-  if (!signature || !appSecret) {
-    console.warn('[Meta Webhook] ⚠️ Missing signature or app secret - skipping validation');
-    return true; // Se não tem secret configurado, aceita (para testes)
+  // Assinatura obrigatória quando há app secret configurado
+  if (!appSecret) return false;
+  if (!signature) {
+    console.warn('[Meta Webhook] ❌ Requisição sem x-hub-signature-256');
+    return false;
   }
-  
+
   try {
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
@@ -29,15 +31,21 @@ async function validateMetaSignature(body: string, signature: string | null, app
       false,
       ['sign']
     );
-    
+
     const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
     const hashArray = Array.from(new Uint8Array(signatureBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     const expectedSignature = 'sha256=' + hashHex;
-    
-    const isValid = signature === expectedSignature;
+
+    // Comparação em tempo constante (evita timing attacks)
+    if (expectedSignature.length !== signature.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expectedSignature.length; i++) {
+      diff |= expectedSignature.charCodeAt(i) ^ signature.charCodeAt(i);
+    }
+    const isValid = diff === 0;
     console.log('[Meta Webhook] Signature validation:', isValid ? '✅ VALID' : '❌ INVALID');
-    
+
     return isValid;
   } catch (error) {
     console.error('[Meta Webhook] Error validating signature:', error);
@@ -210,15 +218,15 @@ async function processMetaWebhookAsync(
       .maybeSingle();
     console.log('[Meta Async] - ai_activation_delay_minutes (agente padrão):', defaultAgentForDelay?.ai_activation_delay_minutes);
 
-    // Validate signature if app secret is configured
-    if (metaSettings.meta_app_secret && signature) {
+    // Validate signature — obrigatória sempre que o app_secret estiver configurado
+    if (metaSettings.meta_app_secret) {
       const isValid = await validateMetaSignature(rawBody, signature, metaSettings.meta_app_secret);
       if (!isValid) {
-        console.error('[Meta Async] ❌ Assinatura inválida - ignorando webhook');
+        console.error('[Meta Async] ❌ Assinatura ausente ou inválida - descartando webhook');
         return;
       }
     } else {
-      console.log('[Meta Async] ⚠️ Sem app_secret configurado ou sem assinatura - prosseguindo');
+      console.warn('[Meta Async] ⚠️ meta_app_secret não configurado — configure para validar a origem dos webhooks');
     }
 
     const groupingEnabled = metaSettings.message_grouping_enabled !== false;
