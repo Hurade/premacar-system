@@ -146,15 +146,39 @@ serve(async (req) => {
     const callback = url.searchParams.get('callback')
     const isDtmf = url.searchParams.get('dtmf') === '1'
 
-    // ── 1. STATUS CALLBACK — ligação finalizou ─────────────────────────────
-    if (callback === 'status') {
-      let callSid = '', callStatus = '', duration = 0
+    // ── 0. Ler o corpo (form-urlencoded do Twilio) e validar a assinatura ───
+    const params: Record<string, string> = {}
+    if (req.method === 'POST') {
       try {
         const fd = await req.formData()
-        callSid = (fd.get('CallSid') as string) || ''
-        callStatus = (fd.get('CallStatus') as string) || ''
-        duration = parseInt((fd.get('CallDuration') as string) || '0')
+        for (const [k, v] of fd.entries()) params[k] = typeof v === 'string' ? v : ''
       } catch { /* body vazio ou formato inesperado */ }
+    }
+
+    const { data: twilioSettings } = await supabase
+      .from('integration_settings')
+      .select('twilio_auth_token')
+      .not('twilio_auth_token', 'is', null)
+      .limit(1)
+      .maybeSingle()
+
+    const twilioAuthToken = twilioSettings?.twilio_auth_token || null
+    if (twilioAuthToken) {
+      const signature = req.headers.get('x-twilio-signature')
+      const valid = await validateTwilioSignature(twilioAuthToken, req.url, params, signature)
+      if (!valid) {
+        console.warn('[voice-twiml] ❌ Assinatura Twilio inválida — requisição rejeitada')
+        return new Response('Unauthorized', { status: 401 })
+      }
+    } else {
+      console.warn('[voice-twiml] ⚠️ twilio_auth_token não configurado — assinatura não validada')
+    }
+
+    // ── 1. STATUS CALLBACK — ligação finalizou ─────────────────────────────
+    if (callback === 'status') {
+      const callSid = params['CallSid'] || ''
+      const callStatus = params['CallStatus'] || ''
+      const duration = parseInt(params['CallDuration'] || '0')
 
       if (callSid) {
         await supabase.from('voice_calls').update({
