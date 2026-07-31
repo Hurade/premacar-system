@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAdmin } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,6 +62,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const { response: authError } = await requireAdmin(req, corsHeaders);
+  if (authError) return authError;
+
+
 
   const startTime = Date.now();
   const results: Record<string, { count: number; status: string; error?: string }> = {};
@@ -140,11 +146,8 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Build and execute UPSERT statements
-        const statements = buildUpsertSQL(table, allRows);
-        for (const stmt of statements) {
-          await sql.unsafe(stmt);
-        }
+        // Execute parameterized UPSERTs
+        await upsertRows(sql, table, allRows);
 
         results[table] = { count: allRows.length, status: "synced" };
 
