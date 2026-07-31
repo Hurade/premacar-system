@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAdmin } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,67 +26,51 @@ const TABLES_TO_SYNC: { name: string; tsCol: string }[] = [
   { name: "team_members", tsCol: "updated_at" },
 ];
 
-// Detect if a string looks like a date/timestamp
-function isDateString(s: string): boolean {
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
-  if (/^[A-Z][a-z]{2}\s/.test(s) && !isNaN(Date.parse(s))) return true;
-  return false;
+// Colunas que nunca devem sair do Lovable Cloud (chaves de API / tokens)
+const SECRET_COLUMN_PATTERN =
+  /(api_key|access_token|auth_token|secret|password|refresh_token|private_key)/i;
+
+// Only plain identifiers are ever interpolated into SQL; values are always
+// sent as bound parameters (postgres.js), never string-concatenated.
+const SAFE_IDENT = /^[a-z_][a-z0-9_]*$/i;
+
+function assertIdent(name: string): string {
+  if (!SAFE_IDENT.test(name)) throw new Error(`Identificador inválido: ${name}`);
+  return name;
 }
 
-// Build UPSERT SQL dynamically based on table data
-function buildUpsertSQL(tableName: string, rows: Record<string, unknown>[]): string[] {
-  if (!rows.length) return [];
+// Upsert rows using bound parameters (no SQL string interpolation of values)
+// deno-lint-ignore no-explicit-any
+async function upsertRows(sql: any, tableName: string, rows: Record<string, unknown>[]): Promise<void> {
+  if (!rows.length) return;
 
-  const statements: string[] = [];
+  const table = assertIdent(tableName);
+  const columns = Object.keys(rows[0]).map(assertIdent);
+  const updateCols = columns
+    .filter((c) => c !== "id")
+    .map((c) => `"${c}" = EXCLUDED."${c}"`)
+    .join(", ");
+
   const BATCH_SIZE = 100;
-
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
-    const columns = Object.keys(batch[0]);
-    const colList = columns.map((c) => `"${c}"`).join(", ");
-
-    const valueRows = batch.map((row) => {
-      const vals = columns.map((col) => {
-        const v = row[col];
-        if (v === null || v === undefined) return "NULL";
-        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-        if (typeof v === "number") return String(v);
-        // Check Array BEFORE object (arrays are objects in JS)
-        if (Array.isArray(v)) {
-          if (v.length === 0) return "'{}'";
-          // Detect if numeric array
-          const isNumeric = v.every((x) => typeof x === "number");
-          if (isNumeric) return `ARRAY[${v.join(",")}]::integer[]`;
-          return `ARRAY[${v.map((x) => `'${String(x).replace(/'/g, "''")}'`).join(",")}]::text[]`;
-        }
-        if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
-        // Convert date strings to ISO format for PostgreSQL compatibility
-        if (typeof v === "string" && isDateString(v)) {
-          const iso = new Date(v).toISOString();
-          return `'${iso}'`;
-        }
-        return `'${String(v).replace(/'/g, "''")}'`;
-      });
-      return `(${vals.join(", ")})`;
-    });
-
-    const updateCols = columns
-      .filter((c) => c !== "id")
-      .map((c) => `"${c}" = EXCLUDED."${c}"`)
-      .join(", ");
-
-    statements.push(
-      `INSERT INTO "${tableName}" (${colList}) VALUES ${valueRows.join(", ")} ON CONFLICT (id) DO UPDATE SET ${updateCols}, synced_at = now();`
-    );
+    await sql`
+      INSERT INTO ${sql(table)} ${sql(batch, ...columns)}
+      ON CONFLICT (id) DO UPDATE SET ${sql.unsafe(updateCols)}, synced_at = now()
+    `;
   }
-
-  return statements;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const { response: authError } = await requireAdmin(req, corsHeaders);
+  if (authError) return authError;
+
+
 
   const startTime = Date.now();
   const results: Record<string, { count: number; status: string; error?: string }> = {};
@@ -146,6 +131,7 @@ Deno.serve(async (req) => {
           query = query.gte(tableConfig.tsCol, lastSync);
         }
 
+
         // Handle pagination (Supabase limit is 1000)
         let allRows: Record<string, unknown>[] = [];
         let offset = 0;
@@ -160,16 +146,22 @@ Deno.serve(async (req) => {
           offset += PAGE_SIZE;
         }
 
+        // Nunca replicar credenciais para o banco externo
+        allRows = allRows.map((row) => {
+          const clean: Record<string, unknown> = { ...row };
+          for (const col of Object.keys(clean)) {
+            if (SECRET_COLUMN_PATTERN.test(col)) clean[col] = null;
+          }
+          return clean;
+        });
+
         if (allRows.length === 0) {
           results[table] = { count: 0, status: "skipped" };
           continue;
         }
 
-        // Build and execute UPSERT statements
-        const statements = buildUpsertSQL(table, allRows);
-        for (const stmt of statements) {
-          await sql.unsafe(stmt);
-        }
+        // Execute parameterized UPSERTs
+        await upsertRows(sql, table, allRows);
 
         results[table] = { count: allRows.length, status: "synced" };
 

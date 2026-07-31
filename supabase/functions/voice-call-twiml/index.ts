@@ -28,6 +28,42 @@ const TWIML_ERROR_FALLBACK = `<?xml version="1.0" encoding="UTF-8"?>
 
 const XML_HEADERS = { 'Content-Type': 'text/xml' }
 
+// ── Validação da assinatura X-Twilio-Signature (HMAC-SHA1 + base64) ─────────
+async function validateTwilioSignature(
+  authToken: string,
+  requestUrl: string,
+  params: Record<string, string>,
+  signature: string | null,
+): Promise<boolean> {
+  if (!signature) return false
+
+  const sortedKeys = Object.keys(params).sort()
+  const buildPayload = (u: string) =>
+    u + sortedKeys.map((k) => k + params[k]).join('')
+
+  // Candidatos de URL: a assinatura é calculada sobre a URL exata chamada
+  const candidates = new Set<string>([requestUrl, requestUrl.replace(/^http:/, 'https:')])
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(authToken),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  )
+
+  for (const candidate of candidates) {
+    const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(buildPayload(candidate)))
+    const expected = btoa(String.fromCharCode(...new Uint8Array(mac)))
+    if (expected.length === signature.length) {
+      let diff = 0
+      for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i)
+      if (diff === 0) return true
+    }
+  }
+  return false
+}
+
 // ── Helper: escapar caracteres XML ───────────────────────────────────────────
 function xmlEscape(s: string): string {
   return s
@@ -146,15 +182,39 @@ serve(async (req) => {
     const callback = url.searchParams.get('callback')
     const isDtmf = url.searchParams.get('dtmf') === '1'
 
-    // ── 1. STATUS CALLBACK — ligação finalizou ─────────────────────────────
-    if (callback === 'status') {
-      let callSid = '', callStatus = '', duration = 0
+    // ── 0. Ler o corpo (form-urlencoded do Twilio) e validar a assinatura ───
+    const params: Record<string, string> = {}
+    if (req.method === 'POST') {
       try {
         const fd = await req.formData()
-        callSid = (fd.get('CallSid') as string) || ''
-        callStatus = (fd.get('CallStatus') as string) || ''
-        duration = parseInt((fd.get('CallDuration') as string) || '0')
+        for (const [k, v] of fd.entries()) params[k] = typeof v === 'string' ? v : ''
       } catch { /* body vazio ou formato inesperado */ }
+    }
+
+    const { data: twilioSettings } = await supabase
+      .from('integration_settings')
+      .select('twilio_auth_token')
+      .not('twilio_auth_token', 'is', null)
+      .limit(1)
+      .maybeSingle()
+
+    const twilioAuthToken = twilioSettings?.twilio_auth_token || null
+    if (twilioAuthToken) {
+      const signature = req.headers.get('x-twilio-signature')
+      const valid = await validateTwilioSignature(twilioAuthToken, req.url, params, signature)
+      if (!valid) {
+        console.warn('[voice-twiml] ❌ Assinatura Twilio inválida — requisição rejeitada')
+        return new Response('Unauthorized', { status: 401 })
+      }
+    } else {
+      console.warn('[voice-twiml] ⚠️ twilio_auth_token não configurado — assinatura não validada')
+    }
+
+    // ── 1. STATUS CALLBACK — ligação finalizou ─────────────────────────────
+    if (callback === 'status') {
+      const callSid = params['CallSid'] || ''
+      const callStatus = params['CallStatus'] || ''
+      const duration = parseInt(params['CallDuration'] || '0')
 
       if (callSid) {
         await supabase.from('voice_calls').update({
@@ -193,12 +253,9 @@ serve(async (req) => {
 
     // ── 2. DTMF — lead teclou um dígito ───────────────────────────────────
     if (isDtmf) {
-      let digit = '', callSid = ''
-      try {
-        const fd = await req.formData()
-        digit = (fd.get('Digits') as string) || ''
-        callSid = (fd.get('CallSid') as string) || ''
-      } catch { /* timeout do Gather — Twilio chama action sem body */ }
+      const digit = params['Digits'] || ''
+      const callSid = params['CallSid'] || ''
+
 
       console.log(`[voice-twiml] DTMF: digit="${digit}", callSid="${callSid}", contact="${contactId}"`)
 

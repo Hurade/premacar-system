@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Check, AlertCircle, Loader2, ChevronRight, TrendingUp, Shield, Star, Zap, Phone, Mail } from 'lucide-react'
-import { usePropostaBySlug, useUpdatePropostaStatus } from '@/hooks/usePropostas'
+import { usePropostaBySlug, usePropostaPublicaStatus } from '@/hooks/usePropostas'
 import { PLANOS_PADRAO, formatarMoeda, calcularTotal, descFidelidadePct, type PlanoTipo, DOR_LABELS } from '@/types/propostas'
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -25,7 +25,7 @@ function CheckItem({ children }: { children: React.ReactNode }) {
 export default function PropostaPublica() {
   const { slug } = useParams<{ slug: string }>()
   const { data: proposta, isLoading } = usePropostaBySlug(slug)
-  const updateStatus = useUpdatePropostaStatus()
+  const updateStatus = usePropostaPublicaStatus(slug)
   const [accepted, setAccepted] = useState(false)
   const trackedRef = useRef(false)
 
@@ -33,7 +33,7 @@ export default function PropostaPublica() {
   useEffect(() => {
     if (proposta?.status === 'enviada' && !trackedRef.current) {
       trackedRef.current = true
-      updateStatus.mutate({ id: proposta.id, status: 'visualizada' })
+      updateStatus.mutate({ status: 'visualizada' })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposta?.id, proposta?.status])
@@ -98,7 +98,7 @@ export default function PropostaPublica() {
 
   async function handleAccept() {
     if (accepted) return
-    await updateStatus.mutateAsync({ id: proposta!.id, status: 'aceita' })
+    await updateStatus.mutateAsync({ status: 'aceita' })
     setAccepted(true)
   }
 

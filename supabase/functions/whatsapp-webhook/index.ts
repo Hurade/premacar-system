@@ -87,10 +87,15 @@ serve(async (req) => {
     if (req.method === 'POST') {
       const rawBody = await req.text();
 
-      // HMAC validation (optional — only enforced when EVOLUTION_WEBHOOK_SECRET is set)
+      // HMAC validation. Quando EVOLUTION_WEBHOOK_SECRET está definido a
+      // assinatura é obrigatória; sem o secret, aceitamos apenas payloads de
+      // instâncias já cadastradas em whatsapp_connections/nina_settings.
       const webhookSecret = Deno.env.get('EVOLUTION_WEBHOOK_SECRET');
       if (webhookSecret) {
-        const signature = req.headers.get('x-signature') ?? '';
+        const signature =
+          req.headers.get('x-signature') ??
+          req.headers.get('x-hub-signature-256')?.replace(/^sha256=/, '') ??
+          '';
         const valid = await verifyHmacSha256(webhookSecret, rawBody, signature);
         if (!valid) {
           console.warn('[Webhook] ❌ Assinatura HMAC inválida — requisição rejeitada');
@@ -109,6 +114,31 @@ serve(async (req) => {
       const event = body.event;
       const instanceName = body.instance;
       const data = body.data;
+
+      if (!webhookSecret) {
+        // Fallback anti-spoofing: a instância precisa existir na configuração
+        const [{ data: knownConn }, { data: ninaConn }] = await Promise.all([
+          supabase
+            .from('whatsapp_connections')
+            .select('id')
+            .eq('evolution_instance_name', instanceName ?? '')
+            .maybeSingle(),
+          supabase
+            .from('nina_settings')
+            .select('evolution_instance_name')
+            .eq('evolution_instance_name', instanceName ?? '')
+            .maybeSingle(),
+        ]);
+
+        if (!instanceName || (!knownConn && !ninaConn)) {
+          console.warn('[Webhook] ❌ Instância desconhecida — requisição rejeitada:', instanceName);
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
 
       // Handle different Evolution events
       if (event === 'connection.update') {

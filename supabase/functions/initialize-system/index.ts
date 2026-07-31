@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAuth } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -197,25 +198,32 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const { auth, response: authError } = await requireAuth(req, corsHeaders);
+  if (authError) return authError;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    let userId: string | null = null;
-    try {
-      const body = await req.json();
-      userId = body.user_id || null;
-    } catch {
-      // Body might be empty
+    // Nunca confiar em body.user_id: o alvo é sempre o usuário autenticado.
+    // Chamadas internas (service_role) podem informar user_id explicitamente.
+    let userId: string | null = auth!.userId;
+    if (auth!.isServiceRole) {
+      try {
+        const body = await req.json();
+        userId = body?.user_id || null;
+      } catch {
+        // Body might be empty
+      }
     }
 
     if (!userId) {
-      console.error('[initialize-system] No user_id provided');
+      console.error('[initialize-system] No user_id resolved');
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'user_id is required in request body',
+          error: 'user_id could not be resolved from the authenticated session',
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
