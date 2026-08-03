@@ -41,29 +41,26 @@ async function sendTextViaMeta(
   phoneNumber: string,
   message: string,
   metaPhoneNumberId: string,
-  metaAccessToken: string
+  metaAccessToken: string,
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const cleanPhone = phoneNumber.replace(/\D/g, "");
   const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
   try {
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${metaPhoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${metaAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: formattedPhone,
-          type: "text",
-          text: { body: message },
-        }),
-      }
-    );
+    const response = await fetch(`https://graph.facebook.com/v18.0/${metaPhoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${metaAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: formattedPhone,
+        type: "text",
+        text: { body: message },
+      }),
+    });
 
     const data = await response.json();
     if (!response.ok) {
@@ -81,21 +78,18 @@ async function sendTextViaEvolution(
   message: string,
   evolutionApiUrl: string,
   evolutionApiKey: string,
-  evolutionInstanceName: string
+  evolutionInstanceName: string,
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const cleanPhone = phoneNumber.replace(/\D/g, "");
   const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
   const baseUrl = evolutionApiUrl.replace(/\/$/, "");
 
   try {
-    const response = await fetch(
-      `${baseUrl}/message/sendText/${evolutionInstanceName}`,
-      {
-        method: "POST",
-        headers: { apikey: evolutionApiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ number: formattedPhone, text: message }),
-      }
-    );
+    const response = await fetch(`${baseUrl}/message/sendText/${evolutionInstanceName}`, {
+      method: "POST",
+      headers: { apikey: evolutionApiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ number: formattedPhone, text: message }),
+    });
 
     const data = await response.json();
 
@@ -113,10 +107,7 @@ async function sendTextViaEvolution(
 // ── Resolve credenciais Evolution com fallback para conexão padrão ─────────────
 // Se a conversa não tem connection_id: tenta is_default=true em whatsapp_connections,
 // depois primeira ativa, e por último o fallback legado de nina_settings.
-async function resolveEvolutionCredentials(
-  supabase: any,
-  connectionId: string | null
-): Promise<SendCredentials> {
+async function resolveEvolutionCredentials(supabase: any, connectionId: string | null): Promise<SendCredentials> {
   if (connectionId) {
     return resolveSendCredentials(supabase, { connectionId, apiSource: "evolution" });
   }
@@ -162,22 +153,19 @@ serve(async (req) => {
 
     if (!allSettings || allSettings.length === 0) {
       console.log(`[${SOURCE}] No active follow-up configurations found.`);
-      return new Response(
-        JSON.stringify({ success: true, processed: 0, results }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ success: true, processed: 0, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const now = new Date();
     const windowSafetyThreshold = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
 
     for (const settings of allSettings as FollowupSettings[]) {
-      const delayThreshold = new Date(
-        now.getTime() - settings.delay_hours * 60 * 60 * 1000
-      ).toISOString();
+      const delayThreshold = new Date(now.getTime() - settings.delay_hours * 60 * 60 * 1000).toISOString();
 
       console.log(
-        `[${SOURCE}] Config user=${settings.user_id} delay=${settings.delay_hours}h tag="${settings.tag_name}"`
+        `[${SOURCE}] Config user=${settings.user_id} delay=${settings.delay_hours}h tag="${settings.tag_name}"`,
       );
 
       // Busca todas conversas elegíveis — sem filtro de api_source
@@ -230,9 +218,7 @@ serve(async (req) => {
           continue;
         }
 
-        console.log(
-          `[${SOURCE}] Sending via ${apiSource} to ${contactData.phone_number} (conv=${conv.id})`
-        );
+        console.log(`[${SOURCE}] Sending via ${apiSource} to ${contactData.phone_number} (conv=${conv.id})`);
 
         // ── Roteamento por api_source ────────────────────────────────────────
         let sendResult: { success: boolean; messageId?: string; error?: string };
@@ -257,7 +243,7 @@ serve(async (req) => {
             contactData.phone_number,
             settings.message,
             creds.meta_phone_number_id!,
-            creds.meta_access_token!
+            creds.meta_access_token!,
           );
           usedApiSource = "meta";
         } else {
@@ -277,16 +263,14 @@ serve(async (req) => {
             settings.message,
             creds.evolution_api_url!,
             creds.evolution_api_key!,
-            creds.evolution_instance_name!
+            creds.evolution_instance_name!,
           );
           usedApiSource = "evolution";
         }
 
         // ── Resultado do envio ───────────────────────────────────────────────
         if (!sendResult.success) {
-          console.error(
-            `[${SOURCE}] Failed ${usedApiSource} → ${contactData.phone_number}: ${sendResult.error}`
-          );
+          console.error(`[${SOURCE}] Failed ${usedApiSource} → ${contactData.phone_number}: ${sendResult.error}`);
           await saveLog(supabase, {
             source: SOURCE,
             level: "error",
@@ -346,10 +330,9 @@ serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, processed: results.length, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true, processed: results.length, results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
     console.error(`[${SOURCE}] Fatal error:`, error);
@@ -359,9 +342,9 @@ serve(async (req) => {
       message: `Erro fatal no processamento de follow-ups: ${errorMessage}`,
       metadata: { error_detail: errorMessage },
     });
-    return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+    return new Response(JSON.stringify({ success: false, error: errorMessage }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
