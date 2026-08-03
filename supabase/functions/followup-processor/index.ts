@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
-import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
+import { resolveSendCredentials, SendCredentials } from "../_shared/connection-resolver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +23,7 @@ interface EligibleConversation {
   id: string;
   contact_id: string;
   connection_id: string | null;
+  api_source: string;
   window_expires_at: string;
   last_customer_message_at: string;
 }
@@ -35,7 +36,7 @@ interface Contact {
   is_blocked: boolean | null;
 }
 
-// Send a plain text message via Meta WhatsApp Business API
+// ── Meta WhatsApp Business API ────────────────────────────────────────────────
 async function sendTextViaMeta(
   phoneNumber: string,
   message: string,
@@ -45,38 +46,99 @@ async function sendTextViaMeta(
   const cleanPhone = phoneNumber.replace(/\D/g, "");
   const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
-  const url = `https://graph.facebook.com/v18.0/${metaPhoneNumberId}/messages`;
-  const payload = {
-    messaging_product: "whatsapp",
-    recipient_type: "individual",
-    to: formattedPhone,
-    type: "text",
-    text: { body: message },
-  };
-
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${metaAccessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${metaPhoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${metaAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: formattedPhone,
+          type: "text",
+          text: { body: message },
+        }),
+      }
+    );
 
     const data = await response.json();
-
     if (!response.ok) {
-      return { success: false, error: data.error?.message || "Meta API error" };
+      return { success: false, error: data.error?.message || `Meta HTTP ${response.status}` };
     }
-
     return { success: true, messageId: data.messages?.[0]?.id };
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: errorMessage };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Erro desconhecido" };
   }
 }
 
+// ── Evolution API ─────────────────────────────────────────────────────────────
+async function sendTextViaEvolution(
+  phoneNumber: string,
+  message: string,
+  evolutionApiUrl: string,
+  evolutionApiKey: string,
+  evolutionInstanceName: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const cleanPhone = phoneNumber.replace(/\D/g, "");
+  const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+  const baseUrl = evolutionApiUrl.replace(/\/$/, "");
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/message/sendText/${evolutionInstanceName}`,
+      {
+        method: "POST",
+        headers: { apikey: evolutionApiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ number: formattedPhone, text: message }),
+      }
+    );
+
+    const data = await response.json();
+
+    // Evolution retorna HTTP 200 mesmo em erro — verifica pelo campo key.id
+    const messageId = data?.key?.id || data?.messageId || null;
+    if (!response.ok || (!messageId && data?.error)) {
+      return { success: false, error: data?.error?.message || data?.message || `Evolution HTTP ${response.status}` };
+    }
+    return { success: true, messageId: messageId || undefined };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Erro desconhecido" };
+  }
+}
+
+// ── Resolve credenciais Evolution com fallback para conexão padrão ─────────────
+// Se a conversa não tem connection_id: tenta is_default=true em whatsapp_connections,
+// depois primeira ativa, e por último o fallback legado de nina_settings.
+async function resolveEvolutionCredentials(
+  supabase: any,
+  connectionId: string | null
+): Promise<SendCredentials> {
+  if (connectionId) {
+    return resolveSendCredentials(supabase, { connectionId, apiSource: "evolution" });
+  }
+
+  // Sem connection_id: busca conexão padrão (is_default=true → primeira ativa)
+  const { data: defaultConn } = await supabase
+    .from("whatsapp_connections")
+    .select("id")
+    .eq("api_type", "evolution")
+    .eq("is_active", true)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return resolveSendCredentials(supabase, {
+    connectionId: defaultConn?.id ?? null,
+    apiSource: "evolution",
+  });
+}
+
+// ── Handler principal ─────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -91,7 +153,6 @@ serve(async (req) => {
   const results: { conversationId: string; sent: boolean; reason?: string }[] = [];
 
   try {
-    // Fetch all active follow-up configurations
     const { data: allSettings, error: settingsError } = await supabase
       .from("followup_settings")
       .select("*")
@@ -108,7 +169,6 @@ serve(async (req) => {
     }
 
     const now = new Date();
-    // Safety: ensure at least 30 minutes remain in the window before sending
     const windowSafetyThreshold = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
 
     for (const settings of allSettings as FollowupSettings[]) {
@@ -117,18 +177,14 @@ serve(async (req) => {
       ).toISOString();
 
       console.log(
-        `[${SOURCE}] Processing config for user ${settings.user_id} — delay: ${settings.delay_hours}h, tag: "${settings.tag_name}"`
+        `[${SOURCE}] Config user=${settings.user_id} delay=${settings.delay_hours}h tag="${settings.tag_name}"`
       );
 
-      // Fetch eligible conversations:
-      // - Meta API, window open
-      // - Customer last messaged >= delay_hours ago
-      // - Window expires in > 30 min (safe to send)
-      // - has a customer message (last_customer_message_at not null)
+      // Busca todas conversas elegíveis — sem filtro de api_source
+      // Critérios: janela aberta, cliente mandou msg há >= delay_hours, janela expira em > 30min
       const { data: conversations, error: convError } = await supabase
         .from("conversations")
-        .select("id, contact_id, connection_id, window_expires_at, last_customer_message_at")
-        .eq("api_source", "meta")
+        .select("id, contact_id, connection_id, api_source, window_expires_at, last_customer_message_at")
         .eq("window_status", "open")
         .not("last_customer_message_at", "is", null)
         .lte("last_customer_message_at", delayThreshold)
@@ -140,14 +196,16 @@ serve(async (req) => {
       }
 
       if (!conversations || conversations.length === 0) {
-        console.log(`[${SOURCE}] No eligible conversations for this configuration.`);
+        console.log(`[${SOURCE}] No eligible conversations.`);
         continue;
       }
 
       console.log(`[${SOURCE}] Found ${conversations.length} candidate conversations.`);
 
       for (const conv of conversations as EligibleConversation[]) {
-        // Fetch contact to check tags and phone
+        const apiSource = conv.api_source || "evolution";
+
+        // Busca contato
         const { data: contact } = await supabase
           .from("contacts")
           .select("id, phone_number, name, tags, is_blocked")
@@ -155,7 +213,6 @@ serve(async (req) => {
           .maybeSingle();
 
         if (!contact) {
-          console.log(`[${SOURCE}] Contact not found for conversation ${conv.id} — skipping.`);
           results.push({ conversationId: conv.id, sent: false, reason: "contact_not_found" });
           continue;
         }
@@ -163,61 +220,82 @@ serve(async (req) => {
         const contactData = contact as Contact;
 
         if (contactData.is_blocked) {
-          console.log(`[${SOURCE}] Contact ${contactData.phone_number} is blocked — skipping.`);
           results.push({ conversationId: conv.id, sent: false, reason: "contact_blocked" });
           continue;
         }
 
         const currentTags = contactData.tags || [];
-
-        // Skip if contact already received a follow-up in this cycle
         if (currentTags.includes(settings.tag_name)) {
-          console.log(
-            `[${SOURCE}] Contact ${contactData.phone_number} already has tag "${settings.tag_name}" — skipping.`
-          );
           results.push({ conversationId: conv.id, sent: false, reason: "already_tagged" });
           continue;
         }
 
         console.log(
-          `[${SOURCE}] Sending follow-up to ${contactData.phone_number} (conv: ${conv.id})`
+          `[${SOURCE}] Sending via ${apiSource} to ${contactData.phone_number} (conv=${conv.id})`
         );
 
-        // Credenciais da conexão específica da conversa, com fallback
-        // legado — ver connection-resolver.ts
-        let credentials;
-        try {
-          credentials = await resolveSendCredentials(supabase, {
-            connectionId: conv.connection_id ?? null,
-            apiSource: "meta",
-          });
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : "Meta API not configured";
-          console.error(`[${SOURCE}] Meta API not configured for conversation ${conv.id}: ${errorMessage}`);
-          results.push({ conversationId: conv.id, sent: false, reason: "meta_api_not_configured" });
-          continue;
+        // ── Roteamento por api_source ────────────────────────────────────────
+        let sendResult: { success: boolean; messageId?: string; error?: string };
+        let usedApiSource = apiSource;
+
+        if (apiSource === "meta" || apiSource === "meta_official") {
+          // ── Meta API ───────────────────────────────────────────────────────
+          let creds: SendCredentials;
+          try {
+            creds = await resolveSendCredentials(supabase, {
+              connectionId: conv.connection_id ?? null,
+              apiSource: "meta",
+            });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Meta API não configurada";
+            console.error(`[${SOURCE}] Meta creds error conv=${conv.id}: ${msg}`);
+            results.push({ conversationId: conv.id, sent: false, reason: "meta_not_configured" });
+            continue;
+          }
+
+          sendResult = await sendTextViaMeta(
+            contactData.phone_number,
+            settings.message,
+            creds.meta_phone_number_id!,
+            creds.meta_access_token!
+          );
+          usedApiSource = "meta";
+        } else {
+          // ── Evolution API ──────────────────────────────────────────────────
+          let creds: SendCredentials;
+          try {
+            creds = await resolveEvolutionCredentials(supabase, conv.connection_id ?? null);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Evolution API não configurada";
+            console.error(`[${SOURCE}] Evolution creds error conv=${conv.id}: ${msg}`);
+            results.push({ conversationId: conv.id, sent: false, reason: "evolution_not_configured" });
+            continue;
+          }
+
+          sendResult = await sendTextViaEvolution(
+            contactData.phone_number,
+            settings.message,
+            creds.evolution_api_url!,
+            creds.evolution_api_key!,
+            creds.evolution_instance_name!
+          );
+          usedApiSource = "evolution";
         }
 
-        // Send message via Meta API
-        const sendResult = await sendTextViaMeta(
-          contactData.phone_number,
-          settings.message,
-          credentials.meta_phone_number_id!,
-          credentials.meta_access_token!
-        );
-
+        // ── Resultado do envio ───────────────────────────────────────────────
         if (!sendResult.success) {
           console.error(
-            `[${SOURCE}] Failed to send to ${contactData.phone_number}: ${sendResult.error}`
+            `[${SOURCE}] Failed ${usedApiSource} → ${contactData.phone_number}: ${sendResult.error}`
           );
           await saveLog(supabase, {
             source: SOURCE,
             level: "error",
-            message: `Erro ao enviar follow-up para ${contactData.phone_number}: ${sendResult.error}`,
+            message: `Erro ao enviar follow-up (${usedApiSource}) para ${contactData.phone_number}: ${sendResult.error}`,
             metadata: {
               conversation_id: conv.id,
               contact_id: conv.contact_id,
               phone: contactData.phone_number,
+              api_source: usedApiSource,
               error_detail: sendResult.error,
             },
           });
@@ -225,14 +303,14 @@ serve(async (req) => {
           continue;
         }
 
-        // Save message to conversation history
+        // Salva mensagem no histórico da conversa
         await supabase.from("messages").insert({
           conversation_id: conv.id,
           content: settings.message,
           type: "text",
           from_type: "human",
           status: "sent",
-          api_source: "meta",
+          api_source: usedApiSource,
           sent_at: now.toISOString(),
           whatsapp_message_id: sendResult.messageId || null,
           metadata: {
@@ -241,7 +319,7 @@ serve(async (req) => {
           },
         });
 
-        // Tag contact to prevent duplicate follow-ups this cycle
+        // Adiciona tag ao contato (dedup guard)
         await supabase
           .from("contacts")
           .update({ tags: [...currentTags, settings.tag_name] })
@@ -250,19 +328,20 @@ serve(async (req) => {
         await saveLog(supabase, {
           source: SOURCE,
           level: "info",
-          message: `Follow-up enviado para ${contactData.phone_number} (${contactData.name || "sem nome"})`,
+          message: `Follow-up enviado (${usedApiSource}) para ${contactData.phone_number} (${contactData.name || "sem nome"})`,
           metadata: {
             conversation_id: conv.id,
             contact_id: conv.contact_id,
             phone: contactData.phone_number,
             contact_name: contactData.name,
+            api_source: usedApiSource,
             tag_applied: settings.tag_name,
             hours_since_last_message: settings.delay_hours,
             message_id: sendResult.messageId,
           },
         });
 
-        console.log(`[${SOURCE}] Follow-up sent successfully to ${contactData.phone_number}`);
+        console.log(`[${SOURCE}] ✅ Follow-up sent (${usedApiSource}) to ${contactData.phone_number}`);
         results.push({ conversationId: conv.id, sent: true });
       }
     }
