@@ -13,7 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApresentacao, useUpdateApresentacaoStatus, useDeleteApresentacao, useUpdateApresentacao } from '@/hooks/useApresentacoes'
 import { StatusBadge } from '@/components/apresentacoes/StatusBadge'
 import { EnviarApresentacaoModal } from '@/components/apresentacoes/EnviarApresentacaoModal'
-import { STATUS_LABELS, type StatusApresentacao, type AssinaturaVendedor } from '@/types/apresentacoes'
+import {
+  STATUS_LABELS, PUBLICO_ALVO_LABELS, ATUACAO_LABELS, ESTRATEGIA_LABELS,
+  type StatusApresentacao, type AssinaturaVendedor,
+} from '@/types/apresentacoes'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -169,6 +172,13 @@ export default function ApresentacaoDetalhe() {
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 <InfoRow label="Template" value={apresentacao.template?.nome} />
+                <InfoRow label="Para quem é" value={apresentacao.publico_alvo ? PUBLICO_ALVO_LABELS[apresentacao.publico_alvo] : null} />
+                <InfoRow label="Atuação principal" value={apresentacao.atuacao_principal ? ATUACAO_LABELS[apresentacao.atuacao_principal] : null} />
+                <InfoRow label="Estratégia inicial" value={apresentacao.estrategia_inicial ? ESTRATEGIA_LABELS[apresentacao.estrategia_inicial] : null} />
+                <InfoRow
+                  label="ERP"
+                  value={apresentacao.tem_erp === true ? (apresentacao.erp_nome || 'Sim') : apresentacao.tem_erp === false ? 'Não tem — vai precisar integrar' : null}
+                />
                 <InfoRow
                   label="Validade"
                   value={apresentacao.validade_ate

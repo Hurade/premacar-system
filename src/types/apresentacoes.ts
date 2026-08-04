@@ -1,8 +1,34 @@
-import type { AssinaturaVendedor } from '@/types/propostas'
+import type { AssinaturaVendedor, PlanoTipo } from '@/types/propostas'
 
-export type { AssinaturaVendedor }
+export type { AssinaturaVendedor, PlanoTipo }
 
 export type StatusApresentacao = 'rascunho' | 'enviada' | 'visualizada' | 'expirada'
+
+/** Template 'parceiros_comerciais' — indicação, sem preço. */
+export type TemplateTipo = 'parceiros_comerciais' | 'oficina_direta'
+
+/** Só relevante para o template 'oficina_direta'. */
+export type PublicoAlvo = 'parceiro_comercial' | 'oficina' | 'autocenter'
+export type AtuacaoPrincipal = 'oleo' | 'pneus' | 'mecanica_geral' | 'outro'
+
+export const PUBLICO_ALVO_LABELS: Record<PublicoAlvo, string> = {
+  parceiro_comercial: 'Parceiro Comercial (vai indicar)',
+  oficina: 'Oficina (prospect direto)',
+  autocenter: 'Auto Center (prospect direto)',
+}
+
+export const ATUACAO_LABELS: Record<AtuacaoPrincipal, string> = {
+  oleo: 'Troca de óleo',
+  pneus: 'Pneus',
+  mecanica_geral: 'Mecânica geral',
+  outro: 'Outro',
+}
+
+export const ESTRATEGIA_LABELS: Record<PlanoTipo, string> = {
+  mensurar: 'Mensurar',
+  fidelizar: 'Fidelizar',
+  recuperar: 'Recuperar',
+}
 
 export interface ApresentacaoTemplate {
   id: string
@@ -32,6 +58,11 @@ export interface Apresentacao {
   status: StatusApresentacao
   titulo_personalizado: string | null
   assinatura_vendedor: AssinaturaVendedor | null
+  publico_alvo: PublicoAlvo | null
+  atuacao_principal: AtuacaoPrincipal | null
+  estrategia_inicial: PlanoTipo | null
+  tem_erp: boolean | null
+  erp_nome: string | null
   validade_dias: number
   validade_ate: string | null
   slug: string

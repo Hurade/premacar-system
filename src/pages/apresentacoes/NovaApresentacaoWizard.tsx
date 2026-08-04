@@ -13,10 +13,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCRMContacts, useLeadFromContact, useCreateLead, useLead, type CRMContact } from '@/hooks/useLeads'
 import { useCreateApresentacao, useApresentacaoTemplates } from '@/hooks/useApresentacoes'
-import type { Lead, TipoNegocio, OrigemLead, DorPrincipal } from '@/types/propostas'
+import type { Lead, TipoNegocio, OrigemLead, DorPrincipal, PlanoTipo } from '@/types/propostas'
 import { TIPO_NEGOCIO_LABELS, ORIGEM_LABELS, DOR_LABELS } from '@/types/propostas'
-import type { AssinaturaVendedor } from '@/types/apresentacoes'
+import type { AssinaturaVendedor, ApresentacaoTemplate, PublicoAlvo, AtuacaoPrincipal } from '@/types/apresentacoes'
+import { PUBLICO_ALVO_LABELS, ATUACAO_LABELS, ESTRATEGIA_LABELS } from '@/types/apresentacoes'
 import { ParceirosComerciaisDeck } from '@/components/apresentacoes/decks/parceiros-comerciais'
+import { OficinaDiretaDeck } from '@/components/apresentacoes/decks/oficina-direta'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
@@ -214,24 +216,42 @@ function Step1Lead({
 
 // ─── Passo 2: Personalizar & Gerar ───────────────────────────────────────────
 function Step2Personalizar({
-  templateId, onTemplateId, templates,
+  templateId, onTemplateId, templates, selectedTemplate,
   tituloPersonalizado, onTitulo,
   assinatura, onAssinatura,
   validadeDias, onValidade,
+  publicoAlvo, onPublicoAlvo,
+  atuacaoPrincipal, onAtuacaoPrincipal,
+  estrategiaInicial, onEstrategiaInicial,
+  temErp, onTemErp,
+  erpNome, onErpNome,
   empresa, responsavel,
 }: {
   templateId: string | null
   onTemplateId: (id: string) => void
-  templates: { id: string; nome: string }[]
+  templates: ApresentacaoTemplate[]
+  selectedTemplate: ApresentacaoTemplate | undefined
   tituloPersonalizado: string
   onTitulo: (v: string) => void
   assinatura: AssinaturaVendedor
   onAssinatura: (a: AssinaturaVendedor) => void
   validadeDias: number
   onValidade: (v: number) => void
+  publicoAlvo: PublicoAlvo | null
+  onPublicoAlvo: (v: PublicoAlvo) => void
+  atuacaoPrincipal: AtuacaoPrincipal | null
+  onAtuacaoPrincipal: (v: AtuacaoPrincipal) => void
+  estrategiaInicial: PlanoTipo | null
+  onEstrategiaInicial: (v: PlanoTipo) => void
+  temErp: boolean | null
+  onTemErp: (v: boolean) => void
+  erpNome: string
+  onErpNome: (v: string) => void
   empresa?: string
   responsavel?: string
 }) {
+  const isOficinaDireta = selectedTemplate?.tipo === 'oficina_direta'
+
   return (
     <div className="space-y-5">
       {templates.length > 1 && (
@@ -243,6 +263,65 @@ function Step2Personalizar({
               {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          {selectedTemplate?.descricao && (
+            <p className="text-xs text-muted-foreground">{selectedTemplate.descricao}</p>
+          )}
+        </div>
+      )}
+
+      {isOficinaDireta && (
+        <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
+          <div className="col-span-2 space-y-1.5">
+            <Label>Para quem é?</Label>
+            <Select value={publicoAlvo ?? ''} onValueChange={v => onPublicoAlvo(v as PublicoAlvo)}>
+              <SelectTrigger className="bg-muted/20 border-border/40"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {(['oficina', 'autocenter'] as PublicoAlvo[]).map(k => (
+                  <SelectItem key={k} value={k}>{PUBLICO_ALVO_LABELS[k]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Atuação principal do lead</Label>
+            <Select value={atuacaoPrincipal ?? ''} onValueChange={v => onAtuacaoPrincipal(v as AtuacaoPrincipal)}>
+              <SelectTrigger className="bg-muted/20 border-border/40"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(ATUACAO_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Estratégia inicial</Label>
+            <Select value={estrategiaInicial ?? ''} onValueChange={v => onEstrategiaInicial(v as PlanoTipo)}>
+              <SelectTrigger className="bg-muted/20 border-border/40"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(ESTRATEGIA_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label>Tem sistema de gestão (ERP) integrado?</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onTemErp(true)}
+                className={cn('flex-1 py-2 rounded-lg text-sm border', temErp === true ? 'border-primary bg-primary/15 text-primary' : 'border-border/40 text-muted-foreground')}
+              >
+                Sim
+              </button>
+              <button
+                type="button"
+                onClick={() => onTemErp(false)}
+                className={cn('flex-1 py-2 rounded-lg text-sm border', temErp === false ? 'border-primary bg-primary/15 text-primary' : 'border-border/40 text-muted-foreground')}
+              >
+                Não, vai precisar fazer
+              </button>
+            </div>
+            {temErp && (
+              <Input value={erpNome} onChange={e => onErpNome(e.target.value)} placeholder="Qual ERP? (ex: Oficina Web, AutoSoft...)" className="bg-muted/20 border-border/40 mt-2" />
+            )}
+          </div>
         </div>
       )}
 
@@ -284,12 +363,25 @@ function Step2Personalizar({
       <div className="space-y-1.5">
         <Label>Prévia</Label>
         <div className="border border-border/40 rounded-xl overflow-hidden max-h-[420px] overflow-y-auto">
-          <ParceirosComerciaisDeck
-            empresa={empresa}
-            responsavel={responsavel}
-            tituloPersonalizado={tituloPersonalizado || null}
-            assinaturaVendedor={assinatura.nome ? assinatura : null}
-          />
+          {isOficinaDireta ? (
+            <OficinaDiretaDeck
+              empresa={empresa}
+              responsavel={responsavel}
+              tituloPersonalizado={tituloPersonalizado || null}
+              assinaturaVendedor={assinatura.nome ? assinatura : null}
+              atuacaoPrincipal={atuacaoPrincipal}
+              estrategiaInicial={estrategiaInicial}
+              temErp={temErp}
+              erpNome={erpNome}
+            />
+          ) : (
+            <ParceirosComerciaisDeck
+              empresa={empresa}
+              responsavel={responsavel}
+              tituloPersonalizado={tituloPersonalizado || null}
+              assinaturaVendedor={assinatura.nome ? assinatura : null}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -309,6 +401,13 @@ export default function NovaApresentacaoWizard() {
   const [tituloPersonalizado, setTituloPersonalizado] = useState('')
   const [assinatura, setAssinatura] = useState<AssinaturaVendedor>({ nome: '', cargo: '', telefone: '', email: '' })
   const [validadeDias, setValidadeDias] = useState(30)
+  const [publicoAlvo, setPublicoAlvo] = useState<PublicoAlvo | null>(null)
+  const [atuacaoPrincipal, setAtuacaoPrincipal] = useState<AtuacaoPrincipal | null>(null)
+  const [estrategiaInicial, setEstrategiaInicial] = useState<PlanoTipo | null>(null)
+  const [temErp, setTemErp] = useState<boolean | null>(null)
+  const [erpNome, setErpNome] = useState('')
+
+  const selectedTemplate = templates.find(t => t.id === templateId)
 
   const { data: preselectedLead } = useLead(preselectedId)
 
@@ -339,6 +438,11 @@ export default function NovaApresentacaoWizard() {
       titulo_personalizado: tituloPersonalizado || null,
       assinatura_vendedor: assinatura.nome ? assinatura : null,
       validade_dias: validadeDias,
+      publico_alvo: publicoAlvo,
+      atuacao_principal: atuacaoPrincipal,
+      estrategia_inicial: estrategiaInicial,
+      tem_erp: temErp,
+      erp_nome: erpNome || null,
     })
 
     navigate(`/apresentacoes/${apresentacao.id}`)
@@ -400,12 +504,23 @@ export default function NovaApresentacaoWizard() {
               templateId={templateId}
               onTemplateId={setTemplateId}
               templates={templates}
+              selectedTemplate={selectedTemplate}
               tituloPersonalizado={tituloPersonalizado}
               onTitulo={setTituloPersonalizado}
               assinatura={assinatura}
               onAssinatura={setAssinatura}
               validadeDias={validadeDias}
               onValidade={setValidadeDias}
+              publicoAlvo={publicoAlvo}
+              onPublicoAlvo={setPublicoAlvo}
+              atuacaoPrincipal={atuacaoPrincipal}
+              onAtuacaoPrincipal={setAtuacaoPrincipal}
+              estrategiaInicial={estrategiaInicial}
+              onEstrategiaInicial={setEstrategiaInicial}
+              temErp={temErp}
+              onTemErp={setTemErp}
+              erpNome={erpNome}
+              onErpNome={setErpNome}
               empresa={selectedLead?.empresa}
               responsavel={selectedLead?.responsavel}
             />

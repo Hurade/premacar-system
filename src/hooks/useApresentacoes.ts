@@ -115,6 +115,11 @@ export function useCreateApresentacao() {
       titulo_personalizado: string | null
       assinatura_vendedor: AssinaturaVendedor | null
       validade_dias: number
+      publico_alvo?: import('@/types/apresentacoes').PublicoAlvo | null
+      atuacao_principal?: import('@/types/apresentacoes').AtuacaoPrincipal | null
+      estrategia_inicial?: import('@/types/apresentacoes').PlanoTipo | null
+      tem_erp?: boolean | null
+      erp_nome?: string | null
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const slug = generateSlug(params.empresa)
@@ -130,6 +135,11 @@ export function useCreateApresentacao() {
           titulo_personalizado: params.titulo_personalizado,
           assinatura_vendedor: params.assinatura_vendedor,
           validade_dias: params.validade_dias,
+          publico_alvo: params.publico_alvo ?? null,
+          atuacao_principal: params.atuacao_principal ?? null,
+          estrategia_inicial: params.estrategia_inicial ?? null,
+          tem_erp: params.tem_erp ?? null,
+          erp_nome: params.erp_nome ?? null,
           slug,
           status: 'rascunho',
           validade_ate: validade.toISOString().split('T')[0],

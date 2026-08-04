@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { useApresentacaoBySlug, useApresentacaoPublicaStatus } from '@/hooks/useApresentacoes'
 import { ParceirosComerciaisDeck } from '@/components/apresentacoes/decks/parceiros-comerciais'
+import { OficinaDiretaDeck } from '@/components/apresentacoes/decks/oficina-direta'
 
 export default function ApresentacaoPublica() {
   const { slug } = useParams<{ slug: string }>()
@@ -52,12 +53,18 @@ export default function ApresentacaoPublica() {
   const lead = apresentacao.lead
   const tipo = apresentacao.template?.tipo
 
-  if (tipo && tipo !== 'parceiros_comerciais') {
+  if (tipo === 'oficina_direta') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-6" style={{ backgroundColor: '#ededed' }}>
-        <AlertCircle className="w-12 h-12" style={{ color: '#612c7d' }} />
-        <h1 className="text-2xl font-bold" style={{ color: '#3a3a3a' }}>Template não suportado</h1>
-      </div>
+      <OficinaDiretaDeck
+        empresa={lead?.empresa}
+        responsavel={lead?.responsavel}
+        tituloPersonalizado={apresentacao.titulo_personalizado}
+        assinaturaVendedor={apresentacao.assinatura_vendedor}
+        atuacaoPrincipal={apresentacao.atuacao_principal}
+        estrategiaInicial={apresentacao.estrategia_inicial}
+        temErp={apresentacao.tem_erp}
+        erpNome={apresentacao.erp_nome}
+      />
     )
   }
 
