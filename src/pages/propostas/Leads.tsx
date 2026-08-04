@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Building2, Phone, Mail, MapPin,
-  Pencil, Trash2, ArrowLeft, ChevronRight, X, Save,
+  Pencil, Trash2, ArrowLeft, ChevronRight, X, Save, Presentation,
 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -230,11 +230,12 @@ function LeadFormDrawer({
   )
 }
 
-function LeadCard({ lead, onEdit, onDelete, onNewProposta }: {
+function LeadCard({ lead, onEdit, onDelete, onNewProposta, onNewApresentacao }: {
   lead: Lead
   onEdit: () => void
   onDelete: () => void
   onNewProposta: () => void
+  onNewApresentacao: () => void
 }) {
   return (
     <div className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl p-5 hover:border-primary/20 transition-all group">
@@ -284,15 +285,26 @@ function LeadCard({ lead, onEdit, onDelete, onNewProposta }: {
         </span>
       </div>
 
-      <Button
-        size="sm"
-        onClick={onNewProposta}
-        className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 gap-1.5"
-        variant="ghost"
-      >
-        Criar Proposta
-        <ChevronRight className="w-3.5 h-3.5" />
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          onClick={onNewProposta}
+          className="flex-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 gap-1.5"
+          variant="ghost"
+        >
+          Criar Proposta
+          <ChevronRight className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          onClick={onNewApresentacao}
+          className="flex-1 bg-muted/30 hover:bg-muted/50 text-foreground border border-border/40 gap-1.5"
+          variant="ghost"
+        >
+          <Presentation className="w-3.5 h-3.5" />
+          Apresentação
+        </Button>
+      </div>
     </div>
   )
 }
@@ -368,6 +380,7 @@ export default function Leads() {
                 onEdit={() => handleEdit(lead)}
                 onDelete={() => handleDelete(lead.id)}
                 onNewProposta={() => navigate('/propostas/nova', { state: { leadId: lead.id } })}
+                onNewApresentacao={() => navigate('/apresentacoes/nova', { state: { leadId: lead.id } })}
               />
             ))}
           </div>

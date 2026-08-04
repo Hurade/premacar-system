@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, MessageSquarePlus, FileText, Zap } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, MessageSquarePlus, FileText, Zap, Presentation } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,6 +50,10 @@ const menuItems = [{
   id: 'propostas',
   label: 'Propostas',
   icon: FileText
+}, {
+  id: 'apresentacoes',
+  label: 'Apresentações',
+  icon: Presentation
 }, {
   id: 'team',
   label: 'Equipe',

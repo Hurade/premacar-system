@@ -1,0 +1,227 @@
+/* ============================================================
+   Prema Design System — bridge for the "Apresentações" deck.
+   Scoped entirely under .prema-deck-scope so it never leaks into
+   the app's own (unrelated) theme. Source of truth for these
+   tokens: "Prema Design System/colors_and_type.css" in the
+   reference repo — kept in sync manually, not imported directly.
+   ============================================================ */
+
+@font-face {
+  font-family: 'Arlon';
+  src: url('/fonts/arlon-regular.otf') format('opentype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.prema-deck-scope {
+  --pd-bg: #ededed;
+  --pd-ink-strong: #3a3a3a;
+  --pd-ink-soft: #7d7d7d;
+  --pd-card: #ffffff;
+  --pd-primary: #612c7d;
+  --pd-primary-variant: #b199d9;
+  --pd-primary-soft: hsl(279 41% 90%);
+  --pd-border: #d9d9d9;
+  --pd-success: #70b99b;
+  --pd-warning: #decc72;
+  --pd-destructive: #da7c65;
+  --pd-orange: #d47629;
+  --pd-radius: 12px;
+  --pd-shadow-card: 0 2px 8px -1px hsl(0 0% 0% / 0.1);
+  --pd-shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.12);
+  --pd-gradient-primary: linear-gradient(135deg, #612c7d 0%, #b199d9 100%);
+  --pd-font-sans: 'Arlon', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --pd-font-mono: 'SF Mono', 'Roboto Mono', 'Fira Code', monospace;
+
+  background: var(--pd-bg);
+  color: var(--pd-ink-strong);
+  font-family: var(--pd-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.prema-deck-scope .pd-section {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 56px 24px;
+}
+.prema-deck-scope .pd-section.pd-cover,
+.prema-deck-scope .pd-section.pd-closing {
+  max-width: 100%;
+  padding: 0;
+}
+
+.prema-deck-scope .pd-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pd-primary);
+  background: var(--pd-primary-soft);
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin: 0;
+}
+
+.prema-deck-scope .pd-title {
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--pd-ink-strong);
+  margin: 14px 0 0 0;
+}
+
+.prema-deck-scope .pd-lede {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--pd-ink-soft);
+  margin: 14px 0 0 0;
+  max-width: 640px;
+}
+
+.prema-deck-scope .pd-card {
+  background: var(--pd-card);
+  border-radius: var(--pd-radius);
+  padding: 22px;
+  box-shadow: var(--pd-shadow-card);
+  border: 1px solid var(--pd-border);
+}
+
+.prema-deck-scope .pd-takeaway {
+  margin-top: 22px;
+  background: var(--pd-gradient-primary);
+  border-radius: var(--pd-radius);
+  padding: 16px 20px;
+  font-size: 14.5px;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--pd-shadow-md);
+}
+
+/* ---------- Cover ---------- */
+.prema-deck-scope .pd-cover-inner {
+  background: var(--pd-gradient-primary);
+  color: #fff;
+  padding: 64px 24px 56px;
+  text-align: center;
+}
+.prema-deck-scope .pd-cover-logo { height: 34px; width: auto; margin: 0 auto 32px; display: block; }
+.prema-deck-scope .pd-cover-inner .pd-eyebrow { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.prema-deck-scope .pd-cover-inner .pd-title { color: #fff; max-width: 620px; margin-left: auto; margin-right: auto; text-wrap: balance; }
+.prema-deck-scope .pd-cover-inner .pd-lede { color: rgba(255, 255, 255, 0.85); max-width: 560px; margin-left: auto; margin-right: auto; }
+.prema-deck-scope .pd-cover-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  max-width: 620px;
+  margin: 32px auto 0;
+}
+@media (min-width: 640px) {
+  .prema-deck-scope .pd-cover-stats { grid-template-columns: repeat(4, 1fr); }
+}
+.prema-deck-scope .pd-cover-stat {
+  background: rgba(255, 255, 255, 0.12);
+  border-top: 3px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--pd-radius);
+  padding: 16px;
+}
+.prema-deck-scope .pd-cover-stat .v { font-size: 24px; font-weight: 700; color: #fff; line-height: 1; font-variant-numeric: tabular-nums; }
+.prema-deck-scope .pd-cover-stat .k { font-size: 12px; color: rgba(255, 255, 255, 0.78); margin-top: 6px; line-height: 1.35; }
+
+/* ---------- Grids ---------- */
+.prema-deck-scope .pd-grid-2 { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 24px; }
+.prema-deck-scope .pd-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; }
+.prema-deck-scope .pd-grid-2-eq { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 700px) {
+  .prema-deck-scope .pd-grid-2 { grid-template-columns: 1.1fr 1fr; }
+  .prema-deck-scope .pd-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .prema-deck-scope .pd-grid-2-eq { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- Slide 02 — Problema ---------- */
+.prema-deck-scope .pd-quote {
+  border-left: 3px solid var(--pd-primary);
+  padding: 2px 0 2px 16px;
+  margin-top: 18px;
+}
+.prema-deck-scope .pd-quote p { font-size: 17px; font-style: italic; color: var(--pd-ink-strong); margin: 0; line-height: 1.4; }
+.prema-deck-scope .pd-quote .src { font-size: 12px; color: var(--pd-ink-soft); margin-top: 6px; font-style: normal; }
+.prema-deck-scope .pd-scale-card { border-top: 3px solid var(--pd-destructive); }
+.prema-deck-scope .pd-scale-total { font-size: 28px; font-weight: 700; color: var(--pd-destructive); margin-top: 4px; }
+.prema-deck-scope .pd-symptom { background: hsl(14 60% 97%); border: 1px solid var(--pd-border); border-top: 3px solid var(--pd-destructive); border-radius: 10px; padding: 12px 14px; }
+.prema-deck-scope .pd-symptom .t { font-size: 12.5px; font-weight: 600; color: var(--pd-ink-strong); }
+.prema-deck-scope .pd-symptom .d { font-size: 11.5px; color: var(--pd-ink-soft); margin-top: 4px; line-height: 1.4; }
+
+/* ---------- Slide 03 — O que a Prema faz ---------- */
+.prema-deck-scope .pd-source-card { background: var(--pd-card); border: 1px solid var(--pd-border); border-top: 3px solid var(--pd-primary); border-radius: var(--pd-radius); padding: 16px; }
+.prema-deck-scope .pd-source-card .tag { display: inline-block; font-family: var(--pd-font-mono); font-size: 10.5px; color: var(--pd-primary); background: var(--pd-primary-soft); padding: 2px 7px; border-radius: 6px; font-weight: 700; letter-spacing: 0.04em; }
+.prema-deck-scope .pd-source-card h5 { margin: 8px 0 4px 0; font-size: 14px; color: var(--pd-ink-strong); }
+.prema-deck-scope .pd-source-card p { margin: 0; font-size: 12px; color: var(--pd-ink-soft); line-height: 1.45; }
+.prema-deck-scope .pd-wa-bubble { background: var(--pd-card); border: 1px solid var(--pd-border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--pd-shadow-card); margin-top: 20px; }
+.prema-deck-scope .pd-wa-bubble .from { font-size: 10.5px; color: var(--pd-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.prema-deck-scope .pd-wa-bubble p { margin: 0; font-size: 14px; color: var(--pd-ink-strong); line-height: 1.45; }
+.prema-deck-scope .pd-wa-reply { background: var(--pd-primary-soft); border-radius: 14px; padding: 12px 16px; max-width: 320px; margin-top: 10px; margin-left: auto; }
+.prema-deck-scope .pd-wa-reply p { margin: 0; font-size: 13px; color: var(--pd-primary); font-weight: 500; }
+
+/* ---------- Slide 04 — Diferenciais ---------- */
+.prema-deck-scope .pd-diff-card { background: var(--pd-card); border: 1px solid var(--pd-border); border-top: 4px solid var(--pd-primary); border-radius: var(--pd-radius); padding: 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--pd-shadow-card); }
+.prema-deck-scope .pd-diff-card .n { width: 32px; height: 32px; border-radius: 50%; background: var(--pd-primary); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; font-family: var(--pd-font-mono); }
+.prema-deck-scope .pd-diff-card h4 { margin: 2px 0 0 0; font-size: 16.5px; color: var(--pd-ink-strong); }
+.prema-deck-scope .pd-diff-card p { margin: 0; font-size: 13.5px; color: var(--pd-ink-soft); line-height: 1.5; }
+.prema-deck-scope .pd-diff-card .impact { padding-top: 10px; border-top: 1px solid var(--pd-border); font-size: 12px; color: var(--pd-primary); font-weight: 600; }
+
+/* ---------- Slide 05 — Prova ---------- */
+.prema-deck-scope .pd-funnel { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+.prema-deck-scope .pd-funnel-step { flex: 1 1 90px; background: var(--pd-card); border: 1px solid var(--pd-border); border-radius: 10px; padding: 12px 8px; text-align: center; }
+.prema-deck-scope .pd-funnel-step .n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--pd-font-mono); font-size: 11px; color: #fff; font-weight: 700; background: var(--pd-primary); }
+.prema-deck-scope .pd-funnel-step.pd-fs-5 .n, .prema-deck-scope .pd-funnel-step.pd-fs-6 .n { background: var(--pd-success); }
+.prema-deck-scope .pd-funnel-step.pd-fs-5, .prema-deck-scope .pd-funnel-step.pd-fs-6 { background: hsl(155 35% 96%); }
+.prema-deck-scope .pd-funnel-step .t { font-size: 11.5px; color: var(--pd-ink-strong); font-weight: 600; margin-top: 6px; }
+.prema-deck-scope .pd-benchmark-card { border-top: 3px solid var(--pd-success); }
+.prema-deck-scope .pd-benchmark-total { font-size: 24px; font-weight: 700; color: var(--pd-success); margin-top: 4px; }
+.prema-deck-scope .pd-mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.prema-deck-scope .pd-mini-stat { background: hsl(0 0% 0% / 0.02); border-radius: 8px; padding: 8px 10px; }
+.prema-deck-scope .pd-mini-stat .v { font-size: 17px; font-weight: 700; color: var(--pd-ink-strong); }
+.prema-deck-scope .pd-mini-stat .k { font-size: 11px; color: var(--pd-ink-soft); }
+.prema-deck-scope .pd-north-star { border-top: 3px solid var(--pd-primary); }
+.prema-deck-scope .pd-north-star h5 { margin: 12px 0 0 0; font-size: 11.5px; color: var(--pd-primary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+.prema-deck-scope .pd-north-star h5:first-child { margin-top: 0; }
+.prema-deck-scope .pd-north-star p { margin: 4px 0 0 0; font-size: 13px; color: var(--pd-ink-soft); line-height: 1.5; }
+
+/* ---------- Slide 06 — ICP ---------- */
+.prema-deck-scope .pd-icp-card { background: var(--pd-card); border: 1px solid var(--pd-border); border-top: 3px solid var(--pd-primary); border-radius: var(--pd-radius); padding: 14px; }
+.prema-deck-scope .pd-icp-card .k { font-size: 10.5px; color: var(--pd-ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+.prema-deck-scope .pd-icp-card .v { font-size: 15px; font-weight: 700; color: var(--pd-ink-strong); margin-top: 4px; line-height: 1.25; }
+.prema-deck-scope .pd-icp-panel { background: var(--pd-card); border: 1px solid var(--pd-border); border-top: 3px solid var(--pd-primary); border-radius: var(--pd-radius); padding: 18px; }
+.prema-deck-scope .pd-icp-panel h5 { margin: 0 0 8px 0; font-size: 11.5px; color: var(--pd-primary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+.prema-deck-scope .pd-icp-panel ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.prema-deck-scope .pd-icp-panel li { font-size: 12.5px; color: var(--pd-ink-strong); padding-left: 16px; position: relative; line-height: 1.4; }
+.prema-deck-scope .pd-icp-panel li::before { content: '✓'; position: absolute; left: 0; color: var(--pd-success); font-weight: 700; font-size: 11px; }
+.prema-deck-scope .pd-icp-panel .quote { font-size: 13px; font-style: italic; color: var(--pd-ink-soft); line-height: 1.5; margin: 0 0 10px 0; }
+.prema-deck-scope .pd-icp-panel.pd-signal { background: hsl(155 35% 97%); border-top-color: var(--pd-success); }
+.prema-deck-scope .pd-icp-panel.pd-signal h5 { color: #3d7a63; }
+.prema-deck-scope .pd-icp-panel.pd-anti { background: hsl(14 60% 97%); border-top-color: var(--pd-destructive); }
+.prema-deck-scope .pd-icp-panel.pd-anti h5 { color: var(--pd-destructive); }
+.prema-deck-scope .pd-icp-panel.pd-anti li::before { content: '✕'; color: var(--pd-destructive); }
+
+/* ---------- Slide 07 — Como indicar ---------- */
+.prema-deck-scope .pd-indicate-step { background: var(--pd-card); border: 1px solid var(--pd-border); border-top: 4px solid var(--pd-primary); border-radius: var(--pd-radius); padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--pd-shadow-card); }
+.prema-deck-scope .pd-indicate-step .n { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--pd-primary); font-family: var(--pd-font-mono); font-size: 12.5px; font-weight: 700; color: #fff; }
+.prema-deck-scope .pd-indicate-step h5 { margin: 0; font-size: 14.5px; color: var(--pd-ink-strong); }
+.prema-deck-scope .pd-indicate-step p { margin: 0; font-size: 12.5px; color: var(--pd-ink-soft); line-height: 1.45; }
+.prema-deck-scope .pd-trigger-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.prema-deck-scope .pd-trigger-chip { background: var(--pd-card); border: 1px solid var(--pd-border); border-radius: 999px; padding: 9px 14px; font-size: 12.5px; color: var(--pd-ink-strong); box-shadow: var(--pd-shadow-card); }
+
+/* ---------- Slide 08 — Contato ---------- */
+.prema-deck-scope .pd-closing-inner { background: var(--pd-gradient-primary); color: #fff; padding: 56px 24px 64px; text-align: center; }
+.prema-deck-scope .pd-closing-inner .pd-eyebrow { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.prema-deck-scope .pd-closing-inner .pd-title { color: #fff; max-width: 560px; margin: 14px auto 0; }
+.prema-deck-scope .pd-closing-inner .pd-lede { color: rgba(255, 255, 255, 0.85); max-width: 480px; margin: 14px auto 0; }
+.prema-deck-scope .pd-contact-card { margin: 28px auto 0; display: inline-flex; align-items: center; gap: 12px; background: #fff; border-radius: var(--pd-radius); padding: 16px 22px; box-shadow: var(--pd-shadow-md); }
+.prema-deck-scope .pd-contact-card .ico { width: 38px; height: 38px; border-radius: 10px; background: var(--pd-gradient-primary); color: #fff; display: grid; place-items: center; font-size: 16px; font-weight: 700; }
+.prema-deck-scope .pd-contact-card .email { font-size: 16px; font-weight: 600; color: var(--pd-ink-strong); text-align: left; }
+.prema-deck-scope .pd-contact-card .role { font-size: 11.5px; color: var(--pd-ink-soft); text-align: left; }
+.prema-deck-scope .pd-footer { text-align: center; padding: 20px 24px 40px; font-size: 11.5px; color: var(--pd-ink-soft); letter-spacing: 0.03em; text-transform: uppercase; }

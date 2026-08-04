@@ -26,6 +26,10 @@ import NovaPropostaWizard from './pages/propostas/NovaPropostaWizard';
 import PropostaDetalhe from './pages/propostas/PropostaDetalhe';
 import PropostaPublica from './pages/propostas/PropostaPublica';
 import Biblioteca from './pages/propostas/Biblioteca';
+import ApresentacoesDashboard from './pages/apresentacoes/ApresentacoesDashboard';
+import NovaApresentacaoWizard from './pages/apresentacoes/NovaApresentacaoWizard';
+import ApresentacaoDetalhe from './pages/apresentacoes/ApresentacaoDetalhe';
+import ApresentacaoPublica from './pages/apresentacoes/ApresentacaoPublica';
 import DuplicateContacts from './pages/DuplicateContacts';
 import CsatPublic from './pages/CsatPublic';
 
@@ -66,6 +70,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/propostas/leads': 'PremaCar - Leads',
   '/propostas/nova': 'PremaCar - Nova Proposta',
   '/propostas/biblioteca': 'PremaCar - Biblioteca Comercial',
+  '/apresentacoes': 'PremaCar - Apresentações',
+  '/apresentacoes/nova': 'PremaCar - Nova Apresentação',
   '/contatos-duplicados': 'PremaCar - Contatos Duplicados',
 };
 
@@ -194,10 +200,17 @@ const App: React.FC = () => {
                   <Route path="/propostas/nova" element={<NovaPropostaWizard />} />
                   <Route path="/propostas/biblioteca" element={<Biblioteca />} />
                   <Route path="/propostas/:id" element={<PropostaDetalhe />} />
+                  {/* Apresentações */}
+                  <Route path="/apresentacoes" element={<ApresentacoesDashboard />} />
+                  <Route path="/apresentacoes/nova" element={<NovaApresentacaoWizard />} />
+                  <Route path="/apresentacoes/:id" element={<ApresentacaoDetalhe />} />
                 </Route>
 
                 {/* Proposta pública — sem autenticação */}
                 <Route path="/p/:slug" element={<PropostaPublica />} />
+
+                {/* Apresentação pública — sem autenticação */}
+                <Route path="/apresentacao/:slug" element={<ApresentacaoPublica />} />
 
                 {/* Avaliação CSAT pública — sem autenticação */}
                 <Route path="/csat/:token" element={<CsatPublic />} />
