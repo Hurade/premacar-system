@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { MessageCircle, Mail, Check, MessagesSquare, UserPlus, ExternalLink, Loader2 } from 'lucide-react'
+import { MessageCircle, Mail, Check, MessagesSquare, UserPlus, ExternalLink, Loader2, Copy } from 'lucide-react'
 import { useUpdateApresentacaoStatus } from '@/hooks/useApresentacoes'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
@@ -43,6 +43,13 @@ export function EnviarApresentacaoModal({ apresentacao, publicLink, open, onClos
   const [chatContactId, setChatContactId] = useState<string | null>(null)
   const [lookingUpConv, setLookingUpConv] = useState(false)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [msgCopied, setMsgCopied] = useState(false)
+
+  function copyWaMsg() {
+    navigator.clipboard.writeText(waMsg)
+    setMsgCopied(true)
+    setTimeout(() => setMsgCopied(false), 2000)
+  }
 
   const assinaturaBlock = useMemo(() => {
     if (!assinatura) return 'Equipe Prema Car'
@@ -149,8 +156,12 @@ export function EnviarApresentacaoModal({ apresentacao, publicLink, open, onClos
             return
           }
         }
+        navigator.clipboard.writeText(waMsg)
+        toast.success('Mensagem copiada — cole na conversa que vai abrir')
         navigate(`/chat?conversation=${chatConvId}`)
       } else if (chatContactId) {
+        navigator.clipboard.writeText(waMsg)
+        toast.success('Mensagem copiada — cole na conversa que vai abrir')
         navigate(`/chat?newContact=${chatContactId}`)
       } else {
         const phone = formatPhone(lead?.telefone ?? '')
@@ -286,17 +297,29 @@ export function EnviarApresentacaoModal({ apresentacao, publicLink, open, onClos
               <Input value={lead?.telefone ?? ''} readOnly className="bg-muted/30 border-border/40 text-sm text-muted-foreground" />
             </div>
 
-            {!chatConvId && !chatContactId && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Mensagem (WhatsApp Web)</Label>
-                <Textarea
-                  value={waMsg}
-                  onChange={e => setWaMsg(e.target.value)}
-                  rows={8}
-                  className="bg-muted/20 border-border/40 resize-none text-sm font-mono leading-relaxed"
-                />
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">
+                  {chatConvId || chatContactId ? 'Mensagem — cole na conversa que vai abrir no Chat' : 'Mensagem (WhatsApp Web)'}
+                </Label>
+                {(chatConvId || chatContactId) && (
+                  <button
+                    type="button"
+                    onClick={copyWaMsg}
+                    className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                  >
+                    {msgCopied ? <><Check className="w-3 h-3" /> Copiado!</> : <><Copy className="w-3 h-3" /> Copiar</>}
+                  </button>
+                )}
               </div>
-            )}
+              <Textarea
+                value={waMsg}
+                onChange={e => setWaMsg(e.target.value)}
+                rows={8}
+                readOnly={!!(chatConvId || chatContactId)}
+                className="bg-muted/20 border-border/40 resize-none text-sm font-mono leading-relaxed"
+              />
+            </div>
           </div>
         )}
 
