@@ -5,7 +5,7 @@ import { StatMetric } from '../types';
 import { api } from '../services/api';
 import { OnboardingBanner } from './OnboardingBanner';
 import { useOutletContext } from 'react-router-dom';
-import { useOperationalMetrics } from '@/hooks/useOperationalMetrics';
+import { useOperationalMetrics, NO_QUEUE_KEY } from '@/hooks/useOperationalMetrics';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -14,9 +14,6 @@ const STATUS_COLORS: Record<string, string> = {
   nina: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
   human: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   paused: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-};
-const TEAM_LABELS: Record<string, string> = {
-  mateus: 'Mateus', igor: 'Igor', fe: 'Fê', vendas: 'Vendas', suporte: 'Suporte', sem_equipe: 'Sem equipe',
 };
 
 interface OutletContext {
@@ -43,6 +40,7 @@ const Dashboard: React.FC = () => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodFilter>('today');
+  const [queues, setQueues] = useState<any[]>([]);
   const { setShowOnboarding } = useOutletContext<OutletContext>();
   const operationalMetrics = useOperationalMetrics();
   const { user } = useAuth();
@@ -68,6 +66,12 @@ const Dashboard: React.FC = () => {
 
     loadData();
   }, [period]);
+
+  useEffect(() => {
+    api.fetchQueues().then(setQueues).catch(err => {
+      console.error('Erro ao carregar filas:', err);
+    });
+  }, []);
 
   const getIcon = (label: string) => {
     if (label.includes('Conversões')) return <DollarSign className="h-5 w-5 text-emerald-400" />;
@@ -159,21 +163,30 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Atendimentos por equipe */}
+        {/* Atendimentos por fila */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-4 h-4 text-violet-400" />
-            <h3 className="text-sm font-semibold text-white">Por Equipe</h3>
+            <h3 className="text-sm font-semibold text-white">Por Fila</h3>
           </div>
           <div className="space-y-2">
-            {(Object.keys(TEAM_LABELS) as Array<keyof typeof TEAM_LABELS>).map((team) => (
-              <div key={team} className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">{TEAM_LABELS[team]}</span>
+            {queues.filter(q => q.is_active).map((queue) => (
+              <div key={queue.id} className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: queue.color }}></span>
+                  {queue.name}
+                </span>
                 <span className="text-sm font-semibold text-slate-200">
-                  {operationalMetrics.loading ? '…' : operationalMetrics.byTeam[team as keyof typeof operationalMetrics.byTeam]}
+                  {operationalMetrics.loading ? '…' : operationalMetrics.byQueue[queue.id] || 0}
                 </span>
               </div>
             ))}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">Sem fila</span>
+              <span className="text-sm font-semibold text-slate-200">
+                {operationalMetrics.loading ? '…' : operationalMetrics.byQueue[NO_QUEUE_KEY] || 0}
+              </span>
+            </div>
           </div>
         </div>
 

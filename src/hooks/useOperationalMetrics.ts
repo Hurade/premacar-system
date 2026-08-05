@@ -2,46 +2,45 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 type ConversationStatus = 'nina' | 'human' | 'paused';
-type TeamAssignment = 'mateus' | 'igor' | 'fe' | 'vendas' | 'suporte';
 
 interface ConversationSnapshot {
   status: ConversationStatus;
-  assigned_team: TeamAssignment | null;
+  queue_id: string | null;
 }
+
+export const NO_QUEUE_KEY = 'sem_fila';
 
 export interface OperationalMetrics {
   total: number;
   byStatus: Record<ConversationStatus, number>;
-  byTeam: Record<TeamAssignment | 'sem_equipe', number>;
+  // Chaveado por queues.id (UUID) — 'sem_fila' agrupa conversas sem fila atribuída.
+  byQueue: Record<string, number>;
   loading: boolean;
 }
 
 const EMPTY_BY_STATUS: Record<ConversationStatus, number> = { nina: 0, human: 0, paused: 0 };
-const EMPTY_BY_TEAM: Record<TeamAssignment | 'sem_equipe', number> = {
-  mateus: 0, igor: 0, fe: 0, vendas: 0, suporte: 0, sem_equipe: 0,
-};
 
 function computeMetrics(map: Map<string, ConversationSnapshot>): Omit<OperationalMetrics, 'loading'> {
   const byStatus = { ...EMPTY_BY_STATUS };
-  const byTeam = { ...EMPTY_BY_TEAM };
+  const byQueue: Record<string, number> = {};
 
   map.forEach((conv) => {
     byStatus[conv.status] = (byStatus[conv.status] || 0) + 1;
-    const teamKey = conv.assigned_team || 'sem_equipe';
-    byTeam[teamKey] = (byTeam[teamKey] || 0) + 1;
+    const queueKey = conv.queue_id || NO_QUEUE_KEY;
+    byQueue[queueKey] = (byQueue[queueKey] || 0) + 1;
   });
 
-  return { total: map.size, byStatus, byTeam };
+  return { total: map.size, byStatus, byQueue };
 }
 
-// Contagem de conversas abertas por status/equipe, ao vivo. Hook enxuto e
+// Contagem de conversas abertas por status/fila, ao vivo. Hook enxuto e
 // separado de useConversations.ts (que carrega mensagens completas) —
-// aqui só guardamos status/assigned_team por conversa ativa.
+// aqui só guardamos status/queue_id por conversa ativa.
 export function useOperationalMetrics() {
   const [metrics, setMetrics] = useState<OperationalMetrics>({
     total: 0,
     byStatus: EMPTY_BY_STATUS,
-    byTeam: EMPTY_BY_TEAM,
+    byQueue: {},
     loading: true,
   });
   const conversationsRef = useRef<Map<string, ConversationSnapshot>>(new Map());
@@ -52,7 +51,7 @@ export function useOperationalMetrics() {
     const fetchSnapshot = async () => {
       const { data, error } = await supabase
         .from('conversations')
-        .select('id, status, assigned_team, is_active')
+        .select('id, status, queue_id, is_active')
         .eq('is_active', true);
 
       if (error) {
@@ -62,7 +61,7 @@ export function useOperationalMetrics() {
 
       const map = new Map<string, ConversationSnapshot>();
       (data || []).forEach((conv: any) => {
-        map.set(conv.id, { status: conv.status, assigned_team: conv.assigned_team });
+        map.set(conv.id, { status: conv.status, queue_id: conv.queue_id });
       });
       conversationsRef.current = map;
       setMetrics({ ...computeMetrics(map), loading: false });
@@ -78,7 +77,7 @@ export function useOperationalMetrics() {
         (payload) => {
           const conv = payload.new as any;
           if (!conv.is_active) return;
-          conversationsRef.current.set(conv.id, { status: conv.status, assigned_team: conv.assigned_team });
+          conversationsRef.current.set(conv.id, { status: conv.status, queue_id: conv.queue_id });
           setMetrics({ ...computeMetrics(conversationsRef.current), loading: false });
         }
       )
@@ -90,7 +89,7 @@ export function useOperationalMetrics() {
           if (!conv.is_active) {
             conversationsRef.current.delete(conv.id);
           } else {
-            conversationsRef.current.set(conv.id, { status: conv.status, assigned_team: conv.assigned_team });
+            conversationsRef.current.set(conv.id, { status: conv.status, queue_id: conv.queue_id });
           }
           setMetrics({ ...computeMetrics(conversationsRef.current), loading: false });
         }

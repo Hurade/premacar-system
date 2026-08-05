@@ -150,16 +150,17 @@ export const api = {
         avgResponseResult
       ] = await Promise.all([
         // Atendimentos = conversas únicas com resposta real de cliente no período
+        // (from_type 'user' = mensagem do cliente; 'human'/'nina' são quem responde)
         supabase
           .from('messages')
           .select('conversation_id')
-          .eq('from_type', 'human')
+          .eq('from_type', 'user')
           .gte('sent_at', periodStartStr),
         // Atendimentos no período anterior
         supabase
           .from('messages')
           .select('conversation_id')
-          .eq('from_type', 'human')
+          .eq('from_type', 'user')
           .gte('sent_at', prevPeriodStartStr)
           .lt('sent_at', periodStartStr),
         // New contacts in period
@@ -272,7 +273,7 @@ export const api = {
         supabase
           .from('messages')
           .select('sent_at, conversation_id')
-          .eq('from_type', 'human')
+          .eq('from_type', 'user')
           .gte('sent_at', periodStart.toISOString()),
         supabase
           .from('deals')
