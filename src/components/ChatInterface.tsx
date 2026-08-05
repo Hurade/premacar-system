@@ -776,13 +776,20 @@ const ChatInterface: React.FC = () => {
     );
   });
 
-  const renderStatusBadge = (status: ConversationStatus) => {
+  const renderStatusBadge = (chat: UIConversation) => {
+    // "Humano" fica redundante quando já tem um atendente atribuído — a
+    // badge de responsável (renderAssignmentBadges) já identifica quem
+    // está atendendo. Só mostra "Humano" pra sinalizar que ainda está fora
+    // da IA mas ninguém assumiu (sem atendente atribuído).
+    if (chat.status === 'human' && chat.assignedUserId) {
+      return null;
+    }
     const config = {
       nina: { label: sdrName, icon: Bot, color: 'bg-violet-500/20 text-violet-400 border-violet-500/30' },
       human: { label: 'Humano', icon: User, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
       paused: { label: 'Pausado', icon: Pause, color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
     };
-    const { label, icon: Icon, color } = config[status];
+    const { label, icon: Icon, color } = config[chat.status];
     return (
       <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 ${color}`}>
         <Icon className="w-3 h-3" />
@@ -1520,7 +1527,7 @@ const ChatInterface: React.FC = () => {
                   </p>
                   
                   <div className="flex flex-wrap items-center mt-2 gap-1.5">
-                    {renderStatusBadge(chat.status)}
+                    {renderStatusBadge(chat)}
                     {renderApiSourceBadge(chat.apiSource)}
                     {renderAssignmentBadges(chat)}
                     {chat.unreadCount > 0 && (
@@ -1579,7 +1586,7 @@ const ChatInterface: React.FC = () => {
                       <p className="text-[10px] text-slate-500 font-mono">Protocolo {activeChat.protocolNumber}</p>
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                      {renderStatusBadge(activeChat.status)}
+                      {renderStatusBadge(activeChat)}
                       {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
                       {activeChat.apiSource === 'meta' && !windowLoading && (
                         <WindowStatusBadge
