@@ -512,6 +512,27 @@ serve(async (req) => {
         messageContent = `📇 Contatos compartilhados: ${names || '[sem nomes]'}`;
         messageType = 'text';
         console.log('[Webhook] 📇 Múltiplos contatos:', messageContent);
+      } else if (msg?.stickerMessage) {
+        // Figurinha (webp) - não é tratada como 'image' pois o pipeline de
+        // descrição de imagem da Nina assume JPEG e quebraria com o formato.
+        messageContent = '[figurinha recebida]';
+        messageType = 'text';
+        console.log('[Webhook] 🏷️ Figurinha recebida');
+      } else if (msg?.reactionMessage) {
+        const emoji = msg.reactionMessage.text || '';
+        messageContent = emoji ? `Reagiu com ${emoji}` : 'Removeu a reação';
+        messageType = 'text';
+        console.log('[Webhook] 😀 Reação:', messageContent);
+      } else if (msg?.locationMessage || msg?.liveLocationMessage) {
+        const loc = msg.locationMessage || msg.liveLocationMessage;
+        const lat = loc?.degreesLatitude;
+        const lng = loc?.degreesLongitude;
+        const label = loc?.name ? `${loc.name} - ` : '';
+        messageContent = lat != null && lng != null
+          ? `📍 Localização compartilhada: ${label}https://maps.google.com/?q=${lat},${lng}`
+          : '📍 Localização compartilhada';
+        messageType = 'text';
+        console.log('[Webhook] 📍 Localização recebida');
       } else {
         messageContent = '[Mensagem recebida em formato não suportado pelo sistema]';
       }
