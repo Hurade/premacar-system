@@ -5,7 +5,7 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
-  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat,
+  KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat, Users,
   History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
@@ -502,6 +502,37 @@ const ChatInterface: React.FC = () => {
     } catch (error) {
       console.error('Error transferring connection:', error);
       toast.error('Erro ao transferir conexão');
+    }
+  };
+
+  // Transferir o atendimento (responsável) e/ou a fila da conversa ativa
+  // para outro usuário/setor — mesma regra de negócio de assignConversation/
+  // assignQueue já usadas no painel de perfil, só que acessível direto do
+  // header. RLS deste sistema é permissiva (single-tenant): qualquer membro
+  // autenticado pode transferir para qualquer atendente/fila, sem
+  // restrição de visibilidade por fila (queue_members só define quem é
+  // notificado no WhatsApp, não quem pode ver/assumir a conversa).
+  const handleTransferUser = async (userId: string | null) => {
+    if (!activeChat) return;
+    try {
+      await assignConversation(activeChat.id, userId);
+      const member = teamMembers.find(m => m.id === userId);
+      toast.success(member ? `Atendimento transferido para ${member.name}` : 'Atendimento removido do responsável atual');
+    } catch (error) {
+      console.error('Error transferring conversation to user:', error);
+      toast.error('Erro ao transferir atendimento');
+    }
+  };
+
+  const handleTransferQueue = async (queueId: string | null) => {
+    if (!activeChat) return;
+    try {
+      await assignQueue(activeChat.id, queueId);
+      const queue = queues.find(q => q.id === queueId);
+      toast.success(queue ? `Conversa movida para a fila ${queue.name}` : 'Conversa removida da fila');
+    } catch (error) {
+      console.error('Error transferring conversation to queue:', error);
+      toast.error('Erro ao mover conversa de fila');
     }
   };
 
@@ -1584,6 +1615,46 @@ const ChatInterface: React.FC = () => {
                       {activeConnections.filter((c: any) => c.id !== activeChat.connectionId).length === 0 && (
                         <p className="text-xs text-slate-600 px-2 py-1.5">Nenhuma outra conexão ativa</p>
                       )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Transferir atendimento"
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <Users className="w-5 h-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3 bg-slate-900 border-slate-700 space-y-3" align="end">
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Transferir para atendente</p>
+                      <select
+                        value={activeChat.assignedUserId || ''}
+                        onChange={(e) => handleTransferUser(e.target.value || null)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-slate-300 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none"
+                      >
+                        <option value="">Não atribuído</option>
+                        {teamMembers.filter(m => m.status === 'active').map(member => (
+                          <option key={member.id} value={member.id}>{member.name} ({member.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Transferir para fila</p>
+                      <select
+                        value={activeChat.queueId || ''}
+                        onChange={(e) => handleTransferQueue(e.target.value || null)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-slate-300 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none"
+                      >
+                        <option value="">Sem fila</option>
+                        {queues.filter(q => q.is_active).map(queue => (
+                          <option key={queue.id} value={queue.id}>{queue.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </PopoverContent>
                 </Popover>
