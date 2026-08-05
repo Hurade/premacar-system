@@ -67,7 +67,7 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
-  const { currentUserName, isAdmin, isManager } = useUserRole();
+  const { currentUserName, isAdmin, isManager, teamMemberId } = useUserRole();
   const canSupervise = isAdmin || isManager;
   const signatureName = currentUserName || sdrName;
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -488,6 +488,12 @@ const ChatInterface: React.FC = () => {
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
     await updateStatus(activeChat.id, status);
+    // "Assumir conversa": ao virar humano, atrela ao atendente que clicou
+    // (aparece na aba "Atendendo" dele). Sem isso a conversa ficava só
+    // roteada pra fila, sem responsável — ninguém "dono" dela.
+    if (status === 'human' && teamMemberId) {
+      await assignConversation(activeChat.id, teamMemberId);
+    }
   };
 
   const handleTransferConnection = async (connection: { id: string; name: string; api_type: string }) => {
@@ -708,7 +714,22 @@ const ChatInterface: React.FC = () => {
   };
 
 
+  // Regra de visibilidade: uma vez que a conversa saiu da IA (humano ou
+  // pausada) e já está atribuída a alguém, atendente só vê a própria —
+  // gerente/admin veem todas. Conversas ainda sem responsável (recém
+  // roteadas pra fila, ninguém assumiu ainda) continuam visíveis pra
+  // todos os atendentes, senão ninguém conseguiria assumi-las.
+  const isHiddenFromAgent = (chat: UIConversation) =>
+    chat.status !== 'nina' &&
+    !canSupervise &&
+    !!chat.assignedUserId &&
+    chat.assignedUserId !== teamMemberId;
+
   const filteredConversations = conversations.filter(chat => {
+    if (isHiddenFromAgent(chat)) {
+      return false;
+    }
+
     // Filtro por não lidas
     if (filterType === 'unread' && chat.unreadCount === 0) {
       return false;
@@ -1032,7 +1053,39 @@ const ChatInterface: React.FC = () => {
               className="w-full pl-9 pr-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none text-slate-200 placeholder:text-slate-600 transition-all"
             />
           </div>
-          
+
+          {/* Abas principais: conversas com a IA vs. em atendimento humano */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setStatusFilter('nina')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                statusFilter === 'nina'
+                  ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+                  : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <Bot className="w-3.5 h-3.5" />
+              Com a {sdrName}
+              <span className="text-[10px] opacity-70">
+                ({conversations.filter(c => c.status === 'nina').length})
+              </span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('human')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                statusFilter === 'human'
+                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                  : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              Atendendo
+              <span className="text-[10px] opacity-70">
+                ({conversations.filter(c => c.status === 'human' && !isHiddenFromAgent(c)).length})
+              </span>
+            </button>
+          </div>
+
           {/* Filtros */}
           <div className="space-y-2">
             {/* Linha 1: Todas/Não lidas + Status */}
