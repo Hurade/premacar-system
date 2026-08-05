@@ -1006,12 +1006,17 @@ npm run typecheck
 
 # Lint
 npm run lint
-
-# Supabase local (se necessário)
-npx supabase start
-npx supabase db reset
-npx supabase migration new nome_da_migration
 ```
+
+> ⚠️ **Backend gerenciado via Lovable:** este projeto usa a integração
+> Lovable ↔ Supabase, não o Supabase CLI manual. Migrations e Edge
+> Functions são sincronizadas automaticamente quando o código é
+> commitado/pushado para o `main` (o Lovable detecta o push no GitHub
+> e aplica no projeto Supabase conectado). Não rode `supabase login`,
+> `supabase link` ou `supabase functions deploy` esperando que
+> funcionem localmente — a conta Supabase usada pelo Lovable não é a
+> conta pessoal do desenvolvedor, então esses comandos falham com 403.
+> Para aplicar uma mudança em `supabase/`, basta commitar e dar push.
 
 ### **Debugging:**
 
@@ -1058,7 +1063,7 @@ console.warn('⚠️ [WARN]', mensagem)
 
 - VSCode: https://code.visualstudio.com
 - Claude Code: https://claude.ai/code
-- Supabase CLI: https://supabase.com/docs/guides/cli
+- Lovable: https://lovable.dev/docs (gerencia o projeto Supabase — ver nota em "Comandos Úteis")
 - Vercel CLI: https://vercel.com/docs/cli
 
 ---
