@@ -304,6 +304,155 @@ export type Database = {
           },
         ]
       }
+      apresentacoes_comerciais: {
+        Row: {
+          assinatura_vendedor: Json | null
+          atuacao_principal: string | null
+          created_at: string
+          enviada_at: string | null
+          erp_nome: string | null
+          estrategia_inicial: string | null
+          id: string
+          lead_id: string
+          notas_vendedor: string | null
+          publico_alvo: string | null
+          slug: string
+          status: string
+          tem_erp: boolean | null
+          template_id: string | null
+          titulo_personalizado: string | null
+          updated_at: string
+          validade_ate: string | null
+          validade_dias: number
+          vendedor_id: string | null
+          visualizada_at: string | null
+        }
+        Insert: {
+          assinatura_vendedor?: Json | null
+          atuacao_principal?: string | null
+          created_at?: string
+          enviada_at?: string | null
+          erp_nome?: string | null
+          estrategia_inicial?: string | null
+          id?: string
+          lead_id: string
+          notas_vendedor?: string | null
+          publico_alvo?: string | null
+          slug: string
+          status?: string
+          tem_erp?: boolean | null
+          template_id?: string | null
+          titulo_personalizado?: string | null
+          updated_at?: string
+          validade_ate?: string | null
+          validade_dias?: number
+          vendedor_id?: string | null
+          visualizada_at?: string | null
+        }
+        Update: {
+          assinatura_vendedor?: Json | null
+          atuacao_principal?: string | null
+          created_at?: string
+          enviada_at?: string | null
+          erp_nome?: string | null
+          estrategia_inicial?: string | null
+          id?: string
+          lead_id?: string
+          notas_vendedor?: string | null
+          publico_alvo?: string | null
+          slug?: string
+          status?: string
+          tem_erp?: boolean | null
+          template_id?: string | null
+          titulo_personalizado?: string | null
+          updated_at?: string
+          validade_ate?: string | null
+          validade_dias?: number
+          vendedor_id?: string | null
+          visualizada_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apresentacoes_comerciais_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads_comerciais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apresentacoes_comerciais_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "apresentacoes_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apresentacoes_historico: {
+        Row: {
+          acao: string
+          apresentacao_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          apresentacao_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          apresentacao_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apresentacoes_historico_apresentacao_id_fkey"
+            columns: ["apresentacao_id"]
+            isOneToOne: false
+            referencedRelation: "apresentacoes_comerciais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apresentacoes_templates: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          tipo: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          tipo?: string
+        }
+        Relationships: []
+      }
       automation_execution_logs: {
         Row: {
           actions_result: Json | null
@@ -3478,6 +3627,10 @@ export type Database = {
     }
     Functions: {
       assign_next_owner_round_robin: { Args: never; Returns: string }
+      atualizar_status_apresentacao_publica: {
+        Args: { p_slug: string }
+        Returns: boolean
+      }
       atualizar_status_proposta_publica: {
         Args: { p_motivo?: string; p_slug: string; p_status: string }
         Returns: boolean
@@ -3568,6 +3721,7 @@ export type Database = {
       }
       cleanup_processed_message_queue: { Args: never; Returns: undefined }
       cleanup_processed_queues: { Args: never; Returns: undefined }
+      get_apresentacao_publica: { Args: { p_slug: string }; Returns: Json }
       get_auth_user_id: { Args: never; Returns: string }
       get_campaign_funnel: { Args: { p_campaign_id: string }; Returns: Json }
       get_csat_survey_by_token: {
