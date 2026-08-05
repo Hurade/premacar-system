@@ -522,10 +522,14 @@ serve(async (req) => {
         messageType = 'text';
         console.log('[Webhook] 📇 Múltiplos contatos:', messageContent);
       } else if (msg?.stickerMessage) {
-        // Figurinha (webp) - não é tratada como 'image' pois o pipeline de
-        // descrição de imagem da Nina assume JPEG e quebraria com o formato.
+        // media-proxy usa o content-type real devolvido pela Evolution API
+        // (image/webp), então o <img> do frontend exibe a figurinha normalmente.
+        // A descrição por IA no nina-orchestrator assume JPEG e pode falhar
+        // silenciosamente para webp — não crítico, só perde a descrição por IA.
         messageContent = '[figurinha recebida]';
-        messageType = 'text';
+        messageType = 'image';
+        mediaType = 'image';
+        mediaId = msg.stickerMessage.mediaKey;
         console.log('[Webhook] 🏷️ Figurinha recebida');
       } else if (msg?.reactionMessage) {
         const emoji = msg.reactionMessage.text || '';
