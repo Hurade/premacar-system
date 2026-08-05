@@ -280,7 +280,16 @@ serve(async (req) => {
         });
       }
 
-      const phoneNumber = remoteJid.replace('@s.whatsapp.net', '');
+      // WhatsApp vem migrando alguns contatos para JIDs "@lid" (Linked ID,
+      // anonimizado) em vez do JID tradicional com o número de telefone.
+      // Quando isso acontece, a Evolution API (>=6.8.0) expõe o JID real
+      // com o telefone em key.remoteJidAlt — sem isso, o telefone extraído
+      // não bate com o contato existente e o webhook cria contato/conversa
+      // duplicados para a mesma pessoa.
+      const resolvedJid = remoteJid.endsWith('@lid') && data.key?.remoteJidAlt
+        ? data.key.remoteJidAlt
+        : remoteJid;
+      const phoneNumber = resolvedJid.replace('@s.whatsapp.net', '').replace('@lid', '');
       const contactName = data.pushName || null;
       const messageId = data.key?.id;
       const messageTimestamp = data.messageTimestamp || Math.floor(Date.now() / 1000);
