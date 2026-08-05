@@ -1454,20 +1454,55 @@ const ChatInterface: React.FC = () => {
                           Bloqueado
                         </span>
                       )}
-                      {renderStatusBadge(activeChat.status)}
-                      {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
-                      {activeChat.apiSource === 'meta' && !windowLoading && (
-                        <WindowStatusBadge 
-                          status={windowStatus} 
-                          hoursRemaining={hoursRemaining}
-                          apiSource={activeChat.apiSource}
-                        />
-                      )}
                     </h2>
                     <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
                     {activeChat.protocolNumber && (
                       <p className="text-[10px] text-slate-500 font-mono">Protocolo {activeChat.protocolNumber}</p>
                     )}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {renderStatusBadge(activeChat.status)}
+                      {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
+                      {activeChat.apiSource === 'meta' && !windowLoading && (
+                        <WindowStatusBadge
+                          status={windowStatus}
+                          hoursRemaining={hoursRemaining}
+                          apiSource={activeChat.apiSource}
+                        />
+                      )}
+                      {(() => {
+                        const assignedMember = teamMembers.find(m => m.id === activeChat.assignedUserId);
+                        return assignedMember ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+                            <User className="w-3 h-3" />
+                            {assignedMember.name}
+                          </span>
+                        ) : null;
+                      })()}
+                      {(() => {
+                        const assignedQueue = queues.find(q => q.id === activeChat.queueId);
+                        return assignedQueue ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-indigo-500/20 text-indigo-400 border-indigo-500/30">
+                            <Layers className="w-3 h-3" />
+                            {assignedQueue.name}
+                          </span>
+                        ) : null;
+                      })()}
+                      {activeChat.tags.map(tagKey => {
+                        const tagDef = availableTags.find(t => t.key === tagKey);
+                        return (
+                          <span
+                            key={tagKey}
+                            style={{
+                              backgroundColor: tagDef?.color ? `${tagDef.color}20` : 'rgba(59, 130, 246, 0.2)',
+                              borderColor: tagDef?.color || '#3b82f6',
+                            }}
+                            className="px-2 py-0.5 rounded-md text-[10px] font-medium border text-slate-200"
+                          >
+                            {tagDef?.label || tagKey}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
