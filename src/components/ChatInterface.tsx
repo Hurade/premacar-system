@@ -787,6 +787,45 @@ const ChatInterface: React.FC = () => {
     );
   };
 
+  // Badges de atendente responsável, fila e tags — usado tanto no header
+  // da conversa quanto no card da lista lateral, pra sempre mostrar o
+  // mesmo conjunto de informação nos dois lugares.
+  const renderAssignmentBadges = (chat: UIConversation) => {
+    const assignedMember = teamMembers.find(m => m.id === chat.assignedUserId);
+    const assignedQueue = queues.find(q => q.id === chat.queueId);
+    return (
+      <>
+        {assignedMember && (
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+            <User className="w-3 h-3" />
+            {assignedMember.name}
+          </span>
+        )}
+        {assignedQueue && (
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-indigo-500/20 text-indigo-400 border-indigo-500/30">
+            <Layers className="w-3 h-3" />
+            {assignedQueue.name}
+          </span>
+        )}
+        {chat.tags.map(tagKey => {
+          const tagDef = availableTags.find(t => t.key === tagKey);
+          return (
+            <span
+              key={tagKey}
+              style={{
+                backgroundColor: tagDef?.color ? `${tagDef.color}20` : 'rgba(59, 130, 246, 0.2)',
+                borderColor: tagDef?.color || '#3b82f6',
+              }}
+              className="px-2 py-0.5 rounded-md text-[10px] font-medium border text-slate-200"
+            >
+              {tagDef?.label || tagKey}
+            </span>
+          );
+        })}
+      </>
+    );
+  };
+
   const renderMessageContent = (msg: UIMessage) => {
     if (msg.type === MessageType.IMAGE) {
       return (
@@ -1427,14 +1466,10 @@ const ChatInterface: React.FC = () => {
                      chat.lastMessage || 'Sem mensagens'}
                   </p>
                   
-                  <div className="flex items-center mt-2 gap-1.5">
+                  <div className="flex flex-wrap items-center mt-2 gap-1.5">
                     {renderStatusBadge(chat.status)}
                     {renderApiSourceBadge(chat.apiSource)}
-                    {chat.tags.slice(0, 1).map(tag => (
-                      <span key={tag} className="px-2 py-0.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-[10px] rounded-md font-medium">
-                        {tag}
-                      </span>
-                    ))}
+                    {renderAssignmentBadges(chat)}
                     {chat.unreadCount > 0 && (
                       <span className="ml-auto bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-[10px] font-bold px-1.5 h-4 min-w-[1rem] flex items-center justify-center rounded-full shadow-lg shadow-cyan-500/20">
                         {chat.unreadCount}
@@ -1456,7 +1491,7 @@ const ChatInterface: React.FC = () => {
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
 
             {/* Chat Header */}
-            <div className="h-16 px-4 md:px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
+            <div className="min-h-16 py-2 px-4 md:px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
               <div className="flex items-center gap-2">
                 {isMobile && (
                   <button 
@@ -1500,39 +1535,7 @@ const ChatInterface: React.FC = () => {
                           apiSource={activeChat.apiSource}
                         />
                       )}
-                      {(() => {
-                        const assignedMember = teamMembers.find(m => m.id === activeChat.assignedUserId);
-                        return assignedMember ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
-                            <User className="w-3 h-3" />
-                            {assignedMember.name}
-                          </span>
-                        ) : null;
-                      })()}
-                      {(() => {
-                        const assignedQueue = queues.find(q => q.id === activeChat.queueId);
-                        return assignedQueue ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-indigo-500/20 text-indigo-400 border-indigo-500/30">
-                            <Layers className="w-3 h-3" />
-                            {assignedQueue.name}
-                          </span>
-                        ) : null;
-                      })()}
-                      {activeChat.tags.map(tagKey => {
-                        const tagDef = availableTags.find(t => t.key === tagKey);
-                        return (
-                          <span
-                            key={tagKey}
-                            style={{
-                              backgroundColor: tagDef?.color ? `${tagDef.color}20` : 'rgba(59, 130, 246, 0.2)',
-                              borderColor: tagDef?.color || '#3b82f6',
-                            }}
-                            className="px-2 py-0.5 rounded-md text-[10px] font-medium border text-slate-200"
-                          >
-                            {tagDef?.label || tagKey}
-                          </span>
-                        );
-                      })}
+                      {renderAssignmentBadges(activeChat)}
                     </div>
                   </div>
                 </div>
