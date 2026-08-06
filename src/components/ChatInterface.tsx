@@ -714,19 +714,31 @@ const ChatInterface: React.FC = () => {
   };
 
 
-  // Regra de visibilidade: uma vez que a conversa saiu da IA (humano ou
-  // pausada) e já está atribuída a alguém, atendente só vê a própria —
-  // gerente/admin veem todas. Conversas ainda sem responsável (recém
-  // roteadas pra fila, ninguém assumiu ainda) continuam visíveis pra
-  // todos os atendentes, senão ninguém conseguiria assumi-las.
+  // Regra 1 (qualquer aba/filtro): uma vez que a conversa saiu da IA
+  // (humano ou pausada) e já está atribuída a alguém, atendente comum só
+  // vê a própria. Conversas ainda sem responsável (recém roteadas pra
+  // fila, ninguém assumiu ainda) continuam visíveis pra todos os
+  // atendentes, senão ninguém conseguiria assumi-las. Gerente/admin não
+  // têm essa restrição — veem tudo em "Todas".
   const isHiddenFromAgent = (chat: UIConversation) =>
     chat.status !== 'nina' &&
     !canSupervise &&
     !!chat.assignedUserId &&
     chat.assignedUserId !== teamMemberId;
 
+  // Regra 2 (só dentro da aba/filtro "Atendendo"): essa aba é sempre uma
+  // visão pessoal — "o que eu estou atendendo agora" — mesmo pra
+  // gerente/admin, senão perderia o sentido. Usada tanto no contador da
+  // aba quanto no filtro em si (aplicada só quando statusFilter==='human').
+  const isHiddenInAttendingTab = (chat: UIConversation) =>
+    chat.status === 'human' && !!chat.assignedUserId && chat.assignedUserId !== teamMemberId;
+
   const filteredConversations = conversations.filter(chat => {
     if (isHiddenFromAgent(chat)) {
+      return false;
+    }
+
+    if (statusFilter === 'human' && isHiddenInAttendingTab(chat)) {
       return false;
     }
 
@@ -1088,7 +1100,7 @@ const ChatInterface: React.FC = () => {
               <User className="w-3.5 h-3.5" />
               Atendendo
               <span className="text-[10px] opacity-70">
-                ({conversations.filter(c => c.status === 'human' && !isHiddenFromAgent(c)).length})
+                ({conversations.filter(c => c.status === 'human' && !isHiddenInAttendingTab(c)).length})
               </span>
             </button>
           </div>
