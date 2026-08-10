@@ -810,19 +810,19 @@ const ChatInterface: React.FC = () => {
     );
   };
 
-  const renderApiSourceBadge = (apiSource: ApiSource) => {
+  const renderApiSourceBadge = (apiSource: ApiSource, connectionName?: string | null) => {
     if (apiSource === 'meta') {
       return (
         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 bg-blue-500/20 text-blue-400 border border-blue-500/30">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-          Meta
+          {connectionName || 'Meta'}
         </span>
       );
     }
     return (
       <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-        Evolution
+        {connectionName || 'Evolution'}
       </span>
     );
   };
@@ -1540,7 +1540,7 @@ const ChatInterface: React.FC = () => {
                   
                   <div className="flex flex-wrap items-center mt-2 gap-1.5">
                     {renderStatusBadge(chat)}
-                    {renderApiSourceBadge(chat.apiSource)}
+                    {renderApiSourceBadge(chat.apiSource, chat.connectionName)}
                     {renderAssignmentBadges(chat)}
                     {chat.unreadCount > 0 && (
                       <span className="ml-auto bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-[10px] font-bold px-1.5 h-4 min-w-[1rem] flex items-center justify-center rounded-full shadow-lg shadow-cyan-500/20">
@@ -1599,7 +1599,7 @@ const ChatInterface: React.FC = () => {
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {renderStatusBadge(activeChat)}
-                      {!isMobile && renderApiSourceBadge(activeChat.apiSource)}
+                      {!isMobile && renderApiSourceBadge(activeChat.apiSource, activeChat.connectionName)}
                       {activeChat.apiSource === 'meta' && !windowLoading && (
                         <WindowStatusBadge
                           status={windowStatus}
