@@ -47,9 +47,18 @@ const Contacts: React.FC = () => {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(50);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showMobileFolders, setShowMobileFolders] = useState(false);
   const navigate = useNavigate();
   const { isAdmin, isManager } = useUserRole();
+
+  // Debounce da busca — evita 1 request por tecla digitada, já que agora a
+  // busca roda no servidor (antes filtrava só os contatos já carregados).
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const loadTagDefinitions = useCallback(async () => {
     try {
@@ -99,43 +108,76 @@ const Contacts: React.FC = () => {
     }
   }, []);
 
+  const CONTACTS_SELECT = `
+    id,
+    name,
+    phone_number,
+    oficina,
+    email,
+    tags,
+    folder_id,
+    last_activity,
+    is_blocked,
+    blocked_reason
+  `;
+
+  const buildContactsQuery = useCallback(() => {
+    let query = supabase
+      .from('contacts')
+      .select(CONTACTS_SELECT, { count: 'exact' })
+      .order('last_activity', { ascending: false });
+
+    if (selectedFolderId) {
+      query = query.eq('folder_id', selectedFolderId);
+    }
+    if (debouncedSearchTerm) {
+      const term = `%${debouncedSearchTerm}%`;
+      query = query.or(`name.ilike.${term},phone_number.ilike.${term},oficina.ilike.${term},email.ilike.${term}`);
+    }
+    return query;
+  }, [selectedFolderId, debouncedSearchTerm]);
+
+  // Busca e contagem no servidor — o Supabase (PostgREST) limita qualquer
+  // resposta a no máximo db.max_rows (padrão 1000) por request, então sem
+  // paginação de verdade a página só via os primeiros 1000 contatos e
+  // tratava esse recorte como se fosse o total (e a busca só filtrava
+  // dentro dele). Pra "Todos" precisamos paginar internamente em blocos
+  // pra mostrar de fato tudo, mesmo com mais de 1000 contatos.
   const loadContacts = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('contacts')
-        .select(`
-          id,
-          name,
-          phone_number,
-          oficina,
-          email,
-          tags,
-          folder_id,
-          last_activity,
-          is_blocked,
-          blocked_reason
-        `)
-        .order('last_activity', { ascending: false });
-
-      if (selectedFolderId) {
-        query = query.eq('folder_id', selectedFolderId);
+      if (pageSize === 'all') {
+        const BATCH = 1000;
+        let rows: any[] = [];
+        let offset = 0;
+        let total = 0;
+        while (true) {
+          const { data, error, count } = await buildContactsQuery().range(offset, offset + BATCH - 1);
+          if (error) throw error;
+          rows = rows.concat(data || []);
+          total = count ?? rows.length;
+          if (!data || data.length < BATCH || rows.length >= total) break;
+          offset += BATCH;
+        }
+        setContacts(rows.map(c => ({ ...c, is_blocked: c.is_blocked ?? false })) as ContactRow[]);
+        setTotalContacts(total);
+      } else {
+        const from = (currentPage - 1) * pageSize;
+        const { data, error, count } = await buildContactsQuery().range(from, from + pageSize - 1);
+        if (error) throw error;
+        setContacts((data || []).map(c => ({
+          ...c,
+          is_blocked: c.is_blocked ?? false,
+        })) as ContactRow[]);
+        setTotalContacts(count ?? 0);
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      setContacts((data || []).map(c => ({
-        ...c,
-        is_blocked: c.is_blocked ?? false,
-      })) as ContactRow[]);
     } catch (error) {
       console.error('Erro ao carregar contatos:', error);
       toast.error('Erro ao carregar contatos');
     } finally {
       setLoading(false);
     }
-  }, [selectedFolderId]);
+  }, [buildContactsQuery, currentPage, pageSize]);
 
   useEffect(() => {
     loadFolders();
@@ -146,27 +188,15 @@ const Contacts: React.FC = () => {
     loadContacts();
   }, [loadContacts]);
 
-  const filteredContacts = contacts.filter(c => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (c.name?.toLowerCase() || '').includes(term) ||
-      (c.phone_number || '').includes(term) ||
-      (c.oficina?.toLowerCase() || '').includes(term) ||
-      (c.email?.toLowerCase() || '').includes(term)
-    );
-  });
-
-  // Pagination logic
-  const totalContacts = filteredContacts.length;
+  // contacts já vem paginado/filtrado do servidor (ver loadContacts) — não
+  // precisa filtrar/paginar de novo no cliente.
+  const paginatedContacts = contacts;
   const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalContacts / pageSize);
-  const paginatedContacts = pageSize === 'all' 
-    ? filteredContacts 
-    : filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Reset to page 1 when filter/search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedFolderId, pageSize]);
+  }, [debouncedSearchTerm, selectedFolderId, pageSize]);
 
   const handleSelectAll = () => {
     if (selectedIds.size === paginatedContacts.length) {
@@ -425,7 +455,7 @@ const Contacts: React.FC = () => {
               <Loader2 className="h-10 w-10 animate-spin text-cyan-500 mb-3" />
               <span className="text-sm text-slate-400 animate-pulse">Carregando contatos...</span>
             </div>
-          ) : filteredContacts.length === 0 ? (
+          ) : paginatedContacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-80 text-slate-400">
               <Users className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-lg font-medium">Nenhum contato encontrado</p>

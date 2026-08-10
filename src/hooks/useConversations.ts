@@ -427,9 +427,18 @@ export function useConversations() {
           table: 'conversations'
         },
         (payload) => {
-          console.log('[Realtime] 🆕 New conversation INSERT detected:', payload.new);
           const newConv = payload.new as any;
-          
+
+          // is_active=false é usado para histórico importado em massa (ex:
+          // backup de outro CRM) — sem essa checagem, cada INSERT aparecia
+          // na tela de quem estivesse com o Chat aberto no momento, mesmo
+          // a busca normal (fetchConversations) filtrando is_active=true.
+          if (!newConv.is_active) {
+            return;
+          }
+
+          console.log('[Realtime] 🆕 New conversation INSERT detected:', newConv);
+
           // Check if already in state
           setConversations(prev => {
             if (prev.some(c => c.id === newConv.id)) {
