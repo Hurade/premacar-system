@@ -466,7 +466,12 @@ serve(async (req) => {
           .from('conversations')
           .select('*')
           .eq('contact_id', contact.id)
-          .eq('api_source', 'evolution');
+          .eq('api_source', 'evolution')
+          // Nunca reabre conversas de backup histórico importado (ex:
+          // migração do Whaticket) — elas ficam só como histórico, sem
+          // nenhum vínculo com mensagens novas de verdade, mesmo se por
+          // acaso tiverem connection_id NULL igual a essa busca.
+          .not('tags', 'cs', '{importado-whaticket}');
         existingQuery = connection?.id
           ? existingQuery.eq('connection_id', connection.id)
           : existingQuery.is('connection_id', null);
