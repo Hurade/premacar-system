@@ -10,6 +10,7 @@ import {
   Star,
   Server,
   CheckCircle2,
+  QrCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +19,7 @@ import {
   SystemOption,
 } from '@/hooks/useWhatsAppConnections';
 import { ConnectionModal } from './ConnectionModal';
+import { QrCodeModal } from './QrCodeModal';
 
 // ── Ícone do provider ─────────────────────────────────────────────────────────
 function ProviderIcon({ apiType, size = 'md' }: { apiType: string; size?: 'sm' | 'md' }) {
@@ -62,12 +64,13 @@ interface CardProps {
   systems: SystemOption[];
   testingId: string | null;
   onEdit: () => void;
+  onConnect?: () => void;
   onTest: () => void;
   onSetDefault: () => void;
   onDelete: () => void;
 }
 
-function ConnectionCard({ conn, systems, testingId, onEdit, onTest, onSetDefault, onDelete }: CardProps) {
+function ConnectionCard({ conn, systems, testingId, onEdit, onConnect, onTest, onSetDefault, onDelete }: CardProps) {
   const connSystemNames = (conn.system_ids || [])
     .map((id) => systems.find((s) => s.id === id)?.name)
     .filter(Boolean) as string[];
@@ -134,6 +137,16 @@ function ConnectionCard({ conn, systems, testingId, onEdit, onTest, onSetDefault
             <Pencil className="w-3.5 h-3.5" />
           </button>
 
+          {conn.api_type === 'evolution' && !conn.is_connected && (
+            <button
+              onClick={onConnect}
+              title="Conectar (QR Code)"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-green-400 hover:bg-slate-700/60 transition-colors"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             onClick={onTest}
             disabled={isTesting}
@@ -178,6 +191,7 @@ export function ConnectionsManager() {
     connections,
     systems,
     loading,
+    refetch,
     createConnection,
     updateConnection,
     deleteConnection,
@@ -190,6 +204,7 @@ export function ConnectionsManager() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<WhatsAppConnection | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [qrConnection, setQrConnection] = useState<WhatsAppConnection | null>(null);
 
   const realConnections = connections.filter(c => !c.id.startsWith('__legacy_'));
 
@@ -251,6 +266,7 @@ export function ConnectionsManager() {
               systems={systems}
               testingId={testingId}
               onEdit={() => { setEditingConnection(conn); setModalOpen(true); }}
+              onConnect={() => setQrConnection(conn)}
               onTest={() => handleTest(conn.id)}
               onSetDefault={() => setDefaultConnection(conn.id)}
               onDelete={() => deleteConnection(conn.id)}
@@ -266,7 +282,7 @@ export function ConnectionsManager() {
         </p>
       )}
 
-      {/* Modal */}
+      {/* Modal de criar/editar */}
       {modalOpen && (
         <ConnectionModal
           connection={editingConnection}
@@ -275,6 +291,16 @@ export function ConnectionsManager() {
           onSave={handleSave}
           onCreateEvolution={createEvolutionInstance}
           pollConnectionStatus={pollConnectionStatus}
+        />
+      )}
+
+      {/* Modal de QR para conexão já existente */}
+      {qrConnection && (
+        <QrCodeModal
+          connectionId={qrConnection.id}
+          connectionName={qrConnection.name}
+          pollConnectionStatus={pollConnectionStatus}
+          onClose={() => { setQrConnection(null); refetch(); }}
         />
       )}
     </div>
