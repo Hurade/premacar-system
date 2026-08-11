@@ -90,34 +90,63 @@ serve(async (req) => {
 
         // Get owner settings for this instance (include meta tokens for audio transcription)
         let ownerSettings = null;
-        
-        // Try by evolution instance name first
-        const { data: evoSettings } = await supabase
-          .from('nina_settings')
-          .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
+
+        // Tenta primeiro pela conexão específica (Evolution ou Meta) que
+        // recebeu a mensagem — nina_settings é uma tabela legada de config
+        // única/global (pré multi-conexão); com várias conexões (ex:
+        // Atendimento, Automax) ela só bate com a conexão original,
+        // fazendo mídia de outras conexões baixar com credenciais erradas
+        // (falha silenciosa: transcrição/descrição nunca acontece).
+        const { data: evoConnection } = await supabase
+          .from('whatsapp_connections')
+          .select('user_id, evolution_base_url, evolution_api_key, evolution_instance_name, meta_access_token')
           .eq('evolution_instance_name', phoneNumberId)
           .maybeSingle();
-        
-        if (evoSettings) {
-          ownerSettings = evoSettings;
+
+        const { data: metaConnection } = evoConnection ? { data: null } : await supabase
+          .from('whatsapp_connections')
+          .select('user_id, evolution_base_url, evolution_api_key, evolution_instance_name, meta_access_token')
+          .eq('meta_phone_number_id', phoneNumberId)
+          .maybeSingle();
+
+        const matchedConnection = evoConnection || metaConnection;
+        if (matchedConnection) {
+          ownerSettings = {
+            user_id: matchedConnection.user_id,
+            evolution_api_url: matchedConnection.evolution_base_url,
+            evolution_api_key: matchedConnection.evolution_api_key,
+            evolution_instance_name: matchedConnection.evolution_instance_name,
+            meta_access_token: matchedConnection.meta_access_token,
+            whatsapp_access_token: null,
+          };
         } else {
-          // Fallback: try by meta_phone_number_id (for Meta API messages)
-          const { data: metaSettings } = await supabase
+          // Fallback legado: nina_settings (config única, pré multi-conexão)
+          const { data: evoSettings } = await supabase
             .from('nina_settings')
             .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
-            .eq('meta_phone_number_id', phoneNumberId)
+            .eq('evolution_instance_name', phoneNumberId)
             .maybeSingle();
-          
-          if (metaSettings) {
-            ownerSettings = metaSettings;
+
+          if (evoSettings) {
+            ownerSettings = evoSettings;
           } else {
-            // Last fallback: any settings
-            const { data: anySettings } = await supabase
+            const { data: metaSettings } = await supabase
               .from('nina_settings')
               .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
-              .limit(1)
+              .eq('meta_phone_number_id', phoneNumberId)
               .maybeSingle();
-            ownerSettings = anySettings;
+
+            if (metaSettings) {
+              ownerSettings = metaSettings;
+            } else {
+              // Last fallback: any settings
+              const { data: anySettings } = await supabase
+                .from('nina_settings')
+                .select('user_id, evolution_api_url, evolution_api_key, evolution_instance_name, meta_access_token, whatsapp_access_token')
+                .limit(1)
+                .maybeSingle();
+              ownerSettings = anySettings;
+            }
           }
         }
 

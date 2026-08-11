@@ -1171,11 +1171,36 @@ async function processQueueItem(
 
       if (mediaId) {
         try {
-          const { data: mediaSettings } = await supabase
-            .from('nina_settings')
-            .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
-            .limit(1)
-            .single();
+          // Credenciais da CONEXÃO que recebeu a mensagem — com múltiplas
+          // conexões Evolution (ex: Atendimento, Automax), usar sempre o
+          // único nina_settings global baixava a mídia com a instância
+          // errada (falha silenciosa), e a IA acabava dizendo que não
+          // conseguia ouvir/ver o anexo mesmo quando a transcrição deveria
+          // funcionar normalmente.
+          let mediaSettings: any = null;
+          if (conversation.connection_id) {
+            const { data: conn } = await supabase
+              .from('whatsapp_connections')
+              .select('meta_access_token, evolution_base_url, evolution_api_key, evolution_instance_name')
+              .eq('id', conversation.connection_id)
+              .maybeSingle();
+            if (conn) {
+              mediaSettings = {
+                meta_access_token: conn.meta_access_token,
+                evolution_api_url: conn.evolution_base_url,
+                evolution_api_key: conn.evolution_api_key,
+                evolution_instance_name: conn.evolution_instance_name,
+              };
+            }
+          }
+          if (!mediaSettings) {
+            const { data: legacySettings } = await supabase
+              .from('nina_settings')
+              .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
+              .limit(1)
+              .single();
+            mediaSettings = legacySettings;
+          }
 
           const mediaBuffer = await downloadMedia(mediaSettings || {}, mediaId);
 
