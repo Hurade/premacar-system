@@ -200,6 +200,7 @@ const ChatInterface: React.FC = () => {
       const { data } = await supabase
         .from('whatsapp_connections')
         .select('id, name, phone_number, is_connected, api_type')
+        .eq('is_active', true)
         .eq('is_connected', true)
         .order('name');
       return data || [];
