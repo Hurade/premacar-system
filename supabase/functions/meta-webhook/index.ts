@@ -525,24 +525,43 @@ async function processMetaWebhookAsync(
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 💬 Buscando conversa...');
 
-        // Buscar conversa ativa para este contato VIA META
-        let { data: conversation } = await supabase
+        // Conexão que recebeu esta mensagem — resolvida ANTES de buscar a
+        // conversa: o mesmo contato pode ter conversas independentes em
+        // números diferentes. Sem escopar por connection_id, uma conversa já
+        // ativa noutra conexão (Meta ou até Evolution) era reaproveitada
+        // aqui, e a resposta saía pelo número errado.
+        const { data: metaConnection } = await supabase
+          .from('whatsapp_connections')
+          .select('id, default_queue_id')
+          .eq('meta_phone_number_id', metaSettings.meta_phone_number_id)
+          .maybeSingle();
+
+        // Buscar conversa ativa para este contato VIA META, nesta conexão
+        let conversationQuery = supabase
           .from('conversations')
           .select('*')
           .eq('contact_id', contact.id)
           .eq('is_active', true)
-          .eq('api_source', 'meta')
-          .maybeSingle();
+          .eq('api_source', 'meta');
+        conversationQuery = metaConnection?.id
+          ? conversationQuery.eq('connection_id', metaConnection.id)
+          : conversationQuery.is('connection_id', null);
+        let { data: conversation } = await conversationQuery.maybeSingle();
 
         if (!conversation) {
           // Tenta reabrir a conversa mais recente já encerrada deste contato
-          // antes de criar uma nova — evita perder o histórico de mensagens
-          // numa conversa antiga que a UI do Chat não mostra mais.
-          const { data: existingConversation } = await supabase
+          // nesta mesma conexão antes de criar uma nova — evita perder o
+          // histórico de mensagens numa conversa antiga que a UI do Chat não
+          // mostra mais.
+          let existingQuery = supabase
             .from('conversations')
             .select('*')
             .eq('contact_id', contact.id)
-            .eq('api_source', 'meta')
+            .eq('api_source', 'meta');
+          existingQuery = metaConnection?.id
+            ? existingQuery.eq('connection_id', metaConnection.id)
+            : existingQuery.is('connection_id', null);
+          const { data: existingConversation } = await existingQuery
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -567,23 +586,17 @@ async function processMetaWebhookAsync(
         if (!conversation) {
           console.log('[Meta Async] ➕ Criando nova conversa');
 
-          // Roteamento real por Fila (conexão) e Campanha (recurring_campaigns)
-          // — ver migration 20260710120000_unify_agent_configs.sql
-          const [{ data: metaConnection }, { data: activeCampaign }] = await Promise.all([
-            supabase
-              .from('whatsapp_connections')
-              .select('id, default_queue_id')
-              .eq('meta_phone_number_id', metaSettings.meta_phone_number_id)
-              .maybeSingle(),
-            supabase
-              .from('campaign_contacts')
-              .select('campaign_id')
-              .eq('contact_id', contact.id)
-              .eq('status', 'in_progress')
-              .order('updated_at', { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-          ]);
+          // Campanha recorrente ativa do contato, se houver (fila padrão já
+          // vem da conexão resolvida acima) — ver migration
+          // 20260710120000_unify_agent_configs.sql
+          const { data: activeCampaign } = await supabase
+            .from('campaign_contacts')
+            .select('campaign_id')
+            .eq('contact_id', contact.id)
+            .eq('status', 'in_progress')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
           const { data: newConversation, error: convError } = await supabase
             .from('conversations')

@@ -433,25 +433,44 @@ serve(async (req) => {
         });
       }
 
-      // 2. Get or create conversation (filter by api_source to support multi-API)
-      let { data: conversation } = await supabase
+      // Conexão que recebeu esta mensagem — precisa ser resolvida ANTES de
+      // buscar a conversa: o mesmo contato pode ter conversas independentes
+      // em números diferentes (ex: testou tanto o Automax quanto o
+      // Atendimento). Sem escopar por connection_id, uma conversa já ativa
+      // numa OUTRA conexão era reaproveitada aqui, e a resposta saía pelo
+      // número errado.
+      const { data: connection } = await supabase
+        .from('whatsapp_connections')
+        .select('id, default_queue_id')
+        .eq('evolution_instance_name', instanceName)
+        .maybeSingle();
+
+      // 2. Get or create conversation (filtra por api_source + connection_id)
+      let conversationQuery = supabase
         .from('conversations')
         .select('*')
         .eq('contact_id', contact.id)
         .eq('is_active', true)
-        .eq('api_source', 'evolution')
-        .maybeSingle();
+        .eq('api_source', 'evolution');
+      conversationQuery = connection?.id
+        ? conversationQuery.eq('connection_id', connection.id)
+        : conversationQuery.is('connection_id', null);
+      let { data: conversation } = await conversationQuery.maybeSingle();
 
-      // If no active evolution conversation exists, tenta reabrir a mais
-      // recente já encerrada deste contato antes de criar uma nova — evita
-      // "perder" o histórico de mensagens numa conversa antiga que a UI do
-      // Chat não mostra mais (só lista is_active=true).
+      // If no active evolution conversation exists nesta conexão, tenta
+      // reabrir a mais recente já encerrada (mesma conexão) antes de criar
+      // uma nova — evita "perder" o histórico de mensagens numa conversa
+      // antiga que a UI do Chat não mostra mais (só lista is_active=true).
       if (!conversation) {
-        const { data: existingConversation } = await supabase
+        let existingQuery = supabase
           .from('conversations')
           .select('*')
           .eq('contact_id', contact.id)
-          .eq('api_source', 'evolution')
+          .eq('api_source', 'evolution');
+        existingQuery = connection?.id
+          ? existingQuery.eq('connection_id', connection.id)
+          : existingQuery.is('connection_id', null);
+        const { data: existingConversation } = await existingQuery
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -473,14 +492,19 @@ serve(async (req) => {
         }
       }
 
-      // Se realmente não existe nenhuma conversa anterior (contato novo), cria uma
+      // Se realmente não existe nenhuma conversa anterior nesta conexão
+      // (contato novo, ou contato antigo falando com um número novo), cria uma
       if (!conversation) {
-        // Fila padrão da conexão (ex: número dedicado de Suporte já nasce
-        // na fila Suporte) + campanha recorrente ativa do contato, se houver
-        const [{ data: connection }, { data: activeCampaign }] = await Promise.all([
-          supabase.from('whatsapp_connections').select('id, default_queue_id').eq('evolution_instance_name', instanceName).maybeSingle(),
-          supabase.from('campaign_contacts').select('campaign_id').eq('contact_id', contact.id).eq('status', 'in_progress').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-        ]);
+        // Campanha recorrente ativa do contato, se houver (fila padrão já
+        // vem da conexão resolvida acima)
+        const { data: activeCampaign } = await supabase
+          .from('campaign_contacts')
+          .select('campaign_id')
+          .eq('contact_id', contact.id)
+          .eq('status', 'in_progress')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         const { data: newConversation, error: convError } = await supabase
           .from('conversations')
