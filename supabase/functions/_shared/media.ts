@@ -38,7 +38,12 @@ export async function downloadMediaWithType(settings: MediaSettings, mediaId: st
               contentType: resp.headers.get('content-type'),
             };
           }
+          console.error('[Media] Meta media file fetch not ok:', resp.status, await resp.text());
+        } else {
+          console.error('[Media] Meta media lookup missing url:', JSON.stringify(mediaData));
         }
+      } else {
+        console.error('[Media] Meta media lookup not ok:', mediaResp.status, await mediaResp.text());
       }
     } catch (err) {
       console.error('[Media] Meta download failed:', err);
@@ -66,6 +71,9 @@ export async function downloadMediaWithType(settings: MediaSettings, mediaId: st
             contentType: data.mimetype || null,
           };
         }
+        console.error('[Media] Evolution response missing base64:', JSON.stringify(data).slice(0, 300));
+      } else {
+        console.error('[Media] Evolution getBase64FromMediaMessage not ok:', resp.status, await resp.text());
       }
     } catch (err) {
       console.error('[Media] Evolution download failed:', err);

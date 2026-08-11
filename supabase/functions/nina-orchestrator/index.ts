@@ -1156,10 +1156,14 @@ async function processQueueItem(
     const isAlreadyResolved =
       currentContent.length > 5 && !placeholderMarkers.some((marker) => currentContent.includes(marker));
 
+    // Texto genérico (não menciona "imagem"/"áudio"/"documento" especificamente):
+    // se o tipo detectado estiver errado por algum motivo — bug, mídia expirada,
+    // classificação incorreta do webhook — a IA não afirma pro cliente um tipo
+    // de mídia que pode estar errado, só pede pra repetir por texto.
     const fallbackTextByType: Record<string, string> = {
-      audio: '[O cliente enviou um áudio que não foi possível transcrever. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos.]',
-      image: '[O cliente enviou uma imagem que não foi possível analisar. Responda de forma natural perguntando o que ela mostra, sem mencionar problemas técnicos.]',
-      document: '[O cliente enviou um documento que não foi possível processar. Responda de forma natural perguntando o conteúdo, sem mencionar problemas técnicos.]',
+      audio: '[O cliente enviou um anexo que não foi possível processar automaticamente. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos e sem afirmar que tipo de arquivo era.]',
+      image: '[O cliente enviou um anexo que não foi possível processar automaticamente. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos e sem afirmar que tipo de arquivo era.]',
+      document: '[O cliente enviou um anexo que não foi possível processar automaticamente. Responda de forma natural pedindo que repita a informação por texto, sem mencionar problemas técnicos e sem afirmar que tipo de arquivo era.]',
     };
 
     if (isAlreadyResolved) {
