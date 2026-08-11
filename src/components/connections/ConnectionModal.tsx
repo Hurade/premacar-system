@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Info, ArrowLeft, Server, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import type { WhatsAppConnection, SystemOption } from '@/hooks/useWhatsAppConnections';
 import { api } from '@/services/api';
 
@@ -27,9 +28,17 @@ interface ConnectionModalProps {
   systems: SystemOption[];
   onClose: () => void;
   onSave: (data: Partial<WhatsAppConnection>) => Promise<boolean>;
+  onCreateEvolution?: (params: {
+    name: string;
+    phone_number: string;
+    default_queue_id: string | null;
+    system_ids: string[];
+  }) => Promise<{ success: boolean; connectionId?: string; error?: string }>;
+  pollConnectionStatus?: (connectionId: string) => Promise<{ is_connected: boolean; qr_code: string | null }>;
 }
 
 type Provider = 'evolution' | 'meta_official';
+type Step = 'provider' | 'form' | 'qr';
 
 // ── Passo 1: escolha de provider ─────────────────────────────────────────────
 function ProviderStep({ onSelect }: { onSelect: (p: Provider) => void }) {
@@ -76,16 +85,15 @@ function ProviderStep({ onSelect }: { onSelect: (p: Provider) => void }) {
 // ── Passo 2: formulário ───────────────────────────────────────────────────────
 interface FormStepProps {
   provider: Provider;
+  isEditing: boolean;
   data: Record<string, any>;
   onChange: (d: Record<string, any>) => void;
   queues: Array<{ id: string; name: string }>;
   systems: SystemOption[];
 }
 
-function FormStep({ provider, data, onChange, queues, systems }: FormStepProps) {
-  const metaWebhookUrl = SUPABASE_URL
-    ? `${SUPABASE_URL}/functions/v1/meta-webhook`
-    : '';
+function FormStep({ provider, isEditing, data, onChange, queues, systems }: FormStepProps) {
+  const metaWebhookUrl = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/meta-webhook` : '';
 
   const set = (key: string, value: any) => onChange({ ...data, [key]: value });
 
@@ -159,12 +167,21 @@ function FormStep({ provider, data, onChange, queues, systems }: FormStepProps) 
           })}
         </div>
         <p className="text-xs text-slate-500">
-          Qual(is) sistema(s)/marca(s) chegam por este número — usado pela Cris para se apresentar certo e escolher o conteúdo certo. Selecione mais de um se esta conexão for compartilhada (ex: Automax Frotas + Oficina + Maxsig no mesmo número).
+          Qual(is) sistema(s)/marca(s) chegam por este número — usado pela Cris para se apresentar certo e escolher o conteúdo certo.
         </p>
       </div>
 
-      {/* Campos Evolution */}
-      {provider === 'evolution' && (
+      {/* Campos Evolution — automático para criação nova, manual só na edição */}
+      {provider === 'evolution' && !isEditing && (
+        <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 flex items-start gap-2">
+          <Info className="w-3.5 h-3.5 text-green-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-green-300">
+            A instância será criada automaticamente na sua Evolution API e um QR Code aparecerá para você escanear.
+          </p>
+        </div>
+      )}
+
+      {provider === 'evolution' && isEditing && (
         <>
           <div className="border-t border-slate-800 pt-3">
             <p className="text-xs font-medium text-green-400 mb-3 flex items-center gap-1.5">
@@ -277,14 +294,91 @@ function FormStep({ provider, data, onChange, queues, systems }: FormStepProps) 
   );
 }
 
+// ── Passo 3: QR Code ──────────────────────────────────────────────────────────
+interface QrStepProps {
+  connectionId: string;
+  pollConnectionStatus: (id: string) => Promise<{ is_connected: boolean; qr_code: string | null }>;
+  onClose: () => void;
+}
+
+function QrStep({ connectionId, pollConnectionStatus, onClose }: QrStepProps) {
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+
+  // Usa useCallback para que o identity da função seja estável no useEffect
+  const stableOnClose = useCallback(onClose, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let active = true;
+
+    const check = async () => {
+      const result = await pollConnectionStatus(connectionId);
+      if (!active) return;
+      if (result.qr_code) setQrCode(result.qr_code);
+      if (result.is_connected) {
+        setConnected(true);
+        active = false;
+        setTimeout(() => stableOnClose(), 1500);
+      }
+    };
+
+    check();
+    const interval = setInterval(check, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [connectionId, pollConnectionStatus, stableOnClose]);
+
+  const normalizedQr = qrCode
+    ? qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`
+    : null;
+
+  if (connected) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8">
+        <CheckCircle className="w-16 h-16 text-green-400" />
+        <p className="text-white font-semibold text-lg">Conectado com sucesso!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 py-4">
+      {normalizedQr ? (
+        <img
+          src={normalizedQr}
+          alt="QR Code WhatsApp"
+          className="w-56 h-56 rounded-xl border border-slate-700 bg-white p-1"
+        />
+      ) : (
+        <div className="w-56 h-56 flex flex-col items-center justify-center gap-3 rounded-xl border border-slate-700 bg-slate-800/50">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+          <p className="text-sm text-slate-400">Gerando QR Code...</p>
+        </div>
+      )}
+      <p className="text-xs text-slate-400 text-center max-w-[260px] leading-relaxed">
+        Abra o WhatsApp → <strong className="text-slate-300">Aparelhos conectados</strong> → Conectar aparelho e aponte para o QR
+      </p>
+    </div>
+  );
+}
+
 // ── Modal principal ──────────────────────────────────────────────────────────
-export function ConnectionModal({ connection, systems, onClose, onSave }: ConnectionModalProps) {
+export function ConnectionModal({
+  connection,
+  systems,
+  onClose,
+  onSave,
+  onCreateEvolution,
+  pollConnectionStatus,
+}: ConnectionModalProps) {
   const isEditing = !!connection;
   const [saving, setSaving] = useState(false);
   const [queues, setQueues] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
 
-  // Ao editar, começa direto no formulário com o provider já definido
-  const [step, setStep] = useState<'provider' | 'form'>(isEditing ? 'form' : 'provider');
+  const [step, setStep] = useState<Step>(isEditing ? 'form' : 'provider');
   const [provider, setProvider] = useState<Provider>(
     (connection?.api_type as Provider) || 'evolution'
   );
@@ -315,8 +409,31 @@ export function ConnectionModal({ connection, systems, onClose, onSave }: Connec
     setStep('form');
   };
 
+  // Fluxo automático Evolution (criação nova)
+  const handleCreateEvolution = async () => {
+    if (!onCreateEvolution) return;
+    setSaving(true);
+    const result = await onCreateEvolution({
+      name: data.name,
+      phone_number: data.phone_number,
+      default_queue_id: data.default_queue_id,
+      system_ids: data.system_ids,
+    });
+    setSaving(false);
+    if (result.success && result.connectionId) {
+      setCreatedConnectionId(result.connectionId);
+      setStep('qr');
+    } else {
+      toast.error(result.error || 'Erro ao criar instância Evolution');
+    }
+  };
+
+  // Fluxo manual (Meta ou edição de qualquer tipo)
   const handleSave = async () => {
     if (!data.name || !data.phone_number) return;
+    if (provider === 'evolution' && !isEditing && onCreateEvolution) {
+      return handleCreateEvolution();
+    }
     setSaving(true);
     const success = await onSave({ ...data, api_type: provider });
     setSaving(false);
@@ -325,16 +442,19 @@ export function ConnectionModal({ connection, systems, onClose, onSave }: Connec
 
   const canSave = data.name.trim() && data.phone_number.trim();
 
-  const title = isEditing
-    ? `Editar: ${connection!.name}`
-    : step === 'provider'
-    ? 'Nova Conexão'
-    : provider === 'evolution'
-    ? 'Configurar Evolution API'
-    : 'Configurar Meta Oficial';
+  const title =
+    step === 'qr'
+      ? 'Conectar WhatsApp'
+      : isEditing
+      ? `Editar: ${connection!.name}`
+      : step === 'provider'
+      ? 'Nova Conexão'
+      : provider === 'evolution'
+      ? 'Nova Conexão Evolution'
+      : 'Configurar Meta Oficial';
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={step === 'qr' ? undefined : onClose}>
       <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
@@ -353,15 +473,21 @@ export function ConnectionModal({ connection, systems, onClose, onSave }: Connec
               Escolha o tipo de integração para esta conexão WhatsApp.
             </DialogDescription>
           )}
+          {step === 'qr' && (
+            <DialogDescription className="text-slate-400">
+              Aguardando conexão do WhatsApp...
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <div className="mt-2">
-          {step === 'provider' ? (
-            <ProviderStep onSelect={handleProviderSelect} />
-          ) : (
+          {step === 'provider' && <ProviderStep onSelect={handleProviderSelect} />}
+
+          {step === 'form' && (
             <>
               <FormStep
                 provider={provider}
+                isEditing={isEditing}
                 data={data}
                 onChange={setData as (d: Record<string, any>) => void}
                 queues={queues}
@@ -377,6 +503,14 @@ export function ConnectionModal({ connection, systems, onClose, onSave }: Connec
                 </Button>
               </div>
             </>
+          )}
+
+          {step === 'qr' && createdConnectionId && pollConnectionStatus && (
+            <QrStep
+              connectionId={createdConnectionId}
+              pollConnectionStatus={pollConnectionStatus}
+              onClose={onClose}
+            />
           )}
         </div>
       </DialogContent>

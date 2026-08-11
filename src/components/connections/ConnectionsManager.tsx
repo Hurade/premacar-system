@@ -183,6 +183,8 @@ export function ConnectionsManager() {
     deleteConnection,
     testConnection,
     setDefaultConnection,
+    createEvolutionInstance,
+    pollConnectionStatus,
   } = useWhatsAppConnections();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -271,6 +273,8 @@ export function ConnectionsManager() {
           systems={systems}
           onClose={() => { setModalOpen(false); setEditingConnection(null); }}
           onSave={handleSave}
+          onCreateEvolution={createEvolutionInstance}
+          pollConnectionStatus={pollConnectionStatus}
         />
       )}
     </div>

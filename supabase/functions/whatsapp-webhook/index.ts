@@ -141,11 +141,50 @@ serve(async (req) => {
 
 
       // Handle different Evolution events
+      if (event === 'qrcode.updated') {
+        // Evolution v2 manda o QR em data.qrcode.base64 ou data.base64
+        const base64 = data?.qrcode?.base64 || data?.base64 || null;
+        console.log('[Webhook] QR updated for instance:', instanceName, 'has base64:', !!base64);
+        if (base64) {
+          const expiresAt = new Date(Date.now() + 60_000).toISOString();
+          const { error: qrErr } = await supabase
+            .from('whatsapp_connections')
+            .update({ qr_code: base64, qr_code_expires_at: expiresAt, is_connected: false })
+            .eq('evolution_instance_name', instanceName);
+          if (qrErr) console.error('[Webhook] Error saving QR:', qrErr);
+        }
+        return new Response(JSON.stringify({ status: 'qrcode_saved' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       if (event === 'connection.update') {
-        console.log('[Webhook] Connection update:', data?.state);
-        return new Response(JSON.stringify({ status: 'connection_update_received' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        const state = data?.state || data?.connection || 'unknown';
+        console.log('[Webhook] Connection update:', state, 'instance:', instanceName);
+        if (state === 'open') {
+          // Conectou — marca conectado e limpa o QR (já não serve)
+          const { error: connErr } = await supabase
+            .from('whatsapp_connections')
+            .update({
+              is_connected: true,
+              last_connected_at: new Date().toISOString(),
+              qr_code: null,
+              qr_code_expires_at: null
+            })
+            .eq('evolution_instance_name', instanceName);
+          if (connErr) console.error('[Webhook] Error marking connected:', connErr);
+        } else if (state === 'close' || state === 'connecting') {
+          // Desconectou ou reconectando — marca desconectado
+          const { error: dcErr } = await supabase
+            .from('whatsapp_connections')
+            .update({ is_connected: false })
+            .eq('evolution_instance_name', instanceName);
+          if (dcErr) console.error('[Webhook] Error marking disconnected:', dcErr);
+        }
+        return new Response(JSON.stringify({ status: 'connection_update_processed', state }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 

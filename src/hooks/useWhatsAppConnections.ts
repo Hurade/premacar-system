@@ -322,6 +322,69 @@ export function useWhatsAppConnections() {
     }
   }, [fetchConnections]);
 
+  // Cria instância Evolution automaticamente (nome amigável → slug → edge function)
+  const createEvolutionInstance = useCallback(async (params: {
+    name: string;
+    phone_number: string;
+    default_queue_id: string | null;
+    system_ids: string[];
+  }): Promise<{ success: boolean; connectionId?: string; instanceName?: string; error?: string }> => {
+    try {
+      const slug = params.name
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const instanceName = `premacar-${slug}-${Date.now().toString(36)}`;
+
+      const { data: created, error: insErr } = await supabase
+        .from('whatsapp_connections')
+        .insert({
+          name: params.name,
+          phone_number: params.phone_number,
+          api_type: 'evolution',
+          evolution_instance_name: instanceName,
+          default_queue_id: params.default_queue_id,
+          is_active: true,
+          is_connected: false,
+        } as any)
+        .select('id')
+        .single();
+      if (insErr) throw insErr;
+      const connectionId = created.id;
+
+      await syncConnectionSystems(connectionId, params.system_ids);
+
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
+      const { data: result, error: fnErr } = await supabase.functions.invoke('evolution-instance-manager', {
+        body: {
+          action: 'create',
+          connection_id: connectionId,
+          instance_name: instanceName,
+          webhook_url: webhookUrl,
+        },
+      });
+      if (fnErr) throw fnErr;
+      if (result?.success === false) {
+        await supabase.from('whatsapp_connections').update({ is_active: false } as any).eq('id', connectionId);
+        return { success: false, error: result?.error || 'Falha ao criar instância' };
+      }
+
+      await fetchConnections();
+      return { success: true, connectionId, instanceName };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }, [fetchConnections, syncConnectionSystems]);
+
+  // Lê status e QR diretamente do banco (o webhook mantém atualizado)
+  const pollConnectionStatus = useCallback(async (connectionId: string): Promise<{ is_connected: boolean; qr_code: string | null }> => {
+    const { data } = await supabase
+      .from('whatsapp_connections')
+      .select('is_connected, qr_code')
+      .eq('id', connectionId)
+      .maybeSingle();
+    return { is_connected: data?.is_connected ?? false, qr_code: data?.qr_code ?? null };
+  }, []);
+
   useEffect(() => {
     fetchConnections();
     fetchSystems();
@@ -338,5 +401,7 @@ export function useWhatsAppConnections() {
     testConnection,
     setDefaultConnection,
     getQrCode,
+    createEvolutionInstance,
+    pollConnectionStatus,
   };
 }
