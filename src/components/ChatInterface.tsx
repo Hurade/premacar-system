@@ -1564,58 +1564,47 @@ const ChatInterface: React.FC = () => {
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
 
             {/* Chat Header */}
-            <div className="min-h-16 py-2 px-4 md:px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
-              <div className="flex items-center gap-2">
+            <div className="min-h-16 py-2 px-4 md:px-6 flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 {isMobile && (
-                  <button 
-                    onClick={() => setSelectedChatId(null)} 
+                  <button
+                    onClick={() => setSelectedChatId(null)}
                     className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
                 )}
-                <div 
-                  className="flex items-center cursor-pointer hover:bg-slate-800/50 p-1.5 rounded-lg transition-colors pr-3"
+                <div
+                  className="flex items-center cursor-pointer hover:bg-slate-800/50 p-1.5 rounded-lg transition-colors pr-3 min-w-0"
                   onClick={() => !isMobile && setShowProfileInfo(!showProfileInfo)}
                 >
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <img src={activeChat.contactAvatar} alt={activeChat.contactName} className="w-9 h-9 rounded-full ring-2 ring-slate-800" />
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
                   </div>
-                  <div className="ml-3">
-                    <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <div className="ml-3 min-w-0">
+                    <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2 truncate">
                       {activeChat.contactName}
                       {activeChat.contactIsBlocked && (
                         <span
-                          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 border border-red-500/30 text-red-400"
+                          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 border border-red-500/30 text-red-400 shrink-0"
                           title={activeChat.contactBlockedReason || undefined}
                         >
                           Bloqueado
                         </span>
                       )}
                     </h2>
-                    <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
+                    <p className="text-xs text-cyan-500 font-medium truncate">{activeChat.contactPhone}</p>
                     {activeChat.protocolNumber && (
-                      <p className="text-[10px] text-slate-500 font-mono">Protocolo {activeChat.protocolNumber}</p>
+                      <p className="text-[10px] text-slate-500 font-mono truncate">Protocolo {activeChat.protocolNumber}</p>
                     )}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                      {renderStatusBadge(activeChat)}
-                      {!isMobile && renderApiSourceBadge(activeChat.apiSource, activeChat.connectionName)}
-                      {activeChat.apiSource === 'meta' && !windowLoading && (
-                        <WindowStatusBadge
-                          status={windowStatus}
-                          hoursRemaining={hoursRemaining}
-                          apiSource={activeChat.apiSource}
-                        />
-                      )}
-                      {renderAssignmentBadges(activeChat)}
-                    </div>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 {/* Status control buttons */}
-                <Button 
+                <Button
                   variant="ghost" 
                   size="icon" 
                   className={`text-slate-400 hover:text-white ${activeChat.status === 'nina' ? 'bg-violet-500/20 text-violet-400' : ''}`}
@@ -1784,6 +1773,20 @@ const ChatInterface: React.FC = () => {
                     </div>
                   </PopoverContent>
                 </Popover>
+              </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {renderStatusBadge(activeChat)}
+                {!isMobile && renderApiSourceBadge(activeChat.apiSource, activeChat.connectionName)}
+                {activeChat.apiSource === 'meta' && !windowLoading && (
+                  <WindowStatusBadge
+                    status={windowStatus}
+                    hoursRemaining={hoursRemaining}
+                    apiSource={activeChat.apiSource}
+                  />
+                )}
+                {renderAssignmentBadges(activeChat)}
               </div>
             </div>
 
