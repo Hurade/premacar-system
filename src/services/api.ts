@@ -995,12 +995,16 @@ export const api = {
     }
     const finalDeals = [...deduplicatedDeals.values(), ...dealsWithoutContact];
 
-    // Incluir contatos com conversa em aberto que ainda não têm deal.
-    // Considera "em aberto": status nina/human OU window_status='open' (cliente com mensagem recente).
+    // Incluir contatos com conversa ainda intocada (status='nina', ativa) que
+    // por algum motivo não têm deal. Não inclui status='human' (já foi
+    // assumida/transferida — deixou de ser "novo lead") nem conversas
+    // inativas (finalizadas ou histórico importado) — mesmo critério do
+    // trigger sync_deal_stage_on_conversation_lifecycle.
     const { data: activeConvsOrphan, error: orphanError } = await supabase
       .from('conversations')
       .select('id, contact_id, status, window_status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
-      .or('status.in.(nina,human),window_status.eq.open');
+      .eq('status', 'nina')
+      .eq('is_active', true);
 
     if (orphanError) console.error('[Pipeline] Error fetching orphan conversations:', orphanError);
 
