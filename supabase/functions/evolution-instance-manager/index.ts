@@ -61,7 +61,7 @@ serve(async (req) => {
           integration: "WHATSAPP-BAILEYS",
           webhook: {
             url: webhook_url,
-            byEvents: true,
+            byEvents: false,
             base64: true,
             events: [
               "MESSAGES_UPSERT",
