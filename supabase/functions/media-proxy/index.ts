@@ -27,14 +27,53 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Busca credenciais Meta + Evolution — o helper compartilhado tenta Meta
-    // primeiro e cai para Evolution automaticamente, cobrindo os dois provedores
-    // sem o frontend precisar saber qual API originou a mensagem.
-    const { data: settings } = await supabase
-      .from('nina_settings')
-      .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
+    // Credenciais da CONEXÃO que recebeu essa mídia (mensagem → conversa →
+    // conexão) — com múltiplas conexões Evolution (ex: Atendimento,
+    // Automax), usar sempre o nina_settings global só funcionava pra
+    // conexão legada original; mídia de qualquer outra conexão falhava
+    // ao baixar (áudio/vídeo/imagem/anexo não tocava/abria no chat).
+    let settings: any = null;
+    const { data: msg } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .eq('media_url', mediaId)
       .limit(1)
       .maybeSingle();
+
+    if (msg?.conversation_id) {
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('connection_id')
+        .eq('id', msg.conversation_id)
+        .maybeSingle();
+
+      if (conv?.connection_id) {
+        const { data: conn } = await supabase
+          .from('whatsapp_connections')
+          .select('meta_access_token, evolution_base_url, evolution_api_key, evolution_instance_name')
+          .eq('id', conv.connection_id)
+          .maybeSingle();
+
+        if (conn) {
+          settings = {
+            meta_access_token: conn.meta_access_token,
+            evolution_api_url: conn.evolution_base_url,
+            evolution_api_key: conn.evolution_api_key,
+            evolution_instance_name: conn.evolution_instance_name,
+          };
+        }
+      }
+    }
+
+    if (!settings) {
+      // Fallback legado: nina_settings (config única, pré multi-conexão)
+      const { data: legacySettings } = await supabase
+        .from('nina_settings')
+        .select('meta_access_token, evolution_api_url, evolution_api_key, evolution_instance_name')
+        .limit(1)
+        .maybeSingle();
+      settings = legacySettings;
+    }
 
     if (!settings) {
       return new Response(JSON.stringify({ error: 'Nenhuma configuração de WhatsApp encontrada' }), {
