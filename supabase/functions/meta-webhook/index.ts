@@ -614,11 +614,36 @@ async function processMetaWebhookAsync(
             .single();
 
           if (convError) {
-            console.error('[Meta Async] ❌ Erro ao criar conversa:', convError);
-            continue;
+            // 23505 = índice único (contact_id, connection_id, api_source)
+            // WHERE is_active — outra execução concorrente já criou a
+            // conversa um instante antes. Busca a que ela criou em vez de
+            // desistir da mensagem.
+            if (convError.code === '23505') {
+              console.log('[Meta Async] Conversa já criada por chamada concorrente, reaproveitando');
+              let raceQuery = supabase
+                .from('conversations')
+                .select('*')
+                .eq('contact_id', contact.id)
+                .eq('is_active', true)
+                .eq('api_source', 'meta');
+              raceQuery = metaConnection?.id
+                ? raceQuery.eq('connection_id', metaConnection.id)
+                : raceQuery.is('connection_id', null);
+              const { data: raceConversation } = await raceQuery.maybeSingle();
+
+              if (!raceConversation) {
+                console.error('[Meta Async] ❌ Conflito de criação mas não achou a conversa concorrente:', convError);
+                continue;
+              }
+              conversation = raceConversation;
+            } else {
+              console.error('[Meta Async] ❌ Erro ao criar conversa:', convError);
+              continue;
+            }
+          } else {
+            conversation = newConversation;
+            console.log('[Meta Async] ✅ Conversa criada:', conversation.id);
           }
-          conversation = newConversation;
-          console.log('[Meta Async] ✅ Conversa criada:', conversation.id);
         } else {
           console.log('[Meta Async] ✅ Conversa encontrada:', conversation.id);
 

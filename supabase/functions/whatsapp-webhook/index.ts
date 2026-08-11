@@ -522,14 +522,43 @@ serve(async (req) => {
           .single();
 
         if (convError) {
-          console.error('[Webhook] Error creating conversation:', convError);
-          return new Response(JSON.stringify({ error: 'Failed to create conversation' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
+          // 23505 = violou o índice único (contact_id, connection_id,
+          // api_source) WHERE is_active — outra execução concorrente deste
+          // webhook (2 mensagens quase simultâneas do mesmo contato) já
+          // criou a conversa um instante antes. Em vez de falhar, busca a
+          // que a outra chamada acabou de criar e segue com ela.
+          if (convError.code === '23505') {
+            console.log('[Webhook] Conversa já criada por chamada concorrente, reaproveitando');
+            let raceQuery = supabase
+              .from('conversations')
+              .select('*')
+              .eq('contact_id', contact.id)
+              .eq('is_active', true)
+              .eq('api_source', 'evolution');
+            raceQuery = connection?.id
+              ? raceQuery.eq('connection_id', connection.id)
+              : raceQuery.is('connection_id', null);
+            const { data: raceConversation } = await raceQuery.maybeSingle();
+
+            if (!raceConversation) {
+              console.error('[Webhook] Conflito de criação mas não achou a conversa concorrente:', convError);
+              return new Response(JSON.stringify({ error: 'Failed to create conversation' }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+            conversation = raceConversation;
+          } else {
+            console.error('[Webhook] Error creating conversation:', convError);
+            return new Response(JSON.stringify({ error: 'Failed to create conversation' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        } else {
+          conversation = newConversation;
+          console.log('[Webhook] Created new conversation:', conversation.id);
         }
-        conversation = newConversation;
-        console.log('[Webhook] Created new conversation:', conversation.id);
       }
 
       // 3. Determine message content and type
