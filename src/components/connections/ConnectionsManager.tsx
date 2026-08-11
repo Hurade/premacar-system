@@ -199,6 +199,7 @@ export function ConnectionsManager() {
     setDefaultConnection,
     createEvolutionInstance,
     pollConnectionStatus,
+    getQrCode,
   } = useWhatsAppConnections();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -291,6 +292,7 @@ export function ConnectionsManager() {
           onSave={handleSave}
           onCreateEvolution={createEvolutionInstance}
           pollConnectionStatus={pollConnectionStatus}
+          getQrCode={getQrCode}
         />
       )}
 
@@ -300,6 +302,7 @@ export function ConnectionsManager() {
           connectionId={qrConnection.id}
           connectionName={qrConnection.name}
           pollConnectionStatus={pollConnectionStatus}
+          getQrCode={getQrCode}
           onClose={() => { setQrConnection(null); refetch(); }}
         />
       )}

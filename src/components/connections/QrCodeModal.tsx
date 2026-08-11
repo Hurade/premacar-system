@@ -13,6 +13,7 @@ interface QrCodeModalProps {
   connectionId: string;
   connectionName: string;
   pollConnectionStatus: (id: string) => Promise<{ is_connected: boolean; qr_code: string | null }>;
+  getQrCode: (id: string) => Promise<{ base64: string | null; already_connected?: boolean; error?: string }>;
   onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export function QrCodeModal({
   connectionId,
   connectionName,
   pollConnectionStatus,
+  getQrCode,
   onClose,
 }: QrCodeModalProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -30,10 +32,27 @@ export function QrCodeModal({
   useEffect(() => {
     let active = true;
 
-    const check = async () => {
+    // Busca ativa de um QR novo na Evolution API — o QR do WhatsApp expira
+    // em ~30-60s. Sem isso a tela só mostrava o que já estava salvo no
+    // banco desde a criação da conexão, então quem abrisse "Conectar"
+    // depois de um tempo sempre via um código já expirado.
+    const refreshQr = async () => {
+      const result = await getQrCode(connectionId);
+      if (!active) return;
+      if (result.already_connected) {
+        setConnected(true);
+        active = false;
+        setTimeout(() => stableOnClose(), 1500);
+        return;
+      }
+      if (result.base64) setQrCode(result.base64);
+    };
+
+    // Detecção rápida de conexão via leitura passiva do banco (o webhook
+    // da Evolution marca is_connected assim que o celular escaneia).
+    const checkConnected = async () => {
       const result = await pollConnectionStatus(connectionId);
       if (!active) return;
-      if (result.qr_code) setQrCode(result.qr_code);
       if (result.is_connected) {
         setConnected(true);
         active = false;
@@ -41,13 +60,15 @@ export function QrCodeModal({
       }
     };
 
-    check();
-    const interval = setInterval(check, 3000);
+    refreshQr();
+    const qrInterval = setInterval(refreshQr, 25000);
+    const statusInterval = setInterval(checkConnected, 3000);
     return () => {
       active = false;
-      clearInterval(interval);
+      clearInterval(qrInterval);
+      clearInterval(statusInterval);
     };
-  }, [connectionId, pollConnectionStatus, stableOnClose]);
+  }, [connectionId, getQrCode, pollConnectionStatus, stableOnClose]);
 
   const normalizedQr = qrCode
     ? qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`

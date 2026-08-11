@@ -35,6 +35,7 @@ interface ConnectionModalProps {
     system_ids: string[];
   }) => Promise<{ success: boolean; connectionId?: string; error?: string }>;
   pollConnectionStatus?: (connectionId: string) => Promise<{ is_connected: boolean; qr_code: string | null }>;
+  getQrCode?: (connectionId: string) => Promise<{ base64: string | null; already_connected?: boolean; error?: string }>;
 }
 
 type Provider = 'evolution' | 'meta_official';
@@ -298,10 +299,11 @@ function FormStep({ provider, isEditing, data, onChange, queues, systems }: Form
 interface QrStepProps {
   connectionId: string;
   pollConnectionStatus: (id: string) => Promise<{ is_connected: boolean; qr_code: string | null }>;
+  getQrCode: (id: string) => Promise<{ base64: string | null; already_connected?: boolean; error?: string }>;
   onClose: () => void;
 }
 
-function QrStep({ connectionId, pollConnectionStatus, onClose }: QrStepProps) {
+function QrStep({ connectionId, pollConnectionStatus, getQrCode, onClose }: QrStepProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -311,10 +313,23 @@ function QrStep({ connectionId, pollConnectionStatus, onClose }: QrStepProps) {
   useEffect(() => {
     let active = true;
 
-    const check = async () => {
+    // Busca ativa de um QR novo — o QR do WhatsApp expira em ~30-60s, sem
+    // isso a tela ficaria travada no QR gerado na criação da instância.
+    const refreshQr = async () => {
+      const result = await getQrCode(connectionId);
+      if (!active) return;
+      if (result.already_connected) {
+        setConnected(true);
+        active = false;
+        setTimeout(() => stableOnClose(), 1500);
+        return;
+      }
+      if (result.base64) setQrCode(result.base64);
+    };
+
+    const checkConnected = async () => {
       const result = await pollConnectionStatus(connectionId);
       if (!active) return;
-      if (result.qr_code) setQrCode(result.qr_code);
       if (result.is_connected) {
         setConnected(true);
         active = false;
@@ -322,13 +337,15 @@ function QrStep({ connectionId, pollConnectionStatus, onClose }: QrStepProps) {
       }
     };
 
-    check();
-    const interval = setInterval(check, 3000);
+    refreshQr();
+    const qrInterval = setInterval(refreshQr, 25000);
+    const statusInterval = setInterval(checkConnected, 3000);
     return () => {
       active = false;
-      clearInterval(interval);
+      clearInterval(qrInterval);
+      clearInterval(statusInterval);
     };
-  }, [connectionId, pollConnectionStatus, stableOnClose]);
+  }, [connectionId, getQrCode, pollConnectionStatus, stableOnClose]);
 
   const normalizedQr = qrCode
     ? qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`
@@ -372,6 +389,7 @@ export function ConnectionModal({
   onSave,
   onCreateEvolution,
   pollConnectionStatus,
+  getQrCode,
 }: ConnectionModalProps) {
   const isEditing = !!connection;
   const [saving, setSaving] = useState(false);
@@ -505,10 +523,11 @@ export function ConnectionModal({
             </>
           )}
 
-          {step === 'qr' && createdConnectionId && pollConnectionStatus && (
+          {step === 'qr' && createdConnectionId && pollConnectionStatus && getQrCode && (
             <QrStep
               connectionId={createdConnectionId}
               pollConnectionStatus={pollConnectionStatus}
+              getQrCode={getQrCode}
               onClose={onClose}
             />
           )}
