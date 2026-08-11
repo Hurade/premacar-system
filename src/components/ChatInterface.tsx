@@ -131,7 +131,7 @@ const ChatInterface: React.FC = () => {
 
   // New feature states
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [signatureEnabled, setSignatureEnabled] = useState(false);
+  const [signatureEnabled, setSignatureEnabled] = useState(true);
   const [isInternalMode, setIsInternalMode] = useState(false);
   const [showCopilot, setShowCopilot] = useState(false);
   const [quickReplies, setQuickReplies] = useState<{ trigger: string; text: string }[]>(() => {
