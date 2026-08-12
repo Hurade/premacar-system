@@ -2437,6 +2437,7 @@ export type Database = {
           business_hours_start: string
           company_name: string | null
           created_at: string
+          csat_survey_enabled: boolean | null
           elevenlabs_api_key: string | null
           elevenlabs_model: string | null
           elevenlabs_similarity_boost: number
@@ -2497,6 +2498,7 @@ export type Database = {
           business_hours_start?: string
           company_name?: string | null
           created_at?: string
+          csat_survey_enabled?: boolean | null
           elevenlabs_api_key?: string | null
           elevenlabs_model?: string | null
           elevenlabs_similarity_boost?: number
@@ -2557,6 +2559,7 @@ export type Database = {
           business_hours_start?: string
           company_name?: string | null
           created_at?: string
+          csat_survey_enabled?: boolean | null
           elevenlabs_api_key?: string | null
           elevenlabs_model?: string | null
           elevenlabs_similarity_boost?: number
