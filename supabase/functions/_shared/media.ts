@@ -96,12 +96,14 @@ function sanitizeCacheKey(mediaId: string): string {
   return mediaId.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-// Baixa mídia com cache no Storage (bucket privado, só service_role).
+// Baixa mídia com cache best-effort no Storage (bucket privado, só service_role).
 // A Evolution API só garante servir a mesma mensagem de forma confiável
 // UMA vez (getBase64FromMediaMessage falha em chamadas repetidas pro
 // mesmo key.id) — sem cache, o segundo consumidor (ex: media-proxy
 // tocando o áudio depois que o nina-orchestrator já transcreveu) recebe
 // erro. `supabase` deve ser um client com service_role.
+// Falhas de cache (bucket sem permissão, chave inexistente) são ignoradas —
+// a mídia é sempre baixada da Evolution/Meta e servida mesmo sem cache.
 export async function getOrDownloadMedia(
   supabase: any,
   settings: MediaSettings,
@@ -109,25 +111,39 @@ export async function getOrDownloadMedia(
 ): Promise<DownloadedMedia | null> {
   const cacheKey = sanitizeCacheKey(mediaId);
 
-  const { data: cached } = await supabase.storage.from(MEDIA_CACHE_BUCKET).download(cacheKey);
-  if (cached) {
-    console.log('[Media] Cache hit:', cacheKey);
-    return { buffer: await cached.arrayBuffer(), contentType: cached.type || null };
+  // 1. Tenta ler do cache — se falhar por QUALQUER motivo, ignora e segue
+  try {
+    const { data: cached, error } = await supabase.storage.from(MEDIA_CACHE_BUCKET).download(cacheKey);
+    if (!error && cached) {
+      console.log('[Media] Cache hit:', cacheKey);
+      return { buffer: await cached.arrayBuffer(), contentType: cached.type || null };
+    }
+  } catch (cacheReadErr) {
+    console.warn('[Media] Cache read failed (ignoring):', cacheReadErr instanceof Error ? cacheReadErr.message : cacheReadErr);
   }
 
+  // 2. Baixa da fonte (Evolution/Meta) — ESTE é o caminho crítico
   const fresh = await downloadMediaWithType(settings, mediaId);
-  if (!fresh) return null;
+  if (!fresh) {
+    console.error('[Media] downloadMediaWithType retornou null para', mediaId);
+    return null;
+  }
 
-  const { error: uploadError } = await supabase.storage
-    .from(MEDIA_CACHE_BUCKET)
-    .upload(cacheKey, fresh.buffer, {
-      contentType: fresh.contentType || 'application/octet-stream',
-      upsert: true,
-    });
-  if (uploadError) {
-    console.error('[Media] Cache upload failed (serving anyway):', uploadError.message);
-  } else {
-    console.log('[Media] Cached for future requests:', cacheKey);
+  // 3. Tenta gravar no cache — se falhar, serve mesmo assim
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from(MEDIA_CACHE_BUCKET)
+      .upload(cacheKey, fresh.buffer, {
+        contentType: fresh.contentType || 'application/octet-stream',
+        upsert: true,
+      });
+    if (uploadError) {
+      console.warn('[Media] Cache upload failed (serving anyway):', uploadError.message);
+    } else {
+      console.log('[Media] Cached:', cacheKey);
+    }
+  } catch (cacheWriteErr) {
+    console.warn('[Media] Cache write threw (serving anyway):', cacheWriteErr instanceof Error ? cacheWriteErr.message : cacheWriteErr);
   }
 
   return fresh;
