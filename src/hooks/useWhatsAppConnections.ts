@@ -385,6 +385,50 @@ export function useWhatsAppConnections() {
     return { is_connected: data?.is_connected ?? false, qr_code: data?.qr_code ?? null };
   }, []);
 
+  // Logout da instância Evolution sem deletá-la (mantém a instância, só desconecta o celular)
+  const disconnectConnection = useCallback(async (id: string): Promise<boolean> => {
+    const conn = connections.find(c => c.id === id);
+    if (!conn || conn.api_type !== 'evolution' || !conn.evolution_instance_name) return false;
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-instance-manager', {
+        body: { action: 'logout', connection_id: id, instance_name: conn.evolution_instance_name },
+      });
+      if (error) throw error;
+      if (data?.success === false) {
+        toast.error(data?.error || 'Falha ao desconectar');
+        return false;
+      }
+      toast.success(`${conn.name} desconectada`);
+      await fetchConnections();
+      return true;
+    } catch (e: any) {
+      toast.error('Erro ao desconectar: ' + e.message);
+      return false;
+    }
+  }, [connections, fetchConnections]);
+
+  // Reaplicar config de webhook (byEvents=false, base64=false) em instância existente
+  const fixConnectionWebhook = useCallback(async (id: string): Promise<boolean> => {
+    const conn = connections.find(c => c.id === id);
+    if (!conn || conn.api_type !== 'evolution' || !conn.evolution_instance_name) return false;
+    try {
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
+      const { data, error } = await supabase.functions.invoke('evolution-instance-manager', {
+        body: { action: 'set_webhook', instance_name: conn.evolution_instance_name, webhook_url: webhookUrl },
+      });
+      if (error) throw error;
+      if (data?.success === false) {
+        toast.error(data?.error || 'Falha ao reconfigurar webhook');
+        return false;
+      }
+      toast.success('Webhook reconfigurado (base64=false). Mídia deve funcionar agora.');
+      return true;
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+      return false;
+    }
+  }, [connections]);
+
   useEffect(() => {
     fetchConnections();
     fetchSystems();
@@ -403,5 +447,7 @@ export function useWhatsAppConnections() {
     getQrCode,
     createEvolutionInstance,
     pollConnectionStatus,
+    disconnectConnection,
+    fixConnectionWebhook,
   };
 }

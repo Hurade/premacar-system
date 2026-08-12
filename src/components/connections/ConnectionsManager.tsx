@@ -11,6 +11,7 @@ import {
   Server,
   CheckCircle2,
   QrCode,
+  PlugZap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -65,12 +66,14 @@ interface CardProps {
   testingId: string | null;
   onEdit: () => void;
   onConnect?: () => void;
+  onDisconnect?: () => void;
+  onFixWebhook?: () => void;
   onTest: () => void;
   onSetDefault: () => void;
   onDelete: () => void;
 }
 
-function ConnectionCard({ conn, systems, testingId, onEdit, onConnect, onTest, onSetDefault, onDelete }: CardProps) {
+function ConnectionCard({ conn, systems, testingId, onEdit, onConnect, onDisconnect, onFixWebhook, onTest, onSetDefault, onDelete }: CardProps) {
   const connSystemNames = (conn.system_ids || [])
     .map((id) => systems.find((s) => s.id === id)?.name)
     .filter(Boolean) as string[];
@@ -147,6 +150,26 @@ function ConnectionCard({ conn, systems, testingId, onEdit, onConnect, onTest, o
             </button>
           )}
 
+          {conn.api_type === 'evolution' && conn.is_connected && (
+            <button
+              onClick={onDisconnect}
+              title="Desconectar"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-orange-400 hover:bg-slate-700/60 transition-colors"
+            >
+              <WifiOff className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {conn.api_type === 'evolution' && (
+            <button
+              onClick={onFixWebhook}
+              title="Reconfigurar webhook (corrige mídia)"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-purple-400 hover:bg-slate-700/60 transition-colors"
+            >
+              <PlugZap className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             onClick={onTest}
             disabled={isTesting}
@@ -197,9 +220,11 @@ export function ConnectionsManager() {
     deleteConnection,
     testConnection,
     setDefaultConnection,
+    getQrCode,
     createEvolutionInstance,
     pollConnectionStatus,
-    getQrCode,
+    disconnectConnection,
+    fixConnectionWebhook,
   } = useWhatsAppConnections();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -213,6 +238,14 @@ export function ConnectionsManager() {
     setTestingId(id);
     await testConnection(id);
     setTestingId(null);
+  };
+
+  const handleDisconnect = async (conn: WhatsAppConnection) => {
+    const confirmed = window.confirm(
+      `Desconectar "${conn.name}"? A instância será mantida na Evolution API — você pode reconectar via QR Code depois.`
+    );
+    if (!confirmed) return;
+    await disconnectConnection(conn.id);
   };
 
   const handleSave = async (data: Partial<WhatsAppConnection>) => {
@@ -268,6 +301,8 @@ export function ConnectionsManager() {
               testingId={testingId}
               onEdit={() => { setEditingConnection(conn); setModalOpen(true); }}
               onConnect={() => setQrConnection(conn)}
+              onDisconnect={() => handleDisconnect(conn)}
+              onFixWebhook={() => fixConnectionWebhook(conn.id)}
               onTest={() => handleTest(conn.id)}
               onSetDefault={() => setDefaultConnection(conn.id)}
               onDelete={() => deleteConnection(conn.id)}

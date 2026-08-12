@@ -256,6 +256,112 @@ serve(async (req) => {
       return ok({ success: true });
     }
 
+    // ── LOGOUT ───────────────────────────────────────────────────────────────────
+    if (action === "logout") {
+      const { connection_id, instance_name } = body;
+
+      if (!instance_name) return fail("Campos obrigatórios: instance_name");
+
+      console.log(`${TAG} [logout] Desconectando instância "${instance_name}"`);
+
+      const logoutRes = await fetch(
+        `${EVOLUTION_BASE_URL}/instance/logout/${instance_name}`,
+        { method: "DELETE", headers: EVOLUTION_HEADERS }
+      );
+
+      if (!logoutRes.ok) {
+        const errText = await logoutRes.text();
+        console.error(`${TAG} [logout] Evolution ${logoutRes.status}:`, errText);
+        return fail(`Evolution API retornou ${logoutRes.status} ao fazer logout`, errText);
+      }
+
+      console.log(`${TAG} [logout] Instância "${instance_name}" desconectada.`);
+
+      if (connection_id) {
+        await supabase
+          .from("whatsapp_connections")
+          .update({ is_connected: false, qr_code: null, qr_code_expires_at: null })
+          .eq("id", connection_id);
+      }
+
+      return ok({ success: true });
+    }
+
+    // ── SET_WEBHOOK ──────────────────────────────────────────────────────────────
+    if (action === "set_webhook") {
+      const { instance_name, webhook_url } = body;
+
+      if (!instance_name || !webhook_url) {
+        return fail("Campos obrigatórios: instance_name, webhook_url");
+      }
+
+      console.log(`${TAG} [set_webhook] Configurando webhook de "${instance_name}" → ${webhook_url}`);
+
+      const webhookPayloadNested = {
+        webhook: {
+          enabled: true,
+          url: webhook_url,
+          byEvents: false,
+          base64: false,
+          events: [
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "CONNECTION_UPDATE",
+            "SEND_MESSAGE",
+            "CHATS_UPSERT",
+            "QRCODE_UPDATED",
+          ],
+        },
+      };
+
+      const webhookRes = await fetch(
+        `${EVOLUTION_BASE_URL}/webhook/set/${instance_name}`,
+        { method: "POST", headers: EVOLUTION_HEADERS, body: JSON.stringify(webhookPayloadNested) }
+      );
+
+      const webhookData = await webhookRes.json().catch(() => null);
+      console.log(`${TAG} [set_webhook] Resposta nested (${webhookRes.status}):`, JSON.stringify(webhookData));
+
+      if (webhookRes.ok) {
+        return ok({ success: true, format: "nested" });
+      }
+
+      // Fallback: formato flat na raiz (algumas versões da Evolution v1)
+      console.warn(`${TAG} [set_webhook] Nested rejeitado, tentando formato flat...`);
+
+      const webhookPayloadFlat = {
+        enabled: true,
+        url: webhook_url,
+        webhook_by_events: false,
+        webhook_base64: false,
+        events: [
+          "MESSAGES_UPSERT",
+          "MESSAGES_UPDATE",
+          "CONNECTION_UPDATE",
+          "SEND_MESSAGE",
+          "CHATS_UPSERT",
+          "QRCODE_UPDATED",
+        ],
+      };
+
+      const webhookResFallback = await fetch(
+        `${EVOLUTION_BASE_URL}/webhook/set/${instance_name}`,
+        { method: "POST", headers: EVOLUTION_HEADERS, body: JSON.stringify(webhookPayloadFlat) }
+      );
+
+      const webhookDataFallback = await webhookResFallback.json().catch(() => null);
+      console.log(`${TAG} [set_webhook] Resposta flat (${webhookResFallback.status}):`, JSON.stringify(webhookDataFallback));
+
+      if (!webhookResFallback.ok) {
+        return fail(
+          `Evolution API rejeitou ambos os formatos de webhook (${webhookRes.status}, ${webhookResFallback.status})`,
+          { nested: webhookData, flat: webhookDataFallback }
+        );
+      }
+
+      return ok({ success: true, format: "flat" });
+    }
+
     // ── AÇÃO DESCONHECIDA ────────────────────────────────────────────────────────
     return new Response(
       JSON.stringify({ success: false, error: "action inválida" }),
