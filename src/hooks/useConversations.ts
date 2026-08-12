@@ -861,9 +861,17 @@ export function useConversations() {
       logUserAction('finalize_conversation', 'conversation', conversationId);
 
       if (conv?.contactId) {
-        api.sendCsatSurvey(conversationId, conv.contactId).catch((err) =>
-          console.error('[useConversations] Error sending CSAT survey (non-blocking):', err)
-        );
+        const { data: ninaSettings } = await supabase
+          .from('nina_settings')
+          .select('csat_survey_enabled')
+          .limit(1)
+          .maybeSingle();
+
+        if (ninaSettings?.csat_survey_enabled !== false) {
+          api.sendCsatSurvey(conversationId, conv.contactId).catch((err) =>
+            console.error('[useConversations] Error sending CSAT survey (non-blocking):', err)
+          );
+        }
       }
 
       // Remove from active conversations list

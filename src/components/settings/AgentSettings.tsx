@@ -24,6 +24,7 @@ interface AgentSettings {
   message_grouping_enabled: boolean;
   message_grouping_delay: number;
   scheduling_notify_phone: string | null;
+  csat_survey_enabled: boolean;
 }
 
 const DAYS_OF_WEEK = [
@@ -59,6 +60,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
     message_grouping_enabled: true,
     message_grouping_delay: 20000,
     scheduling_notify_phone: null,
+    csat_survey_enabled: true,
   });
 
   useImperativeHandle(ref, () => ({
@@ -110,6 +112,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
         message_grouping_enabled: data.message_grouping_enabled ?? true,
         message_grouping_delay: data.message_grouping_delay ?? 20000,
         scheduling_notify_phone: data.scheduling_notify_phone ?? null,
+        csat_survey_enabled: data.csat_survey_enabled ?? true,
       });
     } catch (error) {
       console.error('[AgentSettings] Error loading settings:', error);
@@ -137,6 +140,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           message_grouping_enabled: settings.message_grouping_enabled,
           message_grouping_delay: settings.message_grouping_delay,
           scheduling_notify_phone: settings.scheduling_notify_phone,
+          csat_survey_enabled: settings.csat_survey_enabled,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id!);
@@ -402,6 +406,29 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                   type="checkbox"
                   checked={settings.ai_scheduling_enabled}
                   onChange={(e) => setSettings({ ...settings, ai_scheduling_enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-sm text-slate-300 cursor-help flex items-center gap-1.5">
+                    Pesquisa de Satisfação
+                    <Info className="w-3 h-3 text-slate-500" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs max-w-[200px]">Envia automaticamente o link de avaliação (CSAT) pro cliente sempre que um atendimento é finalizado.</p>
+                </TooltipContent>
+              </Tooltip>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.csat_survey_enabled}
+                  onChange={(e) => setSettings({ ...settings, csat_survey_enabled: e.target.checked })}
                   className="sr-only peer"
                 />
                 <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
