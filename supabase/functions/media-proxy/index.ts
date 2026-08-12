@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { downloadMediaWithType } from "../_shared/media.ts";
+import { getOrDownloadMedia } from "../_shared/media.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,7 +82,7 @@ serve(async (req) => {
       });
     }
 
-    const media = await downloadMediaWithType(settings, mediaId);
+    const media = await getOrDownloadMedia(supabase, settings, mediaId);
 
     if (!media) {
       return new Response(JSON.stringify({ error: 'Falha ao baixar mídia (Meta e Evolution)' }), {

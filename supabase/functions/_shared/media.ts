@@ -90,6 +90,49 @@ export async function downloadMedia(settings: MediaSettings, mediaId: string): P
   return result?.buffer ?? null;
 }
 
+const MEDIA_CACHE_BUCKET = 'whatsapp-media-cache';
+
+function sanitizeCacheKey(mediaId: string): string {
+  return mediaId.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+// Baixa mídia com cache no Storage (bucket privado, só service_role).
+// A Evolution API só garante servir a mesma mensagem de forma confiável
+// UMA vez (getBase64FromMediaMessage falha em chamadas repetidas pro
+// mesmo key.id) — sem cache, o segundo consumidor (ex: media-proxy
+// tocando o áudio depois que o nina-orchestrator já transcreveu) recebe
+// erro. `supabase` deve ser um client com service_role.
+export async function getOrDownloadMedia(
+  supabase: any,
+  settings: MediaSettings,
+  mediaId: string
+): Promise<DownloadedMedia | null> {
+  const cacheKey = sanitizeCacheKey(mediaId);
+
+  const { data: cached } = await supabase.storage.from(MEDIA_CACHE_BUCKET).download(cacheKey);
+  if (cached) {
+    console.log('[Media] Cache hit:', cacheKey);
+    return { buffer: await cached.arrayBuffer(), contentType: cached.type || null };
+  }
+
+  const fresh = await downloadMediaWithType(settings, mediaId);
+  if (!fresh) return null;
+
+  const { error: uploadError } = await supabase.storage
+    .from(MEDIA_CACHE_BUCKET)
+    .upload(cacheKey, fresh.buffer, {
+      contentType: fresh.contentType || 'application/octet-stream',
+      upsert: true,
+    });
+  if (uploadError) {
+    console.error('[Media] Cache upload failed (serving anyway):', uploadError.message);
+  } else {
+    console.log('[Media] Cached for future requests:', cacheKey);
+  }
+
+  return fresh;
+}
+
 // Transcreve áudio no Lovable AI Gateway.
 // Modelo "whisper-1" não é mais aceito pelo gateway (catálogo de modelos
 // mudou) — usa openai/gpt-4o-mini-transcribe, um dos modelos de

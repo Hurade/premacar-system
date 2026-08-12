@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.47.10";
-import { downloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
+import { getOrDownloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
 import { generateEmbedding } from "../_shared/embeddings.ts";
 import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
 import { callAIProvider, resolveModelAndTemperature, type AIProviderRow } from "../_shared/ai-providers.ts";
@@ -1206,7 +1206,8 @@ async function processQueueItem(
             mediaSettings = legacySettings;
           }
 
-          const mediaBuffer = await downloadMedia(mediaSettings || {}, mediaId);
+          const media = await getOrDownloadMedia(supabase, mediaSettings || {}, mediaId);
+          const mediaBuffer = media?.buffer ?? null;
 
           if (mediaBuffer && mediaBuffer.byteLength > 0) {
             if (message.type === 'audio') {

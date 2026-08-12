@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { downloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
+import { getOrDownloadMedia, transcribeAudio, describeImage, extractPdfText } from "../_shared/media.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -325,7 +325,8 @@ async function combineAndTranscribeMessages(
     // não no payload do webhook — funciona igual para Meta e Evolution.
     if (dbMsg.media_url && ['audio', 'image', 'document'].includes(dbMsg.type) && lovableApiKey) {
       console.log(`[MessageGrouper] Resolvendo mídia (${dbMsg.type}):`, dbMsg.media_url);
-      const mediaBuffer = await downloadMedia(mediaSettings, dbMsg.media_url);
+      const media = await getOrDownloadMedia(supabase, mediaSettings, dbMsg.media_url);
+      const mediaBuffer = media?.buffer ?? null;
 
       if (mediaBuffer && mediaBuffer.byteLength > 0) {
         let resolved: string | null = null;
