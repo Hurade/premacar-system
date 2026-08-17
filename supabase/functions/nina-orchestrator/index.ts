@@ -1291,13 +1291,22 @@ async function processQueueItem(
   let tagInstructions: string[] = [];
   const contactTags: string[] = conversation.contact?.tags || [];
   if (contactTags.length > 0) {
+    // contacts.tags guarda o texto da tag como o usuário digitou/aplicou
+    // (ex: "Cliente"), não o `key` slugificado (ex: "cliente") gerado ao
+    // criar a tag em Configurações — comparar direto por `key` nunca batia
+    // com nenhum contato de verdade. Compara contra key E label, sem
+    // diferenciar maiúsculas/minúsculas.
+    const normalizedContactTags = contactTags.map((t) => t?.trim().toLowerCase()).filter(Boolean);
     const { data: actionTags } = await supabase
       .from('tag_definitions')
-      .select('key, ai_instruction')
+      .select('key, label, ai_instruction')
       .eq('has_action', true)
-      .not('ai_instruction', 'is', null)
-      .in('key', contactTags);
+      .not('ai_instruction', 'is', null);
     tagInstructions = (actionTags || [])
+      .filter((t: any) =>
+        normalizedContactTags.includes((t.key || '').toLowerCase()) ||
+        normalizedContactTags.includes((t.label || '').toLowerCase())
+      )
       .map((t: any) => t.ai_instruction)
       .filter((instruction: string | null) => !!instruction?.trim());
   }
