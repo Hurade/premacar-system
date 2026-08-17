@@ -140,10 +140,13 @@ export function EnviarApresentacaoModal({ apresentacao, publicLink, open, onClos
 
       if (chatConvId) {
         if (!chatConvActive) {
+          // Reativa sem forçar 'human' ainda — isso só acontece quando a
+          // mensagem for de fato enviada no chat (api.sendMessage), pra não
+          // travar a conversa fora do alcance da IA só por abrir essa tela.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data: reopened, error: reopenErr } = await (supabase as any)
             .from('conversations')
-            .update({ status: 'human', is_active: true })
+            .update({ status: 'nina', is_active: true })
             .eq('id', chatConvId)
             .select('id')
 

@@ -1664,6 +1664,16 @@ export const api = {
 
     console.log('[API] Message queued for sending');
 
+    // Só agora, quando o humano REALMENTE mandou uma mensagem, a conversa
+    // passa a ser 'human' de fato — abrir a tela (ex: modal de Proposta/
+    // Apresentação) não deve travar a conversa fora do alcance da IA antes
+    // de alguém efetivamente escrever algo.
+    await supabase
+      .from('conversations')
+      .update({ status: 'human' })
+      .eq('id', conversationId)
+      .neq('status', 'human');
+
     // Trigger whatsapp-sender to process the queue immediately
     try {
       console.log('[API] Triggering whatsapp-sender...');

@@ -139,9 +139,12 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
       // Navigate to existing conversation or create new one
       if (chatConvId) {
         if (!chatConvActive) {
+          // Reativa sem forçar 'human' ainda — isso só acontece quando a
+          // mensagem for de fato enviada no chat (api.sendMessage), pra não
+          // travar a conversa fora do alcance da IA só por abrir essa tela.
           const { data: reopened, error: reopenErr } = await (supabase as any)
             .from('conversations')
-            .update({ status: 'human', is_active: true })
+            .update({ status: 'nina', is_active: true })
             .eq('id', chatConvId)
             .select('id')
 

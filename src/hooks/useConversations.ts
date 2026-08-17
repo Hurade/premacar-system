@@ -962,7 +962,12 @@ export function useConversations() {
         .from('conversations')
         .insert({
           contact_id: contactId,
-          status: 'human',
+          // Passa pela Cris primeiro, como qualquer conversa nova — só vira
+          // 'human' de fato quando alguém mandar uma mensagem (ver
+          // api.sendMessage). Criar a conversa aqui não deve, sozinho,
+          // travar a IA fora dela (ex: abrir a tela de Proposta antes de
+          // realmente enviar algo).
+          status: 'nina',
           is_active: true,
           started_at: new Date().toISOString(),
           last_message_at: new Date().toISOString(),
