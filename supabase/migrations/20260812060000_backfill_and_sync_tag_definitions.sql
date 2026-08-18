@@ -38,9 +38,12 @@ BEGIN
       v_key := 'tag_' || substr(md5(v_tag), 1, 8);
     END IF;
 
+    -- Sem ON CONFLICT: a constraint UNIQUE em tag_definitions.key que os
+    -- arquivos de migration deste repo assumem não existe de fato no banco
+    -- de produção (esquema divergiu em algum ponto) — o EXISTS acima já
+    -- evita duplicata dentro deste laço.
     INSERT INTO public.tag_definitions (key, label, color, category, is_active)
-    VALUES (v_key, v_tag, 'border-slate-500', 'custom', true)
-    ON CONFLICT (key) DO NOTHING;
+    VALUES (v_key, v_tag, 'border-slate-500', 'custom', true);
   END LOOP;
 END $$;
 
@@ -77,8 +80,7 @@ BEGIN
     END IF;
 
     INSERT INTO public.tag_definitions (key, label, color, category, is_active)
-    VALUES (v_key, v_tag, 'border-slate-500', 'custom', true)
-    ON CONFLICT (key) DO NOTHING;
+    VALUES (v_key, v_tag, 'border-slate-500', 'custom', true);
   END LOOP;
 
   RETURN NEW;
