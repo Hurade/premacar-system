@@ -188,16 +188,33 @@ serve(async (req) => {
         });
       }
 
-      // Handle message status updates (for campaigns)
+      // Handle message status updates (chat comum + campanhas)
       if (event === 'messages.update') {
         const updates = Array.isArray(data) ? data : [data];
         
         for (const update of updates) {
           const messageId = update.key?.id;
           const status = update.update?.status;
-          
+
           if (!messageId) continue;
-          
+
+          // Atualiza a mensagem de chat normal (independente de campanha) —
+          // sem isso, o check de entregue/lida nunca muda no chat comum,
+          // só em disparos de campanha (campaign_leads, abaixo).
+          if (status === 'DELIVERY_ACK' || status === 'delivered') {
+            await supabase
+              .from('messages')
+              .update({ status: 'delivered' })
+              .eq('whatsapp_message_id', messageId)
+              .eq('status', 'sent');
+          } else if (status === 'READ' || status === 'read') {
+            await supabase
+              .from('messages')
+              .update({ status: 'read' })
+              .eq('whatsapp_message_id', messageId)
+              .in('status', ['sent', 'delivered']);
+          }
+
           // Update campaign lead status
           if (status === 'DELIVERY_ACK' || status === 'delivered') {
             await supabase
