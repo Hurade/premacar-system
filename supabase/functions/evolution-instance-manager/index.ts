@@ -38,6 +38,43 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
+  const DEFAULT_CALL_REJECTION_MESSAGE =
+    "Olá! No momento não atendemos chamadas de voz/vídeo por aqui. Pode escrever sua mensagem que já te respondemos por texto. 🙂";
+
+  // Liga a recusa automática de chamadas de voz/vídeo (rejectCall + msgCall) —
+  // usada tanto pela ação dedicada quanto automaticamente ao criar toda
+  // instância nova, pra já nascer com esse comportamento por padrão.
+  const applyCallRejection = async (instance_name: string, message?: string) => {
+    const rejectMessage = message || DEFAULT_CALL_REJECTION_MESSAGE;
+
+    // Busca as settings atuais primeiro — settings/set costuma substituir o
+    // objeto inteiro, então preserva o que já está configurado (ex:
+    // alwaysOnline, readMessages) e só muda rejectCall/msgCall.
+    const currentRes = await fetch(
+      `${EVOLUTION_BASE_URL}/settings/find/${instance_name}`,
+      { method: "GET", headers: EVOLUTION_HEADERS }
+    );
+    const current = currentRes.ok ? await currentRes.json().catch(() => ({})) : {};
+
+    const settingsPayload = {
+      rejectCall: true,
+      msgCall: rejectMessage,
+      groupsIgnore: current?.groupsIgnore ?? current?.groups_ignore ?? false,
+      alwaysOnline: current?.alwaysOnline ?? current?.always_online ?? true,
+      readMessages: current?.readMessages ?? current?.read_messages ?? false,
+      readStatus: current?.readStatus ?? current?.read_status ?? false,
+      syncFullHistory: current?.syncFullHistory ?? current?.sync_full_history ?? false,
+    };
+
+    const setRes = await fetch(
+      `${EVOLUTION_BASE_URL}/settings/set/${instance_name}`,
+      { method: "POST", headers: EVOLUTION_HEADERS, body: JSON.stringify(settingsPayload) }
+    );
+    const setData = await setRes.json().catch(() => null);
+
+    return { ok: setRes.ok, status: setRes.status, data: setData, settingsPayload };
+  };
+
   try {
     const body = await req.json();
     const { action } = body;
@@ -84,6 +121,20 @@ serve(async (req) => {
       }
 
       console.log(`${TAG} [create] Resposta Evolution:`, JSON.stringify(createData));
+
+      // Toda instância nova já nasce com recusa automática de chamada ligada
+      // — não bloqueia a criação se isso falhar (ex: instância ainda não
+      // totalmente pronta no servidor logo após criar), só loga o aviso.
+      try {
+        const callRejectionResult = await applyCallRejection(instance_name);
+        if (!callRejectionResult.ok) {
+          console.warn(`${TAG} [create] Falha ao ligar recusa de chamada (não bloqueante):`, callRejectionResult.status, JSON.stringify(callRejectionResult.data));
+        } else {
+          console.log(`${TAG} [create] Recusa de chamada ligada por padrão para "${instance_name}"`);
+        }
+      } catch (callRejectionErr) {
+        console.warn(`${TAG} [create] Erro ao ligar recusa de chamada (não bloqueante):`, callRejectionErr instanceof Error ? callRejectionErr.message : callRejectionErr);
+      }
 
       // Normaliza QR — algumas versões retornam diretamente, outras aninhado
       const base64: string | null =
@@ -369,49 +420,22 @@ serve(async (req) => {
     // Liga a recusa automática de chamadas de voz/vídeo na instância (a Evolution
     // recusa e já manda o aviso pro cliente sozinha, sem precisar de código nosso
     // pra isso — só registramos o ocorrido na conversa, no whatsapp-webhook).
+    // Toda instância NOVA já chama isso automaticamente (ver ação "create"); esta
+    // ação existe à parte pra aplicar/reaplicar em instâncias já existentes.
     if (action === "set_call_rejection") {
       const { instance_name, message } = body;
 
       if (!instance_name) return fail("Campos obrigatórios: instance_name");
 
-      const rejectMessage =
-        message || "Olá! No momento não atendemos chamadas de voz/vídeo por aqui. Pode escrever sua mensagem que já te respondemos por texto. 🙂";
-
       console.log(`${TAG} [set_call_rejection] Configurando recusa de chamadas em "${instance_name}"`);
+      const result = await applyCallRejection(instance_name, message);
+      console.log(`${TAG} [set_call_rejection] Resposta (${result.status}):`, JSON.stringify(result.data));
 
-      // Busca as settings atuais primeiro — settings/set costuma substituir o
-      // objeto inteiro, então preserva o que já está configurado (ex:
-      // alwaysOnline, readMessages) e só muda rejectCall/msgCall.
-      const currentRes = await fetch(
-        `${EVOLUTION_BASE_URL}/settings/find/${instance_name}`,
-        { method: "GET", headers: EVOLUTION_HEADERS }
-      );
-      const current = currentRes.ok ? await currentRes.json().catch(() => ({})) : {};
-      console.log(`${TAG} [set_call_rejection] Settings atuais:`, JSON.stringify(current));
-
-      const settingsPayload = {
-        rejectCall: true,
-        msgCall: rejectMessage,
-        groupsIgnore: current?.groupsIgnore ?? current?.groups_ignore ?? false,
-        alwaysOnline: current?.alwaysOnline ?? current?.always_online ?? true,
-        readMessages: current?.readMessages ?? current?.read_messages ?? false,
-        readStatus: current?.readStatus ?? current?.read_status ?? false,
-        syncFullHistory: current?.syncFullHistory ?? current?.sync_full_history ?? false,
-      };
-
-      const setRes = await fetch(
-        `${EVOLUTION_BASE_URL}/settings/set/${instance_name}`,
-        { method: "POST", headers: EVOLUTION_HEADERS, body: JSON.stringify(settingsPayload) }
-      );
-
-      const setData = await setRes.json().catch(() => null);
-      console.log(`${TAG} [set_call_rejection] Resposta (${setRes.status}):`, JSON.stringify(setData));
-
-      if (!setRes.ok) {
-        return fail(`Evolution API retornou ${setRes.status}`, setData);
+      if (!result.ok) {
+        return fail(`Evolution API retornou ${result.status}`, result.data);
       }
 
-      return ok({ success: true, settings: settingsPayload });
+      return ok({ success: true, settings: result.settingsPayload });
     }
 
     // ── AÇÃO DESCONHECIDA ────────────────────────────────────────────────────────
