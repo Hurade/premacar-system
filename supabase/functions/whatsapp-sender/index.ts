@@ -380,8 +380,12 @@ async function sendViaEvolution(
       payload = { number: recipient, mediatype: 'image', media: queueItem.media_url, caption: queueItem.content || undefined };
       break;
     case 'audio':
-      endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
-      payload = { number: recipient, mediatype: 'audio', media: queueItem.media_url };
+      // Áudio usa endpoint próprio (nota de voz/PTT), não o sendMedia
+      // genérico — mediatype 'audio' no sendMedia não é aceito pela
+      // Evolution API (por isso o áudio salvava aqui mas nunca chegava
+      // de fato pro cliente).
+      endpoint = `/message/sendWhatsAppAudio/${settings.evolution_instance_name}`;
+      payload = { number: recipient, audio: queueItem.media_url };
       break;
     case 'document':
       endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
