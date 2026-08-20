@@ -272,6 +272,80 @@ serve(async (req) => {
         });
       }
 
+      // Chamada de voz/vídeo recebida — a Evolution já recusa automaticamente
+      // e envia o aviso pro cliente sozinha (settings rejectCall/msgCall da
+      // instância); aqui só registramos o ocorrido na conversa, se já existir
+      // uma pra esse contato. Não cria contato/conversa novos só por causa de
+      // uma chamada — evita poluir o pipeline com "leads" que só ligaram.
+      if (event === 'call') {
+        console.log('[Webhook] 📞 Evento de chamada:', JSON.stringify(data));
+        const calls = Array.isArray(data) ? data : [data];
+
+        for (const call of calls) {
+          const status = call?.status;
+          // Só na primeira notificação (oferta) — evita duplicar quando a
+          // Evolution manda updates subsequentes da mesma chamada
+          if (status !== 'offer' && status !== 'ringing') continue;
+
+          const rawFrom: string = call?.from || call?.chatId || '';
+          if (!rawFrom) continue;
+          const resolvedJid = rawFrom.endsWith('@lid') && call?.fromAlt ? call.fromAlt : rawFrom;
+          const phoneNumber = resolvedJid.replace('@s.whatsapp.net', '').replace('@lid', '');
+
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('phone_number', phoneNumber)
+            .maybeSingle();
+
+          if (!contact) {
+            console.log('[Webhook] 📞 Chamada de número sem contato cadastrado, ignorando:', phoneNumber);
+            continue;
+          }
+
+          const { data: connection } = await supabase
+            .from('whatsapp_connections')
+            .select('id')
+            .eq('evolution_instance_name', instanceName)
+            .maybeSingle();
+
+          let convQuery = supabase
+            .from('conversations')
+            .select('id')
+            .eq('contact_id', contact.id)
+            .eq('api_source', 'evolution')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          convQuery = connection?.id
+            ? convQuery.eq('connection_id', connection.id)
+            : convQuery.is('connection_id', null);
+          const { data: conversation } = await convQuery.maybeSingle();
+
+          if (!conversation) {
+            console.log('[Webhook] 📞 Chamada sem conversa existente pra registrar, ignorando:', contact.id);
+            continue;
+          }
+
+          const isVideo = call?.isVideo === true;
+          await supabase.from('messages').insert({
+            conversation_id: conversation.id,
+            content: `📞 ${isVideo ? 'Chamada de vídeo' : 'Chamada de voz'} recebida e recusada automaticamente — este número não atende chamadas por aqui.`,
+            type: 'text',
+            from_type: 'system',
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            api_source: 'evolution',
+          });
+
+          console.log('[Webhook] 📞 Chamada registrada na conversa:', conversation.id);
+        }
+
+        return new Response(JSON.stringify({ status: 'call_processed' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       // Only process messages.upsert events
       if (event !== 'messages.upsert') {
         console.log('[Webhook] Ignoring event:', event);
