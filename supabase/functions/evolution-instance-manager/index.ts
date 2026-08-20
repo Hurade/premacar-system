@@ -257,7 +257,20 @@ serve(async (req) => {
         data?.instance?.connectionStatus ||
         "unknown";
 
-      return ok({ success: true, is_connected: state === "open", state });
+      // fetchInstances traz o número/dono pareado — connectionState não traz.
+      // Usado pra diagnosticar duas instâncias apontando pro mesmo WhatsApp.
+      let ownerInfo: unknown = null;
+      try {
+        const fetchRes = await fetch(
+          `${EVOLUTION_BASE_URL}/instance/fetchInstances?instanceName=${instance_name}`,
+          { method: "GET", headers: EVOLUTION_HEADERS }
+        );
+        ownerInfo = await fetchRes.json().catch(() => null);
+      } catch (fetchErr) {
+        console.warn(`${TAG} [status] fetchInstances falhou (não bloqueante):`, fetchErr instanceof Error ? fetchErr.message : fetchErr);
+      }
+
+      return ok({ success: true, is_connected: state === "open", state, raw: data, ownerInfo });
     }
 
     // ── DELETE ───────────────────────────────────────────────────────────────────
