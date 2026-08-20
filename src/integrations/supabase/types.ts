@@ -3727,6 +3727,7 @@ export type Database = {
       get_apresentacao_publica: { Args: { p_slug: string }; Returns: Json }
       get_auth_user_id: { Args: never; Returns: string }
       get_campaign_funnel: { Args: { p_campaign_id: string }; Returns: Json }
+      get_csat_enabled: { Args: never; Returns: boolean }
       get_csat_survey_by_token: {
         Args: { p_token: string }
         Returns: {
