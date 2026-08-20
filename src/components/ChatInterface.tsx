@@ -6,7 +6,7 @@ import {
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
   KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat, Users,
-  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply, Smartphone
+  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply, Smartphone, Mic
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -65,7 +65,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager, teamMemberId } = useUserRole();
   const canSupervise = isAdmin || isManager;
@@ -139,8 +139,15 @@ const ChatInterface: React.FC = () => {
   });
   const [showQuickRepliesPanel, setShowQuickRepliesPanel] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [isSendingAudio, setIsSendingAudio] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   const activeChat = conversations.find(c => c.id === selectedChatId);
   const isSpyMode = canSupervise && spyConversationId !== null && spyConversationId === selectedChatId;
@@ -461,6 +468,87 @@ const ChatInterface: React.FC = () => {
       setIsUploadingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const stopRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const stopRecordingStream = () => {
+    recordingStreamRef.current?.getTracks().forEach(track => track.stop());
+    recordingStreamRef.current = null;
+  };
+
+  const startAudioRecording = async () => {
+    if (!activeChat) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      audioChunksRef.current = [];
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.start();
+      setIsRecordingAudio(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch (err) {
+      console.error('[ChatInterface] Error starting audio recording:', err);
+      toast.error('Não foi possível acessar o microfone. Verifique a permissão do navegador.');
+    }
+  };
+
+  const cancelAudioRecording = () => {
+    mediaRecorderRef.current?.stop();
+    stopRecordingStream();
+    stopRecordingTimer();
+    audioChunksRef.current = [];
+    setIsRecordingAudio(false);
+    setRecordingSeconds(0);
+  };
+
+  const finishAudioRecording = () => {
+    if (!mediaRecorderRef.current || !activeChat) return;
+    const recorder = mediaRecorderRef.current;
+    const conversationId = activeChat.id;
+    const durationSeconds = recordingSeconds;
+
+    recorder.onstop = async () => {
+      stopRecordingStream();
+      setIsRecordingAudio(false);
+      setRecordingSeconds(0);
+
+      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+      audioChunksRef.current = [];
+
+      if (audioBlob.size === 0) return;
+
+      setIsSendingAudio(true);
+      try {
+        await sendAudioMessage(conversationId, audioBlob, durationSeconds);
+      } catch (err) {
+        console.error('[ChatInterface] Error sending recorded audio:', err);
+      } finally {
+        setIsSendingAudio(false);
+      }
+    };
+
+    stopRecordingTimer();
+    recorder.stop();
+  };
+
+  const formatRecordingTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -2084,6 +2172,25 @@ const ChatInterface: React.FC = () => {
                 )}
 
                 <form onSubmit={handleSendMessage} className="flex items-end gap-2 max-w-4xl mx-auto">
+                  {isRecordingAudio ? (
+                    <div className="flex-1 flex items-center gap-3 bg-slate-950 border border-red-500/40 rounded-2xl px-4 py-3">
+                      <button type="button" onClick={cancelAudioRecording} className="text-slate-400 hover:text-red-400 shrink-0" title="Cancelar gravação">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                      <span className="text-sm text-slate-300 font-mono shrink-0">{formatRecordingTime(recordingSeconds)}</span>
+                      <span className="flex-1 text-xs text-slate-500 truncate">Gravando áudio...</span>
+                      <button
+                        type="button"
+                        onClick={finishAudioRecording}
+                        className="rounded-full w-10 h-10 flex items-center justify-center bg-cyan-500 hover:bg-cyan-400 text-white shrink-0 transition-colors"
+                        title="Enviar áudio"
+                      >
+                        <Send className="w-4 h-4 ml-0.5" />
+                      </button>
+                    </div>
+                  ) : (
+                  <>
                   <div className="flex items-center gap-1">
                     {/* Emoji picker */}
                     <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
@@ -2177,19 +2284,33 @@ const ChatInterface: React.FC = () => {
                     )}
                   </div>
 
-                  <Button
-                    type="submit"
-                    disabled={!inputText.trim()}
-                    className={`rounded-full w-12 h-12 p-0 transition-all shrink-0 ${
-                      isInternalMode
-                        ? 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
-                        : inputText.trim()
-                          ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95'
-                          : 'opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    {isInternalMode ? <Lock className="w-4 h-4" /> : <Send className="w-5 h-5 ml-0.5" />}
-                  </Button>
+                  {!isInternalMode && !inputText.trim() ? (
+                    <Button
+                      type="button"
+                      disabled={isSendingAudio}
+                      onClick={startAudioRecording}
+                      title="Gravar áudio"
+                      className="rounded-full w-12 h-12 p-0 shrink-0 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-white shadow-none"
+                    >
+                      {isSendingAudio ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={!inputText.trim()}
+                      className={`rounded-full w-12 h-12 p-0 transition-all shrink-0 ${
+                        isInternalMode
+                          ? 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
+                          : inputText.trim()
+                            ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95'
+                            : 'opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      {isInternalMode ? <Lock className="w-4 h-4" /> : <Send className="w-5 h-5 ml-0.5" />}
+                    </Button>
+                  )}
+                  </>
+                  )}
                 </form>
               </div>
             )}

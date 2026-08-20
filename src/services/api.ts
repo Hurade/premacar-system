@@ -1694,6 +1694,98 @@ export const api = {
   },
 
   /**
+   * Envia uma mensagem de áudio (gravada no navegador) pelo chat.
+   * Sobe o arquivo pro bucket público "chat-audio" e reaproveita o mesmo
+   * fluxo do sendMessage (mensagem pré-criada + send_queue + trigger do
+   * whatsapp-sender, que já sabe mandar mediatype 'audio' pra Evolution/Meta).
+   */
+  sendAudioMessage: async (conversationId: string, audioBlob: Blob, durationSeconds?: number): Promise<string> => {
+    console.log(`[API] Sending audio message to conversation ${conversationId}`);
+
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('contact_id')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      console.error('[API] Error getting conversation:', convError);
+      throw new Error('Conversation not found');
+    }
+
+    const contentType = audioBlob.type || 'audio/webm';
+    const ext = contentType.includes('ogg') ? 'ogg' : contentType.includes('mp4') || contentType.includes('m4a') ? 'm4a' : 'webm';
+    const filePath = `${conversationId}/${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('chat-audio')
+      .upload(filePath, audioBlob, { contentType, upsert: false });
+
+    if (uploadError) {
+      console.error('[API] Error uploading audio:', uploadError);
+      throw uploadError;
+    }
+
+    const { data: urlData } = supabase.storage.from('chat-audio').getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
+
+    const { data: msgData, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        content: '',
+        type: 'audio',
+        from_type: 'human',
+        status: 'processing',
+        media_url: publicUrl,
+        media_type: 'audio',
+        sent_at: new Date().toISOString(),
+        metadata: durationSeconds ? { duration_seconds: durationSeconds } : {},
+      })
+      .select('id')
+      .single();
+
+    if (msgError || !msgData) {
+      console.error('[API] Error creating audio message record:', msgError);
+      throw new Error('Failed to create message record');
+    }
+
+    const { error: sendError } = await supabase
+      .from('send_queue')
+      .insert({
+        conversation_id: conversationId,
+        contact_id: conversation.contact_id,
+        content: '',
+        from_type: 'human',
+        message_type: 'audio',
+        media_url: publicUrl,
+        priority: 2,
+        message_id: msgData.id,
+      });
+
+    if (sendError) {
+      console.error('[API] Error queuing audio message:', sendError);
+      throw sendError;
+    }
+
+    // Mesma regra de qualquer envio humano: a conversa passa a ser 'human'.
+    await supabase
+      .from('conversations')
+      .update({ status: 'human' })
+      .eq('id', conversationId)
+      .neq('status', 'human');
+
+    try {
+      const { error: triggerError } = await supabase.functions.invoke('whatsapp-sender');
+      if (triggerError) console.error('[API] Error triggering whatsapp-sender:', triggerError);
+    } catch (err) {
+      console.error('[API] Failed to trigger whatsapp-sender:', err);
+    }
+
+    return msgData.id;
+  },
+
+  /**
    * Apaga uma mensagem — sempre remove do nosso sistema; se for uma
    * mensagem nossa numa conversa Evolution com whatsapp_message_id,
    * tenta (best-effort) apagar também do lado do cliente.

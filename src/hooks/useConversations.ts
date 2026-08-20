@@ -581,6 +581,44 @@ export function useConversations() {
     }
   }, []);
 
+  // Send a recorded audio message (voice note) via WhatsApp
+  const sendAudioMessage = useCallback(async (conversationId: string, audioBlob: Blob, durationSeconds?: number) => {
+    const tempId = `temp-audio-${Date.now()}`;
+    const tempUrl = URL.createObjectURL(audioBlob);
+    const tempMessage: UIMessage = {
+      id: tempId,
+      content: '',
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      sentAt: new Date().toISOString(),
+      direction: MessageDirection.OUTGOING,
+      type: MessageType.AUDIO,
+      status: 'sent',
+      fromType: 'human',
+      mediaUrl: tempUrl,
+      whatsappMessageId: null,
+      replyToId: null,
+      apiSource: null
+    };
+
+    setConversations(prev => prev.map(conv => (
+      conv.id === conversationId
+        ? { ...conv, messages: [...conv.messages, tempMessage], lastMessage: '🎤 Áudio', lastMessageTime: 'Agora' }
+        : conv
+    )));
+
+    try {
+      await api.sendAudioMessage(conversationId, audioBlob, durationSeconds);
+    } catch (err) {
+      console.error('[useConversations] Error sending audio message:', err);
+      toast.error('Erro ao enviar áudio');
+      setConversations(prev => prev.map(conv => (
+        conv.id === conversationId
+          ? { ...conv, messages: conv.messages.filter(m => m.id !== tempId) }
+          : conv
+      )));
+    }
+  }, []);
+
   // Send internal note (saved in DB, NOT sent to WhatsApp, not visible to contact)
   const sendInternalNote = useCallback(async (conversationId: string, content: string, senderName?: string) => {
     if (!content.trim()) return;
@@ -992,6 +1030,7 @@ export function useConversations() {
     error,
     realtimeConnected,
     sendMessage,
+    sendAudioMessage,
     sendInternalNote,
     updateStatus,
     markAsRead,
