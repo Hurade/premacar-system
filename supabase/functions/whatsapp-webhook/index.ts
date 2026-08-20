@@ -391,13 +391,32 @@ serve(async (req) => {
         ownerId = adminRole?.user_id || null;
       }
 
-      // Skip messages from self (fromMe = true)
+      // fromMe = true cobre dois casos bem diferentes: (1) eco da mensagem que
+      // o PRÓPRIO sistema acabou de mandar (via whatsapp-sender) — precisa
+      // ignorar, senão duplica; (2) mensagem mandada direto do celular
+      // conectado, fora do sistema — nunca foi salva, precisa aparecer no
+      // chat (com um ícone de celular pra diferenciar de quem manda pelo
+      // sistema). Distingue pelo whatsapp_message_id: se já existe uma
+      // mensagem nossa com esse id, é o eco do caso (1); senão, é (2).
+      let isPhoneMessage = false;
       if (data.key?.fromMe) {
-        console.log('[Webhook] Skipping message from self');
-        return new Response(JSON.stringify({ status: 'ignored_from_me' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
+        const echoId = data.key?.id;
+        const { data: existingEcho } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('whatsapp_message_id', echoId)
+          .maybeSingle();
+
+        if (existingEcho) {
+          console.log('[Webhook] Skipping message from self (already sent via system)');
+          return new Response(JSON.stringify({ status: 'ignored_from_me' }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log('[Webhook] 📱 Mensagem enviada direto do celular, registrando');
+        isPhoneMessage = true;
       }
 
       // Extract phone number from remoteJid (format: 5511999999999@s.whatsapp.net)
@@ -738,6 +757,18 @@ serve(async (req) => {
         messageContent = '[Mensagem recebida em formato não suportado pelo sistema]';
       }
 
+      // Mensagem mandada direto do celular = um humano assumiu a conversa por
+      // fora do sistema. Mesma regra de qualquer envio humano: a conversa
+      // passa a ser 'human' de fato (e por consequência já para de ser
+      // enfileirada pra IA mais abaixo, que só enfileira se status === 'nina').
+      if (isPhoneMessage && conversation.status !== 'human') {
+        await supabase
+          .from('conversations')
+          .update({ status: 'human' })
+          .eq('id', conversation.id);
+        conversation.status = 'human';
+      }
+
       // 4. Create message with api_source
       const { data: dbMessage, error: msgError } = await supabase
         .from('messages')
@@ -746,7 +777,7 @@ serve(async (req) => {
           whatsapp_message_id: messageId,
           content: messageContent,
           type: messageType,
-          from_type: 'user',
+          from_type: isPhoneMessage ? 'human' : 'user',
           status: 'sent',
           media_type: mediaType,
           // media_url guarda o whatsapp_message_id (não o mediaKey de criptografia
@@ -758,7 +789,8 @@ serve(async (req) => {
           metadata: {
             original_type: messageType,
             media_id: mediaId,
-            evolution_instance: instanceName
+            evolution_instance: instanceName,
+            ...(isPhoneMessage ? { sent_via: 'phone' } : {})
           }
         })
         .select()
@@ -781,9 +813,13 @@ serve(async (req) => {
 
       console.log('[Webhook] Created message:', dbMessage.id);
 
-      // 4b. Mark user responded (unlock AI anti-spam guard)
-      await supabase.rpc('mark_user_responded', { p_conversation_id: conversation.id });
-      console.log('[Webhook] ✅ mark_user_responded called for conversation:', conversation.id);
+      // 4b. Mark user responded (unlock AI anti-spam guard) — só faz sentido
+      // pra mensagem de verdade do cliente, não pra mensagem que um humano
+      // mandou do celular.
+      if (!isPhoneMessage) {
+        await supabase.rpc('mark_user_responded', { p_conversation_id: conversation.id });
+        console.log('[Webhook] ✅ mark_user_responded called for conversation:', conversation.id);
+      }
 
       // 5. Update conversation last_message_at
       await supabase

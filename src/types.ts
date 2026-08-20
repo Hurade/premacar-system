@@ -343,6 +343,7 @@ export interface UIMessage {
   whatsappMessageId: string | null;
   isInternal?: boolean;
   senderName?: string;
+  sentViaPhone?: boolean;
   replyToId: string | null;
   apiSource: string | null;
 }
@@ -409,6 +410,7 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     whatsappMessageId: msg.whatsapp_message_id,
     isInternal: (msg.metadata as any)?.is_internal === true,
     senderName: (msg.metadata as any)?.sender_name || undefined,
+    sentViaPhone: (msg.metadata as any)?.sent_via === 'phone',
     replyToId: msg.reply_to_id,
     apiSource: msg.api_source || null
   };

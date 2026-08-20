@@ -6,7 +6,7 @@ import {
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
   KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat, Users,
-  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply
+  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply, Smartphone
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -1920,7 +1920,13 @@ const ChatInterface: React.FC = () => {
                                 <Bot className="w-3 h-3 text-violet-400" />
                               )}
                               {isOutgoing && msg.fromType === 'human' && (
-                                <User className="w-3 h-3 text-cyan-400" />
+                                msg.sentViaPhone ? (
+                                  <span title="Enviada direto do celular (fora do sistema)">
+                                    <Smartphone className="w-3 h-3 text-amber-400" />
+                                  </span>
+                                ) : (
+                                  <User className="w-3 h-3 text-cyan-400" />
+                                )
                               )}
                               <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
                               {isOutgoing && (
