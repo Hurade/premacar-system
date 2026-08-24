@@ -1613,7 +1613,7 @@ export const api = {
     // Get conversation to find contact_id
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('contact_id')
+      .select('contact_id, connection_id')
       .eq('id', conversationId)
       .single();
 
@@ -1650,6 +1650,7 @@ export const api = {
       .insert({
         conversation_id: conversationId,
         contact_id: conversation.contact_id,
+        connection_id: conversation.connection_id ?? null,
         content: content,
         from_type: 'human',
         message_type: 'text',
@@ -1704,7 +1705,7 @@ export const api = {
 
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('contact_id')
+      .select('contact_id, connection_id')
       .eq('id', conversationId)
       .single();
 
@@ -1755,6 +1756,7 @@ export const api = {
       .insert({
         conversation_id: conversationId,
         contact_id: conversation.contact_id,
+        connection_id: conversation.connection_id ?? null,
         content: '',
         from_type: 'human',
         message_type: 'audio',
