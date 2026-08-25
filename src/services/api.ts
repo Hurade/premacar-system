@@ -19,6 +19,31 @@ const getCurrentUserId = async (): Promise<string> => {
   return user.id;
 };
 
+// team_members.id do usuário logado (mesma resolução do useUserRole: por
+// user_id, com fallback por email) — usado pra atribuir automaticamente uma
+// conversa a quem responde, quando ainda não tem ninguém atribuído.
+const getCurrentTeamMemberId = async (): Promise<string | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: byUserId } = await supabase
+    .from('team_members')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (byUserId) return byUserId.id;
+
+  if (!user.email) return null;
+  const { data: byEmail } = await supabase
+    .from('team_members')
+    .select('id')
+    .eq('email', user.email)
+    .eq('status', 'active')
+    .maybeSingle();
+  return byEmail?.id ?? null;
+};
+
 // Cache for system stage IDs (Ganho/Perdido) - keyed by user_id for multi-tenant
 const systemStagesCacheByUser: Map<string, { ganhoId: string | null; perdidoId: string | null }> = new Map();
 
@@ -1675,6 +1700,26 @@ export const api = {
       .eq('id', conversationId)
       .neq('status', 'human');
 
+    // Quem respondeu vira o responsável, se a conversa ainda não tinha
+    // ninguém atribuído (ex: alguém digitou direto sem clicar em "Assumir
+    // conversa" antes) — sem isso ficava "Não atribuído" mesmo com humano
+    // já respondendo de fato.
+    try {
+      const { data: convForAssign } = await supabase
+        .from('conversations')
+        .select('assigned_user_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      if (convForAssign && !convForAssign.assigned_user_id) {
+        const teamMemberId = await getCurrentTeamMemberId();
+        if (teamMemberId) {
+          await supabase.from('conversations').update({ assigned_user_id: teamMemberId }).eq('id', conversationId);
+        }
+      }
+    } catch (err) {
+      console.error('[API] Error auto-assigning conversation (non-blocking):', err);
+    }
+
     // Trigger whatsapp-sender to process the queue immediately
     try {
       console.log('[API] Triggering whatsapp-sender...');
@@ -1776,6 +1821,22 @@ export const api = {
       .update({ status: 'human' })
       .eq('id', conversationId)
       .neq('status', 'human');
+
+    try {
+      const { data: convForAssign } = await supabase
+        .from('conversations')
+        .select('assigned_user_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      if (convForAssign && !convForAssign.assigned_user_id) {
+        const teamMemberId = await getCurrentTeamMemberId();
+        if (teamMemberId) {
+          await supabase.from('conversations').update({ assigned_user_id: teamMemberId }).eq('id', conversationId);
+        }
+      }
+    } catch (err) {
+      console.error('[API] Error auto-assigning conversation (non-blocking):', err);
+    }
 
     try {
       const { error: triggerError } = await supabase.functions.invoke('whatsapp-sender');
