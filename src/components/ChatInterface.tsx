@@ -449,9 +449,8 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeChat) return;
+  const uploadAndSendAttachment = async (file: File) => {
+    if (!activeChat) return;
     setIsUploadingFile(true);
     try {
       const { data, error } = await supabase.storage
@@ -463,11 +462,35 @@ const ChatInterface: React.FC = () => {
       toast.success('Arquivo enviado');
     } catch (err) {
       console.error('[ChatInterface] File upload error:', err);
-      toast.error('Erro ao enviar arquivo. Verifique se o bucket "chat-attachments" existe.');
+      toast.error('Erro ao enviar arquivo');
     } finally {
       setIsUploadingFile(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadAndSendAttachment(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Cola (Ctrl+V) uma imagem/print copiado direto na área de mensagem —
+  // sem precisar salvar o arquivo antes pra depois escolher pelo clipe.
+  const handlePasteAttachment = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items || !activeChat) return;
+
+    const fileItem = Array.from(items).find(item => item.kind === 'file');
+    if (!fileItem) return; // sem arquivo colado, deixa o paste de texto normal acontecer
+
+    e.preventDefault();
+    const file = fileItem.getAsFile();
+    if (!file) return;
+
+    const ext = file.type.split('/')[1] || 'png';
+    const namedFile = new File([file], `print-${Date.now()}.${ext}`, { type: file.type });
+    await uploadAndSendAttachment(namedFile);
   };
 
   const stopRecordingTimer = () => {
@@ -2258,6 +2281,7 @@ const ChatInterface: React.FC = () => {
                       ref={textareaRef}
                       value={inputText}
                       onChange={handleInputChange}
+                      onPaste={handlePasteAttachment}
                       onKeyDown={(e) => {
                         if (e.key === 'Escape') { setShowQuickRepliesPanel(false); return; }
                         if (e.key === 'Enter' && !e.shiftKey) {
