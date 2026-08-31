@@ -11,6 +11,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Celular BR tem 13 dígitos com DDI (55 + DDD 2 dígitos + 9 + 8 dígitos),
+// mas o WhatsApp às vezes manda o JID sem esse "9" (formato legado, 12
+// dígitos) — inconsistente até pro MESMO contato entre uma mensagem e
+// outra. Busca exata (=) então não bate com o contato já cadastrado e
+// cria um duplicado do zero. Gera as duas variantes pra buscar com IN().
+function brPhoneVariants(phone: string): string[] {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits.startsWith('55')) return [digits];
+  const rest = digits.slice(2);
+  if (rest.length === 9 && rest[2] === '9') {
+    // DDD (2) + 9 dígitos com o 9 extra -> variante sem o 9
+    return [digits, '55' + rest.slice(0, 2) + rest.slice(3)];
+  }
+  if (rest.length === 8) {
+    // DDD (2) + 8 dígitos -> variante com o 9 inserido
+    return [digits, '55' + rest.slice(0, 2) + '9' + rest.slice(2)];
+  }
+  return [digits];
+}
+
 // ═══════════════════════════════════════════
 // HMAC-SHA256 signature validation
 // Set EVOLUTION_WEBHOOK_SECRET in Supabase secrets to enable.
@@ -295,7 +315,9 @@ serve(async (req) => {
           const { data: contact } = await supabase
             .from('contacts')
             .select('id')
-            .eq('phone_number', phoneNumber)
+            .in('phone_number', brPhoneVariants(phoneNumber))
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
 
           if (!contact) {
@@ -490,10 +512,16 @@ serve(async (req) => {
       }
 
       // 1. Get or create contact
+      // .limit(1) + order: já existem alguns duplicados antigos (mesmo
+      // contato com/sem o 9) — evita erro do maybeSingle() se as duas
+      // variantes já tiverem virado contatos separados; fica com o mais
+      // antigo (mais estabelecido) até a limpeza desses duplicados rodar.
       let { data: contact } = await supabase
         .from('contacts')
         .select('*')
-        .eq('phone_number', phoneNumber)
+        .in('phone_number', brPhoneVariants(phoneNumber))
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (!contact) {
