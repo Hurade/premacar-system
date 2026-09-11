@@ -43,6 +43,7 @@ const Team: React.FC = () => {
     function_id: '',
     weight: 1,
     notification_phone: '',
+    follow_me_enabled: true,
     queue_ids: [] as string[],
   });
   const [newPassword, setNewPassword] = useState('');
@@ -204,6 +205,7 @@ const Team: React.FC = () => {
       function_id: member.function_id || '',
       weight: member.weight || 1,
       notification_phone: member.notification_phone || '',
+      follow_me_enabled: member.follow_me_enabled ?? true,
       queue_ids: queueIds,
     });
     setNewPassword('');
@@ -225,6 +227,7 @@ const Team: React.FC = () => {
         function_id: editFormData.function_id || null,
         weight: editFormData.weight,
         notification_phone: editFormData.notification_phone.trim() || null,
+        follow_me_enabled: editFormData.follow_me_enabled,
       });
       await api.setQueueIdsForMember(editingMember.id, editFormData.queue_ids);
 
@@ -880,6 +883,22 @@ const Team: React.FC = () => {
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
                         />
                         <p className="text-xs text-slate-500">Número que recebe o aviso quando uma conversa é transferida para uma fila deste atendente</p>
+                    </div>
+
+                    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
+                        <div>
+                            <label className="text-sm font-medium text-slate-300">Siga-me</label>
+                            <p className="text-xs text-slate-500">Avisa este atendente por WhatsApp se ele não responder um cliente em 5 minutos</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                            <input
+                                type="checkbox"
+                                checked={editFormData.follow_me_enabled}
+                                onChange={(e) => setEditFormData({ ...editFormData, follow_me_enabled: e.target.checked })}
+                                className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                        </label>
                     </div>
 
                     <div className="space-y-2">

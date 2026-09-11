@@ -609,6 +609,7 @@ export const api = {
     function_id: string | null;
     weight: number;
     notification_phone: string | null;
+    follow_me_enabled: boolean;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')

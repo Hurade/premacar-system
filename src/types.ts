@@ -34,6 +34,7 @@ export interface TeamMember {
   team?: Team;
   function?: TeamFunction;
   notification_phone?: string | null;
+  follow_me_enabled?: boolean;
 }
 
 export interface Team {
