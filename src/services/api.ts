@@ -547,7 +547,8 @@ export const api = {
       user_id: m.user_id || null,
       team: m.team as any,
       function: m.function as any,
-      notification_phone: (m as any).notification_phone || null
+      notification_phone: (m as any).notification_phone || null,
+      follow_me_enabled: (m as any).follow_me_enabled ?? true
     }));
   },
 
