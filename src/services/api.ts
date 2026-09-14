@@ -1696,30 +1696,31 @@ export const api = {
     // passa a ser 'human' de fato — abrir a tela (ex: modal de Proposta/
     // Apresentação) não deve travar a conversa fora do alcance da IA antes
     // de alguém efetivamente escrever algo.
-    await supabase
+    const { data: convBeforeSend } = await supabase
       .from('conversations')
-      .update({ status: 'human' })
+      .select('status')
       .eq('id', conversationId)
-      .neq('status', 'human');
+      .maybeSingle();
+    const wasAlreadyHuman = convBeforeSend?.status === 'human';
 
-    // Quem respondeu vira o responsável, se a conversa ainda não tinha
-    // ninguém atribuído (ex: alguém digitou direto sem clicar em "Assumir
-    // conversa" antes) — sem isso ficava "Não atribuído" mesmo com humano
-    // já respondendo de fato.
-    try {
-      const { data: convForAssign } = await supabase
-        .from('conversations')
-        .select('assigned_user_id')
-        .eq('id', conversationId)
-        .maybeSingle();
-      if (convForAssign && !convForAssign.assigned_user_id) {
+    if (!wasAlreadyHuman) {
+      await supabase.from('conversations').update({ status: 'human' }).eq('id', conversationId);
+    }
+
+    // Quem manda a primeira mensagem humana de verdade vira o responsável —
+    // inclusive substituindo um dono padrão do sorteio round-robin (que só
+    // reflete quem "receberia" o lead, não quem de fato está atendendo). Só
+    // não mexe se a conversa JÁ estava em modo humano (não rouba de quem já
+    // assumiu de propósito).
+    if (!wasAlreadyHuman) {
+      try {
         const teamMemberId = await getCurrentTeamMemberId();
         if (teamMemberId) {
           await supabase.from('conversations').update({ assigned_user_id: teamMemberId }).eq('id', conversationId);
         }
+      } catch (err) {
+        console.error('[API] Error auto-assigning conversation (non-blocking):', err);
       }
-    } catch (err) {
-      console.error('[API] Error auto-assigning conversation (non-blocking):', err);
     }
 
     // Trigger whatsapp-sender to process the queue immediately
@@ -1817,27 +1818,28 @@ export const api = {
       throw sendError;
     }
 
-    // Mesma regra de qualquer envio humano: a conversa passa a ser 'human'.
-    await supabase
+    // Mesma regra de qualquer envio humano: a conversa passa a ser 'human',
+    // e quem manda a primeira mensagem humana de verdade vira o
+    // responsável — substituindo até um dono padrão do sorteio
+    // round-robin, mas só se a conversa ainda não estava em modo humano.
+    const { data: convBeforeAudio } = await supabase
       .from('conversations')
-      .update({ status: 'human' })
+      .select('status')
       .eq('id', conversationId)
-      .neq('status', 'human');
+      .maybeSingle();
+    const wasAlreadyHumanAudio = convBeforeAudio?.status === 'human';
 
-    try {
-      const { data: convForAssign } = await supabase
-        .from('conversations')
-        .select('assigned_user_id')
-        .eq('id', conversationId)
-        .maybeSingle();
-      if (convForAssign && !convForAssign.assigned_user_id) {
+    if (!wasAlreadyHumanAudio) {
+      await supabase.from('conversations').update({ status: 'human' }).eq('id', conversationId);
+
+      try {
         const teamMemberId = await getCurrentTeamMemberId();
         if (teamMemberId) {
           await supabase.from('conversations').update({ assigned_user_id: teamMemberId }).eq('id', conversationId);
         }
+      } catch (err) {
+        console.error('[API] Error auto-assigning conversation (non-blocking):', err);
       }
-    } catch (err) {
-      console.error('[API] Error auto-assigning conversation (non-blocking):', err);
     }
 
     try {
