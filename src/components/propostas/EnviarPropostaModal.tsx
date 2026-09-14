@@ -362,7 +362,7 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
             onClick={handleSend}
             disabled={!canSend || isLoading || sent}
             className={cn(
-              'flex-1 gap-2 text-white',
+              'flex-1 gap-2 text-slate-100',
               sent ? 'bg-green-600 hover:bg-green-600' : 'bg-primary hover:bg-primary/90',
             )}
           >

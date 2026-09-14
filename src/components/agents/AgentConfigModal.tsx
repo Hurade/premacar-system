@@ -239,7 +239,7 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white">
+          <DialogTitle className="flex items-center gap-2 text-slate-100">
             <Bot className="w-5 h-5 text-cyan-400" />
             {agentId ? 'Editar Agente' : 'Novo Agente de IA'}
           </DialogTitle>
@@ -363,7 +363,7 @@ const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                   Prompt do Agente <span className="text-red-400">*</span>
                 </h3>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={handleRestoreDefault} className="text-slate-400 hover:text-white text-xs">
+                  <Button variant="ghost" size="sm" onClick={handleRestoreDefault} className="text-slate-400 hover:text-slate-100 text-xs">
                     <RotateCcw className="w-3 h-3 mr-1" />
                     Restaurar Padrão
                   </Button>

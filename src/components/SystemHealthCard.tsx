@@ -166,7 +166,7 @@ export const SystemHealthCard: React.FC = () => {
         <div className="flex items-center gap-3">
           {getStatusIcon(healthData.overallStatus)}
           <div>
-            <h3 className="text-sm font-semibold text-white">Status do Sistema</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Status do Sistema</h3>
             <p className="text-xs text-slate-400">{healthData.message}</p>
           </div>
         </div>
@@ -177,7 +177,7 @@ export const SystemHealthCard: React.FC = () => {
           <button
             onClick={fetchHealth}
             disabled={loading}
-            className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors text-slate-400 hover:text-white"
+            className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors text-slate-400 hover:text-slate-100"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -203,7 +203,7 @@ export const SystemHealthCard: React.FC = () => {
       {/* Expandable Details */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between py-2 text-sm text-slate-400 hover:text-white transition-colors"
+        className="w-full flex items-center justify-between py-2 text-sm text-slate-400 hover:text-slate-100 transition-colors"
       >
         <span>{expanded ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
         {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

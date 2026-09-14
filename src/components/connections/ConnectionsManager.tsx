@@ -95,7 +95,7 @@ function ConnectionCard({ conn, systems, testingId, onEdit, onConnect, onDisconn
       {/* Info — cresce para ocupar espaço disponível */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-white text-sm truncate">{conn.name}</span>
+          <span className="font-semibold text-slate-100 text-sm truncate">{conn.name}</span>
           {conn.is_default && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shrink-0">
               padrão
@@ -135,7 +135,7 @@ function ConnectionCard({ conn, systems, testingId, onEdit, onConnect, onDisconn
           <button
             onClick={onEdit}
             title="Editar"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700/60 transition-colors"
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
@@ -266,7 +266,7 @@ export function ConnectionsManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-cyan-400" />
             Conexões WhatsApp
           </h3>

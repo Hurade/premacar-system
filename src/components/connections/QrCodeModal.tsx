@@ -78,7 +78,7 @@ export function QrCodeModal({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="bg-slate-900 border-slate-700 max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-white">Conectar {connectionName}</DialogTitle>
+          <DialogTitle className="text-slate-100">Conectar {connectionName}</DialogTitle>
           <DialogDescription className="text-slate-400">
             {connected ? 'WhatsApp conectado!' : 'Aguardando escaneamento do QR Code...'}
           </DialogDescription>
@@ -88,7 +88,7 @@ export function QrCodeModal({
           {connected ? (
             <>
               <CheckCircle className="w-16 h-16 text-green-400" />
-              <p className="text-white font-semibold text-lg">Conectado com sucesso!</p>
+              <p className="text-slate-100 font-semibold text-lg">Conectado com sucesso!</p>
             </>
           ) : normalizedQr ? (
             <img

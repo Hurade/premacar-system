@@ -57,7 +57,7 @@ function ProviderStep({ onSelect }: { onSelect: (p: Provider) => void }) {
             <Server className="w-6 h-6 text-green-400" />
           </div>
           <div>
-            <p className="font-semibold text-white text-sm">Evolution API</p>
+            <p className="font-semibold text-slate-100 text-sm">Evolution API</p>
             <p className="text-xs text-slate-400 mt-0.5">
               Self-hosted, sem limite de mensagens
             </p>
@@ -72,7 +72,7 @@ function ProviderStep({ onSelect }: { onSelect: (p: Provider) => void }) {
             <CheckCircle className="w-6 h-6 text-blue-400" />
           </div>
           <div>
-            <p className="font-semibold text-white text-sm">Meta Oficial</p>
+            <p className="font-semibold text-slate-100 text-sm">Meta Oficial</p>
             <p className="text-xs text-slate-400 mt-0.5">
               WhatsApp Business API oficial
             </p>
@@ -355,7 +355,7 @@ function QrStep({ connectionId, pollConnectionStatus, getQrCode, onClose }: QrSt
     return (
       <div className="flex flex-col items-center gap-4 py-8">
         <CheckCircle className="w-16 h-16 text-green-400" />
-        <p className="text-white font-semibold text-lg">Conectado com sucesso!</p>
+        <p className="text-slate-100 font-semibold text-lg">Conectado com sucesso!</p>
       </div>
     );
   }
@@ -475,11 +475,11 @@ export function ConnectionModal({
     <Dialog open onOpenChange={step === 'qr' ? undefined : onClose}>
       <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="text-slate-100 flex items-center gap-2">
             {step === 'form' && !isEditing && (
               <button
                 onClick={() => setStep('provider')}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-slate-100 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>

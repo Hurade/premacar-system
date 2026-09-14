@@ -30,7 +30,7 @@ const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-6 py-3 bg-slate-800 border border-slate-700 rounded-full shadow-2xl">
-      <span className="text-sm font-medium text-white">
+      <span className="text-sm font-medium text-slate-100">
         {selectedCount} selecionado{selectedCount > 1 ? 's' : ''}
       </span>
       

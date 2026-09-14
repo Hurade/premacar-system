@@ -65,7 +65,7 @@ const IntegrationSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white">🔌 Integrações</h3>
+        <h3 className="text-lg font-semibold text-slate-100">🔌 Integrações</h3>
         <p className="text-sm text-slate-400 mt-1">
           Configure as integrações necessárias para campanhas multi-canal funcionarem corretamente.
         </p>

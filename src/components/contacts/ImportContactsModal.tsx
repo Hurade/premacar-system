@@ -300,7 +300,7 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
               <FileSpreadsheet className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Importar Contatos</h2>
+              <h2 className="text-xl font-bold text-slate-100">Importar Contatos</h2>
               <p className="text-sm text-slate-400">Importe contatos de uma planilha Excel ou CSV</p>
             </div>
           </div>
@@ -338,7 +338,7 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
               <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-lg">
                 <FileSpreadsheet className="w-8 h-8 text-emerald-400" />
                 <div className="flex-1">
-                  <p className="font-medium text-white">{file.name}</p>
+                  <p className="font-medium text-slate-100">{file.name}</p>
                   <p className="text-sm text-slate-400">{sheets.length} página(s) encontrada(s)</p>
                 </div>
                 <Button
@@ -408,7 +408,7 @@ const ImportContactsModal: React.FC<ImportContactsModalProps> = ({
               {/* WhatsApp validation toggle */}
               <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700">
                 <div>
-                  <p className="text-sm font-medium text-white">Validar WhatsApp antes de importar</p>
+                  <p className="text-sm font-medium text-slate-100">Validar WhatsApp antes de importar</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Verifica quais números têm WhatsApp ativo. Números inválidos serão ignorados.
                   </p>

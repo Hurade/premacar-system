@@ -249,7 +249,7 @@ export const CreateDealModal: React.FC<CreateDealModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-slate-50">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-white">
+          <DialogTitle className="text-2xl font-bold text-slate-100">
             Criar Novo Deal
           </DialogTitle>
           <DialogDescription className="text-slate-400">
@@ -391,7 +391,7 @@ export const CreateDealModal: React.FC<CreateDealModalProps> = ({
 
             {/* Campos do Deal */}
             <div className="border-t border-slate-700 pt-6 space-y-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
                 <Building className="w-5 h-5 text-cyan-400" />
                 Informações do Deal
               </h3>

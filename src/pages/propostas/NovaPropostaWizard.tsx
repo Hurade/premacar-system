@@ -637,7 +637,7 @@ function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNota
 
           <div className="flex justify-between items-center text-sm">
             <span className="text-foreground flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-lg text-white text-xs font-bold" style={{ backgroundColor: info.cor }}>{info.nome}</span>
+              <span className="px-2 py-0.5 rounded-lg text-slate-100 text-xs font-bold" style={{ backgroundColor: info.cor }}>{info.nome}</span>
               {unidades > 1 && <span className="text-muted-foreground text-xs">× {unidades} unidades</span>}
             </span>
             <span className="font-medium text-foreground">{formatarMoeda(valorBase)}/mês</span>

@@ -128,7 +128,7 @@ const TagsSettings: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-white hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-slate-100 hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Nova Tag
@@ -150,7 +150,7 @@ const TagsSettings: React.FC = () => {
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-white flex items-center gap-2 flex-wrap">
+                    <div className="text-sm font-medium text-slate-100 flex items-center gap-2 flex-wrap">
                       {tag.label}
                       {!tag.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">Inativa</span>}
                       {tag.has_action && (
@@ -172,12 +172,12 @@ const TagsSettings: React.FC = () => {
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => handleToggleAtivo(tag.id, tag.is_active)}
-                    className="text-xs text-slate-400 hover:text-white transition-colors px-2"
+                    className="text-xs text-slate-400 hover:text-slate-100 transition-colors px-2"
                     title={tag.is_active ? 'Desativar' : 'Ativar'}
                   >
                     {tag.is_active ? 'Desativar' : 'Ativar'}
                   </button>
-                  <button onClick={() => startEdit(tag)} className="p-2 text-slate-400 hover:text-white transition-colors">
+                  <button onClick={() => startEdit(tag)} className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(tag.id, tag.label)} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
@@ -217,7 +217,7 @@ function TagForm({
         placeholder="Nome da tag (ex: Cliente)"
         value={form.label}
         onChange={(e) => setForm({ ...form, label: e.target.value })}
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
       />
 
       <div className="flex items-center gap-1.5">
@@ -235,7 +235,7 @@ function TagForm({
       <select
         value={form.category}
         onChange={(e) => setForm({ ...form, category: e.target.value })}
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
       >
         {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
           <option key={value} value={value}>{label}</option>
@@ -258,7 +258,7 @@ function TagForm({
           value={form.ai_instruction}
           onChange={(e) => setForm({ ...form, ai_instruction: e.target.value })}
           rows={3}
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none"
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 resize-none"
         />
       )}
 

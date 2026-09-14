@@ -148,7 +148,7 @@ export function AutomationRuleModal({ open, onOpenChange, rule, onSaved }: Autom
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-slate-900 border-slate-800 text-white">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-slate-900 border-slate-800 text-slate-100">
         <DialogHeader>
           <DialogTitle>{rule ? 'Editar Automação' : 'Nova Automação'}</DialogTitle>
         </DialogHeader>

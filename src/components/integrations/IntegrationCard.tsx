@@ -21,7 +21,7 @@ const IntegrationCard: React.FC<IntegrationCardProps> = ({
         <span className="text-3xl">{icon}</span>
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-white">{name}</h3>
+            <h3 className="text-base font-semibold text-slate-100">{name}</h3>
             {configured ? (
               <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] px-1.5 py-0">
                 <CheckCircle className="w-3 h-3 mr-1" />
@@ -42,7 +42,7 @@ const IntegrationCard: React.FC<IntegrationCardProps> = ({
         variant="outline"
         size="sm"
         onClick={onConfigure}
-        className="gap-2 border-slate-700 text-slate-300 hover:text-white"
+        className="gap-2 border-slate-700 text-slate-300 hover:text-slate-100"
       >
         <Settings className="w-4 h-4" />
         Configurar

@@ -40,14 +40,14 @@ export function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
     : CATEGORIES[activeCategory].emojis;
 
   return (
-    <div className="w-72 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl flex flex-col overflow-hidden">
-      <div className="p-2 border-b border-white/10">
+    <div className="w-72 bg-slate-900 border border-slate-800 rounded-xl shadow-xl flex flex-col overflow-hidden">
+      <div className="p-2 border-b border-slate-800">
         <input
           type="text"
           placeholder="Pesquisar emoji..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-white/5 text-white text-sm rounded-lg px-3 py-1.5 outline-none placeholder:text-white/30 focus:ring-1 focus:ring-blue-500"
+          className="w-full bg-slate-800/50 text-slate-100 text-sm rounded-lg px-3 py-1.5 outline-none placeholder:text-slate-500 focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
@@ -60,7 +60,7 @@ export function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
               className={`flex-1 text-xs py-1 rounded-md transition-colors ${
                 activeCategory === i
                   ? 'bg-blue-500/20 text-blue-400'
-                  : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
               }`}
             >
               {cat.label.slice(0, 3)}
@@ -74,14 +74,14 @@ export function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
           <button
             key={`${emoji}-${i}`}
             onClick={() => onEmojiSelect(emoji)}
-            className="text-xl p-1 rounded hover:bg-white/10 transition-colors leading-none"
+            className="text-xl p-1 rounded hover:bg-slate-800 transition-colors leading-none"
             title={emoji}
           >
             {emoji}
           </button>
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-8 text-center text-white/30 text-sm py-4">
+          <div className="col-span-8 text-center text-slate-600 text-sm py-4">
             Nenhum emoji encontrado
           </div>
         )}

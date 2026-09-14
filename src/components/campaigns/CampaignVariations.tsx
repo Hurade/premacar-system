@@ -107,7 +107,7 @@ const VariationModal: React.FC<VariationModalProps> = ({ campaignId, existing, u
                   onChange={e => setForm(f => ({ ...f, weight: Number(e.target.value) }))}
                   className="flex-1 accent-cyan-500"
                 />
-                <span className="text-white font-bold w-10 text-right">{form.weight}%</span>
+                <span className="text-slate-100 font-bold w-10 text-right">{form.weight}%</span>
               </div>
             </div>
           </div>
@@ -127,7 +127,7 @@ const VariationModal: React.FC<VariationModalProps> = ({ campaignId, existing, u
             <select
               value={form.meta_template_id}
               onChange={e => setForm(f => ({ ...f, meta_template_id: e.target.value }))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
             >
               <option value="">Selecionar template…</option>
               {templates.map(t => (
@@ -213,7 +213,7 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
             <FlaskConical className="w-4 h-4 text-cyan-400" />
             Teste A/B de Templates
           </h3>
@@ -242,13 +242,13 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
           <div className="flex items-center gap-2 text-amber-300 text-sm font-medium">
             <Trophy className="w-4 h-4" />
-            Vencedor: <span className="text-white">{winner.name || `Variação ${winner.label}`}</span>
+            Vencedor: <span className="text-slate-100">{winner.name || `Variação ${winner.label}`}</span>
             <span className="text-xs text-amber-400/70">— apenas esta variação está sendo usada</span>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-400 hover:text-white gap-1.5"
+            className="text-slate-400 hover:text-slate-100 gap-1.5"
             onClick={() => clearWinner.mutate(campaignId)}
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -289,12 +289,12 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
                 {/* Card header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm ${METRIC_COLORS[idx] || 'bg-slate-700'}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-slate-100 font-bold text-sm ${METRIC_COLORS[idx] || 'bg-slate-700'}`}>
                       {v.label}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-white">{v.name || `Variação ${v.label}`}</span>
+                        <span className="text-sm font-medium text-slate-100">{v.name || `Variação ${v.label}`}</span>
                         {v.is_winner && <Trophy className="w-3.5 h-3.5 text-amber-400" />}
                         {isLead && !v.is_winner && (
                           <Badge className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
@@ -339,7 +339,7 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
                     { label: 'Respostas', value: v.total_replied },
                   ].map(s => (
                     <div key={s.label} className="bg-slate-800/60 rounded-lg py-1.5">
-                      <p className="text-base font-bold text-white">{s.value}</p>
+                      <p className="text-base font-bold text-slate-100">{s.value}</p>
                       <p className="text-[10px] text-slate-500">{s.label}</p>
                     </div>
                   ))}

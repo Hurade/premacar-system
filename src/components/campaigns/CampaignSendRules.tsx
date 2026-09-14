@@ -20,7 +20,7 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; children: React.
   <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-4">
     <div className="flex items-center gap-2">
       <div className="text-cyan-400">{icon}</div>
-      <h4 className="text-sm font-semibold text-white">{title}</h4>
+      <h4 className="text-sm font-semibold text-slate-100">{title}</h4>
     </div>
     {children}
   </div>
@@ -39,7 +39,7 @@ const RangeField: React.FC<{
   <div>
     <div className="flex justify-between items-center mb-1">
       <Label className="text-xs text-slate-300">{label}</Label>
-      <span className="text-xs font-semibold text-white">{value}{unit}</span>
+      <span className="text-xs font-semibold text-slate-100">{value}{unit}</span>
     </div>
     {hint && <p className="text-[11px] text-slate-500 mb-1">{hint}</p>}
     <input
@@ -77,7 +77,7 @@ const NumberInput: React.FC<{
         max={max}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white text-right"
+        className="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 text-right"
       />
       {unit && <span className="text-xs text-slate-400">{unit}</span>}
     </div>
@@ -116,7 +116,7 @@ const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
             <Shield className="w-4 h-4 text-cyan-400" />
             Regras de Envio
           </h3>

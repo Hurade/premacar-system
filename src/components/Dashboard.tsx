@@ -118,7 +118,7 @@ const Dashboard: React.FC = () => {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-100">Dashboard</h2>
           <p className="text-slate-400 mt-1">
             Visão geral da performance da sua IA {period === 'today' ? 'hoje' : `nos últimos ${periodLabels[period].toLowerCase()}`}.
           </p>
@@ -130,7 +130,7 @@ const Dashboard: React.FC = () => {
               onClick={() => setPeriod(p)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 period === p
-                  ? 'bg-slate-800 text-white shadow-sm'
+                  ? 'bg-slate-800 text-slate-100 shadow-sm'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
@@ -146,7 +146,7 @@ const Dashboard: React.FC = () => {
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <Radio className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-sm font-semibold text-white">Atendimentos Abertos</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Atendimentos Abertos</h3>
             <span className="ml-auto text-xs text-slate-500">{operationalMetrics.loading ? '…' : operationalMetrics.total}</span>
           </div>
           <div className="space-y-2">
@@ -167,7 +167,7 @@ const Dashboard: React.FC = () => {
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-4 h-4 text-violet-400" />
-            <h3 className="text-sm font-semibold text-white">Por Fila</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Por Fila</h3>
           </div>
           <div className="space-y-2">
             {queues.filter(q => q.is_active).map((queue) => (
@@ -194,7 +194,7 @@ const Dashboard: React.FC = () => {
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <UserCheck className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-semibold text-white">Atendentes Online</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Atendentes Online</h3>
             <span className="ml-auto text-xs text-slate-500">{onlineAgents.length}</span>
           </div>
           {onlineAgents.length === 0 ? (
@@ -230,7 +230,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex items-end justify-between">
-                <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
+                <div className="text-3xl font-bold text-slate-100 tracking-tight">{stat.value}</div>
                 <div className={`flex items-center text-xs font-medium px-2 py-1 rounded-full ${stat.trendUp ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                     {stat.trendUp ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
                     {stat.trend}
@@ -248,7 +248,7 @@ const Dashboard: React.FC = () => {
         <div className="col-span-4 rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 shadow-lg">
           <div className="mb-6 flex items-center justify-between">
             <div>
-                <h3 className="text-lg font-semibold text-white">Volume de Atendimentos</h3>
+                <h3 className="text-lg font-semibold text-slate-100">Volume de Atendimentos</h3>
                 <p className="text-sm text-slate-400">
                   Interações da IA {period === 'today' ? 'hoje' : `nos últimos ${periodDays[period]} dias`}
                 </p>
@@ -302,7 +302,7 @@ const Dashboard: React.FC = () => {
         {/* Secondary Chart */}
         <div className="col-span-3 rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 shadow-lg flex flex-col">
            <div className="mb-6">
-            <h3 className="text-lg font-semibold text-white">Conversões</h3>
+            <h3 className="text-lg font-semibold text-slate-100">Conversões</h3>
             <p className="text-sm text-slate-400">Reuniões, vendas e ações concluídas</p>
           </div>
           
@@ -311,7 +311,7 @@ const Dashboard: React.FC = () => {
               <div key={i} className="group">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-300">{day.name}</span>
-                    <span className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">{day.sales} conv.</span>
+                    <span className="text-sm font-bold text-slate-100 group-hover:text-cyan-400 transition-colors">{day.sales} conv.</span>
                 </div>
                 <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden">
                   <div 

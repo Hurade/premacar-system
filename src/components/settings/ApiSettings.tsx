@@ -407,7 +407,7 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <MessageSquare className="w-5 h-5 text-emerald-400" />
-              <h3 className="font-semibold text-white">Evolution API</h3>
+              <h3 className="font-semibold text-slate-100">Evolution API</h3>
             </div>
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
               evolutionConfigured 
@@ -439,12 +439,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             </summary>
             <div className="mt-2 p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs space-y-3">
               <div className="space-y-2">
-                <p className="text-white font-medium">📋 Passo a passo:</p>
+                <p className="text-slate-100 font-medium">📋 Passo a passo:</p>
                 <ol className="list-decimal list-inside space-y-1.5 text-slate-400">
                   <li>Acesse o painel da sua Evolution API</li>
                   <li>Crie ou selecione uma instância existente</li>
                   <li>Conecte seu WhatsApp escaneando o QR Code</li>
-                  <li>Copie a <strong className="text-white">API Key</strong> no painel de configurações</li>
+                  <li>Copie a <strong className="text-slate-100">API Key</strong> no painel de configurações</li>
                   <li>Configure o webhook na Evolution apontando para a URL abaixo</li>
                   <li>Cole as informações nos campos</li>
                 </ol>
@@ -680,9 +680,9 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-xs font-bold text-white">M</span>
+                <span className="text-xs font-bold text-slate-100">M</span>
               </div>
-              <h3 className="font-semibold text-white">Meta API Oficial (WhatsApp Business)</h3>
+              <h3 className="font-semibold text-slate-100">Meta API Oficial (WhatsApp Business)</h3>
             </div>
             <div className="flex items-center gap-3">
               <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${

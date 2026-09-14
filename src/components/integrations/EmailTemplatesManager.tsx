@@ -61,7 +61,7 @@ const EmailTemplatesManager: React.FC = () => {
           {templates.map((t) => (
             <div key={t.id} className="flex items-center justify-between p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
               <div>
-                <p className="text-sm font-medium text-white">{t.name}</p>
+                <p className="text-sm font-medium text-slate-100">{t.name}</p>
                 <p className="text-xs text-slate-400">Assunto: {t.subject}</p>
                 <div className="flex gap-1 mt-1">
                   {(t.variables || []).map((v) => (

@@ -105,7 +105,7 @@ export const StepBusinessHours: React.FC<StepBusinessHoursProps> = ({
         >
           <Clock className="w-8 h-8 text-orange-400" />
         </motion.div>
-        <h3 className="text-xl font-semibold text-white mb-2">Horário Comercial</h3>
+        <h3 className="text-xl font-semibold text-slate-100 mb-2">Horário Comercial</h3>
         <p className="text-slate-400 text-sm max-w-md mx-auto">
           Configure quando seu agente estará disponível para atender.
         </p>
@@ -122,14 +122,14 @@ export const StepBusinessHours: React.FC<StepBusinessHoursProps> = ({
             Fuso Horário
           </Label>
           <Select value={timezone} onValueChange={onTimezoneChange}>
-            <SelectTrigger className="bg-slate-800/50 border-slate-700 text-white">
+            <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-100">
               <SelectValue placeholder="Selecione o fuso horário">
                 {selectedTimezone?.name || 'Selecione o fuso horário'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent className="bg-slate-800 border-slate-700 z-50">
               {TIMEZONES.map((tz) => (
-                <SelectItem key={tz.id} value={tz.id} className="text-white hover:bg-violet-500/20 focus:bg-violet-500/20 focus:text-white">
+                <SelectItem key={tz.id} value={tz.id} className="text-slate-100 hover:bg-violet-500/20 focus:bg-violet-500/20 focus:text-slate-100">
                   {tz.name}
                 </SelectItem>
               ))}
@@ -147,12 +147,12 @@ export const StepBusinessHours: React.FC<StepBusinessHoursProps> = ({
             <div className="space-y-1">
               <span className="text-xs text-slate-500">Início</span>
               <Select value={businessHoursStart} onValueChange={onBusinessHoursStartChange}>
-                <SelectTrigger className="bg-slate-800/50 border-slate-700 text-white">
+                <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700 max-h-60 z-50">
                   {HOURS.map((hour) => (
-                    <SelectItem key={hour.id} value={hour.id} className="text-white hover:bg-violet-500/20 focus:bg-violet-500/20 focus:text-white">
+                    <SelectItem key={hour.id} value={hour.id} className="text-slate-100 hover:bg-violet-500/20 focus:bg-violet-500/20 focus:text-slate-100">
                       {hour.name}
                     </SelectItem>
                   ))}
@@ -162,12 +162,12 @@ export const StepBusinessHours: React.FC<StepBusinessHoursProps> = ({
             <div className="space-y-1">
               <span className="text-xs text-slate-500">Fim</span>
               <Select value={businessHoursEnd} onValueChange={onBusinessHoursEndChange}>
-                <SelectTrigger className="bg-slate-800/50 border-slate-700 text-white">
+                <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700 max-h-60 z-50">
                   {HOURS.map((hour) => (
-                    <SelectItem key={hour.id} value={hour.id} className="text-white hover:bg-violet-500/20 focus:bg-violet-500/20 focus:text-white">
+                    <SelectItem key={hour.id} value={hour.id} className="text-slate-100 hover:bg-violet-500/20 focus:bg-violet-500/20 focus:text-slate-100">
                       {hour.name}
                     </SelectItem>
                   ))}
@@ -218,7 +218,7 @@ export const StepBusinessHours: React.FC<StepBusinessHoursProps> = ({
           <div className="space-y-2 text-sm">
             <p className="text-slate-300">
               <span className="text-slate-500">Fuso:</span>{' '}
-              <span className="text-white font-medium">{selectedTimezone?.short || timezone}</span>
+              <span className="text-slate-100 font-medium">{selectedTimezone?.short || timezone}</span>
             </p>
             <p className="text-slate-300">
               <span className="text-slate-500">Horário:</span>{' '}
@@ -226,7 +226,7 @@ export const StepBusinessHours: React.FC<StepBusinessHoursProps> = ({
             </p>
             <p className="text-slate-300">
               <span className="text-slate-500">Dias:</span>{' '}
-              <span className="text-white font-medium">{formattedDays || 'Nenhum selecionado'}</span>
+              <span className="text-slate-100 font-medium">{formattedDays || 'Nenhum selecionado'}</span>
             </p>
           </div>
         </motion.div>

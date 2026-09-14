@@ -6,7 +6,7 @@ import { PLANOS_PADRAO, formatarMoeda, calcularTotal, descFidelidadePct, type Pl
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+    <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
       <span className="w-1 h-5 rounded-full" style={{ backgroundColor: '#9B5ABE' }} />
       {children}
     </h2>
@@ -50,7 +50,7 @@ export default function PropostaPublica() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ backgroundColor: '#2A1038' }}>
         <AlertCircle className="w-12 h-12 text-violet-400" />
-        <h1 className="text-2xl font-bold text-white">Proposta não encontrada</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Proposta não encontrada</h1>
         <p style={{ color: '#C8C4CE' }}>O link pode ter expirado ou sido removido.</p>
       </div>
     )
@@ -60,7 +60,7 @@ export default function PropostaPublica() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-6" style={{ backgroundColor: '#2A1038' }}>
         <AlertCircle className="w-12 h-12 text-orange-400" />
-        <h1 className="text-2xl font-bold text-white">Proposta Expirada</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Proposta Expirada</h1>
         <p style={{ color: '#C8C4CE' }}>
           Essa proposta não está mais válida. Entre em contato com seu representante Prema Car.
         </p>
@@ -122,7 +122,7 @@ export default function PropostaPublica() {
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
             Proposta Comercial
           </div>
-          <h1 className="text-4xl font-extrabold text-white mb-3 leading-tight">
+          <h1 className="text-4xl font-extrabold text-slate-100 mb-3 leading-tight">
             Transforme o pós-venda de
             <br />
             <span style={{ color: '#9B5ABE' }}>{lead?.empresa}</span>
@@ -130,7 +130,7 @@ export default function PropostaPublica() {
           <p className="text-lg mb-8" style={{ color: '#C8C4CE' }}>
             Preparada especialmente para {lead?.responsavel}
           </p>
-          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl text-white font-bold text-xl" style={{ backgroundColor: '#5D267A' }}>
+          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl text-slate-100 font-bold text-xl" style={{ backgroundColor: '#5D267A' }}>
             {planoInfo ? (
               <>
                 <span>{planoInfo.nome}{unidades > 1 ? ` × ${unidades}` : ''}</span>
@@ -193,7 +193,7 @@ export default function PropostaPublica() {
             <SectionTitle>Nossa Solução para Você</SectionTitle>
             <div className="p-5 rounded-2xl border" style={{ backgroundColor: '#3A1750', borderColor: '#5D267A' }}>
               <p className="text-sm mb-4" style={{ color: '#C8C4CE' }}>
-                Com base na dor <strong className="text-white">{DOR_LABELS[lead.dor_principal]}</strong>,
+                Com base na dor <strong className="text-slate-100">{DOR_LABELS[lead.dor_principal]}</strong>,
                 a Prema Car vai automatizar e escalar o pós-venda do {lead.empresa} com:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -204,7 +204,7 @@ export default function PropostaPublica() {
                 ].map(({ icon: Icon, title, desc }) => (
                   <div key={title} className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(93, 38, 122, 0.3)' }}>
                     <Icon className="w-5 h-5 mb-2" style={{ color: '#9B5ABE' }} />
-                    <p className="font-semibold text-white text-sm mb-1">{title}</p>
+                    <p className="font-semibold text-slate-100 text-sm mb-1">{title}</p>
                     <p className="text-xs" style={{ color: '#C8C4CE' }}>{desc}</p>
                   </div>
                 ))}
@@ -238,7 +238,7 @@ export default function PropostaPublica() {
                   {planoInfo?.nome ?? 'Plano'}
                   {unidades > 1 && <span className="ml-1" style={{ color: '#9B5ABE' }}>× {unidades} unidades</span>}
                 </span>
-                <span className="font-medium text-white">{formatarMoeda(valorBase)}/mês</span>
+                <span className="font-medium text-slate-100">{formatarMoeda(valorBase)}/mês</span>
               </div>
 
               {/* Desconto fidelidade */}
@@ -266,7 +266,7 @@ export default function PropostaPublica() {
                   {extras.map((e, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
                       <span style={{ color: '#C8C4CE' }}>{e.nome || 'Item adicional'}</span>
-                      <span className="text-white">{formatarMoeda(e.valor)}/mês</span>
+                      <span className="text-slate-100">{formatarMoeda(e.valor)}/mês</span>
                     </div>
                   ))}
                 </>
@@ -274,8 +274,8 @@ export default function PropostaPublica() {
 
               {/* Total */}
               <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid #7B3A9E' }}>
-                <span className="font-semibold text-white">Total mensal</span>
-                <span className="text-3xl font-extrabold text-white">{formatarMoeda(valorTotal)}</span>
+                <span className="font-semibold text-slate-100">Total mensal</span>
+                <span className="text-3xl font-extrabold text-slate-100">{formatarMoeda(valorTotal)}</span>
               </div>
             </div>
 
@@ -286,7 +286,7 @@ export default function PropostaPublica() {
               )}
               {validade && (
                 <p className="text-xs" style={{ color: 'rgba(237,232,244,0.7)' }}>
-                  Proposta válida até <strong className="text-white">{validade}</strong>
+                  Proposta válida até <strong className="text-slate-100">{validade}</strong>
                 </p>
               )}
             </div>
@@ -308,7 +308,7 @@ export default function PropostaPublica() {
                   {n}
                 </div>
                 <div>
-                  <p className="font-semibold text-white text-sm">{title}</p>
+                  <p className="font-semibold text-slate-100 text-sm">{title}</p>
                   <p className="text-xs" style={{ color: '#C8C4CE' }}>{desc}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 ml-auto flex-shrink-0" style={{ color: '#7B3A9E' }} />
@@ -324,7 +324,7 @@ export default function PropostaPublica() {
               <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-green-500/20">
                 <Check className="w-8 h-8 text-green-400" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Proposta Aceita!</h2>
+              <h2 className="text-2xl font-bold text-slate-100 mb-2">Proposta Aceita!</h2>
               <p style={{ color: '#C8C4CE' }}>
                 Nossa equipe entrará em contato com {lead?.responsavel} em até 24 horas para iniciar o onboarding.
               </p>
@@ -338,7 +338,7 @@ export default function PropostaPublica() {
               <button
                 onClick={handleAccept}
                 disabled={updateStatus.isPending}
-                className="group relative px-10 py-4 rounded-2xl text-white font-bold text-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group relative px-10 py-4 rounded-2xl text-slate-100 font-bold text-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: 'linear-gradient(135deg, #5D267A, #9B5ABE)', boxShadow: '0 8px 32px rgba(93, 38, 122, 0.4)' }}
               >
                 {updateStatus.isPending ? (
@@ -366,23 +366,23 @@ export default function PropostaPublica() {
           <section className="pb-2">
             <div className="flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl" style={{ backgroundColor: '#3A1750', border: '1px solid #5D267A' }}>
               <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#5D267A' }}>
-                <span className="text-lg font-bold text-white">
+                <span className="text-lg font-bold text-slate-100">
                   {proposta.assinatura_vendedor.nome.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="text-center sm:text-left flex-1">
-                <p className="font-semibold text-white">{proposta.assinatura_vendedor.nome}</p>
+                <p className="font-semibold text-slate-100">{proposta.assinatura_vendedor.nome}</p>
                 <p className="text-sm" style={{ color: '#9B5ABE' }}>{proposta.assinatura_vendedor.cargo}</p>
               </div>
               <div className="flex flex-col gap-1.5 text-sm" style={{ color: '#C8C4CE' }}>
                 {proposta.assinatura_vendedor.telefone && (
-                  <a href={`tel:${proposta.assinatura_vendedor.telefone}`} className="flex items-center gap-2 hover:text-white transition-colors">
+                  <a href={`tel:${proposta.assinatura_vendedor.telefone}`} className="flex items-center gap-2 hover:text-slate-100 transition-colors">
                     <Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9B5ABE' }} />
                     {proposta.assinatura_vendedor.telefone}
                   </a>
                 )}
                 {proposta.assinatura_vendedor.email && (
-                  <a href={`mailto:${proposta.assinatura_vendedor.email}`} className="flex items-center gap-2 hover:text-white transition-colors">
+                  <a href={`mailto:${proposta.assinatura_vendedor.email}`} className="flex items-center gap-2 hover:text-slate-100 transition-colors">
                     <Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9B5ABE' }} />
                     {proposta.assinatura_vendedor.email}
                   </a>

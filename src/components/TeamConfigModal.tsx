@@ -162,8 +162,8 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
       <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-white">⚙️ Configurar Equipe</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <h3 className="text-lg font-bold text-slate-100">⚙️ Configurar Equipe</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-100 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -174,8 +174,8 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
             onClick={() => setActiveTab('teams')}
             className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'teams'
-                ? 'text-white border-b-2 border-cyan-500 bg-slate-800/50'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-slate-100 border-b-2 border-cyan-500 bg-slate-800/50'
+                : 'text-slate-400 hover:text-slate-100'
             }`}
           >
             🏢 Times
@@ -184,8 +184,8 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
             onClick={() => setActiveTab('functions')}
             className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'functions'
-                ? 'text-white border-b-2 border-cyan-500 bg-slate-800/50'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-slate-100 border-b-2 border-cyan-500 bg-slate-800/50'
+                : 'text-slate-400 hover:text-slate-100'
             }`}
           >
             💼 Funções
@@ -208,14 +208,14 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                     placeholder="Nome do time"
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                   />
                   <input
                     type="text"
                     placeholder="Descrição (opcional)"
                     value={editForm.description}
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                   />
                   <div className="flex items-center gap-2">
                     <input
@@ -234,7 +234,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
               ) : (
                 <button
                   onClick={() => setIsCreating(true)}
-                  className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-white hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-slate-100 hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Novo Time
@@ -250,13 +250,13 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                         type="text"
                         value={editForm.name}
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                       />
                       <input
                         type="text"
                         value={editForm.description}
                         onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                       />
                       <div className="flex items-center gap-2">
                         <input
@@ -279,7 +279,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                       <div className="flex items-center gap-3">
                         <div className="w-4 h-4 rounded-full" style={{ backgroundColor: team.color || '#3b82f6' }}></div>
                         <div>
-                          <div className="text-sm font-medium text-white">{team.name}</div>
+                          <div className="text-sm font-medium text-slate-100">{team.name}</div>
                           {team.description && (
                             <div className="text-xs text-slate-400">{team.description}</div>
                           )}
@@ -288,7 +288,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEdit(team, 'team')}
-                          className="p-2 text-slate-400 hover:text-white transition-colors"
+                          className="p-2 text-slate-400 hover:text-slate-100 transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -314,14 +314,14 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                     placeholder="Nome da função"
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                   />
                   <input
                     type="text"
                     placeholder="Descrição (opcional)"
                     value={editForm.description}
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                   />
                   <div className="flex gap-2">
                     <Button onClick={handleCreateFunction} className="flex-1">Salvar</Button>
@@ -331,7 +331,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
               ) : (
                 <button
                   onClick={() => setIsCreating(true)}
-                  className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-white hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-slate-100 hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Nova Função
@@ -347,13 +347,13 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                         type="text"
                         value={editForm.name}
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                       />
                       <input
                         type="text"
                         value={editForm.description}
                         onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                       />
                       <div className="flex gap-2">
                         <Button onClick={() => handleUpdateFunction(func.id)} size="sm">
@@ -366,7 +366,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                   ) : (
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium text-white">{func.name}</div>
+                        <div className="text-sm font-medium text-slate-100">{func.name}</div>
                         {func.description && (
                           <div className="text-xs text-slate-400">{func.description}</div>
                         )}
@@ -374,7 +374,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEdit(func, 'function')}
-                          className="p-2 text-slate-400 hover:text-white transition-colors"
+                          className="p-2 text-slate-400 hover:text-slate-100 transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>

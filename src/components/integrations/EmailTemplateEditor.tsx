@@ -64,7 +64,7 @@ const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({ template, onS
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-white max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-slate-100 max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{template.id ? 'Editar Template' : 'Novo Template'}</DialogTitle>
         </DialogHeader>

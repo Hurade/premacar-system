@@ -1098,7 +1098,7 @@ const ChatInterface: React.FC = () => {
               target="_blank"
               rel="noopener noreferrer"
               title="Salvar anexo"
-              className={`shrink-0 ${msg.direction === MessageDirection.OUTGOING ? 'text-cyan-100 hover:text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`shrink-0 ${msg.direction === MessageDirection.OUTGOING ? 'text-cyan-100 hover:text-slate-100' : 'text-slate-400 hover:text-slate-100'}`}
             >
               <Download className="w-3.5 h-3.5" />
             </a>
@@ -1161,7 +1161,7 @@ const ChatInterface: React.FC = () => {
         {/* Search Header */}
         <div className="p-4 border-b border-slate-800/50 space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+            <h2 className="text-lg font-bold text-slate-100">Chats Ativos</h2>
             <Button
               size="sm"
               onClick={handleOpenNewConversationModal}
@@ -1192,7 +1192,7 @@ const ChatInterface: React.FC = () => {
               className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
                 statusFilter === 'nina'
                   ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
-                  : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
               }`}
             >
               <Bot className="w-3.5 h-3.5" />
@@ -1206,7 +1206,7 @@ const ChatInterface: React.FC = () => {
               className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
                 statusFilter === 'human'
                   ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-                  : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
               }`}
             >
               <User className="w-3.5 h-3.5" />
@@ -1228,7 +1228,7 @@ const ChatInterface: React.FC = () => {
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                     filterType === 'all' 
                       ? 'bg-cyan-600 text-white' 
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
                   Todas
@@ -1238,7 +1238,7 @@ const ChatInterface: React.FC = () => {
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
                     filterType === 'unread' 
                       ? 'bg-cyan-600 text-white' 
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
                   <Inbox className="w-3 h-3" />
@@ -1249,7 +1249,7 @@ const ChatInterface: React.FC = () => {
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
                     filterType === 'favorite'
                       ? 'bg-cyan-600 text-white'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
                   <Star className="w-3 h-3" />
@@ -1268,7 +1268,7 @@ const ChatInterface: React.FC = () => {
                           : statusFilter === 'human'
                             ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
                             : 'bg-amber-600/20 border-amber-500/50 text-amber-400'
-                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
                     }`}
                   >
                     {statusFilter === 'nina' && <Bot className="w-3 h-3" />}
@@ -1278,7 +1278,7 @@ const ChatInterface: React.FC = () => {
                     {statusFilter === 'all' ? 'Status' : statusFilter === 'nina' ? sdrName : statusFilter === 'human' ? 'Humano' : 'Pausado'}
                     {statusFilter !== 'all' && (
                       <X 
-                        className="w-3 h-3 ml-1 hover:text-white" 
+                        className="w-3 h-3 ml-1 hover:text-slate-100" 
                         onClick={(e) => {
                           e.stopPropagation();
                           setStatusFilter('all');
@@ -1292,7 +1292,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setStatusFilter('all')}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        statusFilter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        statusFilter === 'all' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       Todos os status
@@ -1300,7 +1300,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setStatusFilter('nina')}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                        statusFilter === 'nina' ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        statusFilter === 'nina' ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       <Bot className="w-4 h-4" />
@@ -1309,7 +1309,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setStatusFilter('human')}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                        statusFilter === 'human' ? 'bg-emerald-600/20 text-emerald-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        statusFilter === 'human' ? 'bg-emerald-600/20 text-emerald-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       <User className="w-4 h-4" />
@@ -1318,7 +1318,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setStatusFilter('paused')}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                        statusFilter === 'paused' ? 'bg-amber-600/20 text-amber-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        statusFilter === 'paused' ? 'bg-amber-600/20 text-amber-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       <Pause className="w-4 h-4" />
@@ -1338,14 +1338,14 @@ const ChatInterface: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
                       filterTag 
                         ? 'bg-violet-600/20 border-violet-500/50 text-violet-400' 
-                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
                     }`}
                   >
                     <Tag className="w-3 h-3" />
                     {filterTag ? availableTags.find(t => t.key === filterTag)?.label || filterTag : 'Tag'}
                     {filterTag && (
                       <X 
-                        className="w-3 h-3 ml-1 hover:text-white" 
+                        className="w-3 h-3 ml-1 hover:text-slate-100" 
                         onClick={(e) => {
                           e.stopPropagation();
                           setFilterTag(null);
@@ -1360,7 +1360,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setFilterTag(null)}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        !filterTag ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        !filterTag ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       Todas as tags
@@ -1370,7 +1370,7 @@ const ChatInterface: React.FC = () => {
                         key={tag.key}
                         onClick={() => setFilterTag(tag.key)}
                         className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                          filterTag === tag.key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          filterTag === tag.key ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                         }`}
                       >
                         <span 
@@ -1394,14 +1394,14 @@ const ChatInterface: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
                       excludedTags.length > 0 
                         ? 'bg-red-600/20 border-red-500/50 text-red-400' 
-                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
                     }`}
                   >
                     <X className="w-3 h-3" />
                     {excludedTags.length > 0 ? `Ocultar (${excludedTags.length})` : 'Ocultar tag'}
                     {excludedTags.length > 0 && (
                       <X 
-                        className="w-3 h-3 ml-1 hover:text-white" 
+                        className="w-3 h-3 ml-1 hover:text-slate-100" 
                         onClick={(e) => {
                           e.stopPropagation();
                           setExcludedTags([]);
@@ -1426,7 +1426,7 @@ const ChatInterface: React.FC = () => {
                             }
                           }}
                           className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                            isExcluded ? 'bg-red-600/20 text-red-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            isExcluded ? 'bg-red-600/20 text-red-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                           }`}
                         >
                           <span 
@@ -1460,7 +1460,7 @@ const ChatInterface: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
                       filterAssignedUser 
                         ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' 
-                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
                     }`}
                   >
                     <UserPlus className="w-3 h-3" />
@@ -1469,7 +1469,7 @@ const ChatInterface: React.FC = () => {
                       : 'Atribuído a'}
                     {filterAssignedUser && (
                       <X 
-                        className="w-3 h-3 ml-1 hover:text-white" 
+                        className="w-3 h-3 ml-1 hover:text-slate-100" 
                         onClick={(e) => {
                           e.stopPropagation();
                           setFilterAssignedUser(null);
@@ -1484,7 +1484,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setFilterAssignedUser(null)}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        !filterAssignedUser ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        !filterAssignedUser ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       Todos os membros
@@ -1494,7 +1494,7 @@ const ChatInterface: React.FC = () => {
                         key={member.id}
                         onClick={() => setFilterAssignedUser(member.id)}
                         className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                          filterAssignedUser === member.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          filterAssignedUser === member.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                         }`}
                       >
                         <img 
@@ -1519,14 +1519,14 @@ const ChatInterface: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
                       filterQueue
                         ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
-                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-100 hover:border-slate-700'
                     }`}
                   >
                     <Layers className="w-3 h-3" />
                     {filterQueue ? queues.find(q => q.id === filterQueue)?.name || 'Fila' : 'Fila'}
                     {filterQueue && (
                       <X
-                        className="w-3 h-3 ml-1 hover:text-white"
+                        className="w-3 h-3 ml-1 hover:text-slate-100"
                         onClick={(e) => {
                           e.stopPropagation();
                           setFilterQueue(null);
@@ -1541,7 +1541,7 @@ const ChatInterface: React.FC = () => {
                     <button
                       onClick={() => setFilterQueue(null)}
                       className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                        !filterQueue ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        !filterQueue ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                       }`}
                     >
                       Todas as filas
@@ -1551,7 +1551,7 @@ const ChatInterface: React.FC = () => {
                         key={queue.id}
                         onClick={() => setFilterQueue(queue.id)}
                         className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                          filterQueue === queue.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          filterQueue === queue.id ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                         }`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: queue.color }} />
@@ -1611,7 +1611,7 @@ const ChatInterface: React.FC = () => {
                 
                 <div className="ml-3 flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
-                    <h3 className={`text-sm font-semibold truncate flex items-center gap-1 ${selectedChatId === chat.id ? 'text-white' : 'text-slate-300'}`}>
+                    <h3 className={`text-sm font-semibold truncate flex items-center gap-1 ${selectedChatId === chat.id ? 'text-slate-100' : 'text-slate-300'}`}>
                       {chat.contactName}
                     </h3>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1669,7 +1669,7 @@ const ChatInterface: React.FC = () => {
 
       {/* Right Area: Chat Window & Profile */}
       {activeChat ? (
-        <div className={`${isMobile && !selectedChatId ? 'hidden' : ''} flex-1 flex overflow-hidden bg-[#0B0E14]`}>
+        <div className={`${isMobile && !selectedChatId ? 'hidden' : ''} flex-1 flex overflow-hidden bg-slate-950`}>
           {/* Main Chat Content */}
           <div className="flex-1 flex flex-col min-w-0 relative">
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
@@ -1681,7 +1681,7 @@ const ChatInterface: React.FC = () => {
                 {isMobile && (
                   <button
                     onClick={() => setSelectedChatId(null)}
-                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
@@ -1718,7 +1718,7 @@ const ChatInterface: React.FC = () => {
                 <Button
                   variant="ghost" 
                   size="icon" 
-                  className={`text-slate-400 hover:text-white ${activeChat.status === 'nina' ? 'bg-violet-500/20 text-violet-400' : ''}`}
+                  className={`text-slate-400 hover:text-slate-100 ${activeChat.status === 'nina' ? 'bg-violet-500/20 text-violet-400' : ''}`}
                   onClick={() => handleStatusChange('nina')}
                   title={`Ativar ${sdrName} (IA)`}
                 >
@@ -1727,7 +1727,7 @@ const ChatInterface: React.FC = () => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className={`text-slate-400 hover:text-white ${activeChat.status === 'human' ? 'bg-emerald-500/20 text-emerald-400' : ''}`}
+                  className={`text-slate-400 hover:text-slate-100 ${activeChat.status === 'human' ? 'bg-emerald-500/20 text-emerald-400' : ''}`}
                   onClick={() => handleStatusChange('human')}
                   title="Assumir conversa"
                 >
@@ -1736,7 +1736,7 @@ const ChatInterface: React.FC = () => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className={`text-slate-400 hover:text-white ${activeChat.status === 'paused' ? 'bg-amber-500/20 text-amber-400' : ''}`}
+                  className={`text-slate-400 hover:text-slate-100 ${activeChat.status === 'paused' ? 'bg-amber-500/20 text-amber-400' : ''}`}
                   onClick={() => handleStatusChange('paused')}
                   title="Pausar conversa"
                 >
@@ -1746,7 +1746,7 @@ const ChatInterface: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`text-slate-400 hover:text-white ${showProfileInfo ? 'bg-slate-800 text-cyan-400' : ''}`}
+                  className={`text-slate-400 hover:text-slate-100 ${showProfileInfo ? 'bg-slate-800 text-cyan-400' : ''}`}
                   onClick={() => setShowProfileInfo(!showProfileInfo)}
                   title="Ver Informações"
                 >
@@ -1755,7 +1755,7 @@ const ChatInterface: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`text-slate-400 hover:text-white ${showCopilot ? 'bg-purple-500/20 text-purple-400' : ''}`}
+                  className={`text-slate-400 hover:text-slate-100 ${showCopilot ? 'bg-purple-500/20 text-purple-400' : ''}`}
                   onClick={() => setShowCopilot(!showCopilot)}
                   title="Copiloto IA"
                 >
@@ -1768,7 +1768,7 @@ const ChatInterface: React.FC = () => {
                       variant="ghost"
                       size="icon"
                       title="Transferir conexão"
-                      className="text-slate-400 hover:text-white"
+                      className="text-slate-400 hover:text-slate-100"
                     >
                       <Repeat className="w-5 h-5" />
                     </Button>
@@ -1782,7 +1782,7 @@ const ChatInterface: React.FC = () => {
                           <button
                             key={c.id}
                             onClick={() => handleTransferConnection(c)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors text-left"
                           >
                             <span>{c.api_type === 'meta_official' ? '✅' : '🔧'}</span>
                             <span className="truncate">{c.name}</span>
@@ -1800,7 +1800,7 @@ const ChatInterface: React.FC = () => {
                       variant="ghost"
                       size="icon"
                       title="Transferir atendimento"
-                      className="text-slate-400 hover:text-white"
+                      className="text-slate-400 hover:text-slate-100"
                     >
                       <Users className="w-5 h-5" />
                     </Button>
@@ -1841,7 +1841,7 @@ const ChatInterface: React.FC = () => {
                       variant="ghost"
                       size="icon"
                       title="Mais opções"
-                      className="text-slate-400 hover:text-white"
+                      className="text-slate-400 hover:text-slate-100"
                     >
                       <MoreVertical className="w-5 h-5" />
                     </Button>
@@ -1850,14 +1850,14 @@ const ChatInterface: React.FC = () => {
                     <div className="space-y-1">
                       <button
                         onClick={() => handleExportConversation(activeChat)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 rounded-md transition-colors"
                       >
                         <Download className="w-4 h-4 text-cyan-400" />
                         Exportar Conversa
                       </button>
                       <button
                         onClick={() => setShowFinalizeDialog(true)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 rounded-md transition-colors"
                       >
                         <CheckCircle className="w-4 h-4 text-emerald-400" />
                         Finalizar Atendimento
@@ -1909,7 +1909,7 @@ const ChatInterface: React.FC = () => {
                 </span>
                 <button
                   onClick={() => setSpyConversationId(null)}
-                  className="text-cyan-300 hover:text-white underline"
+                  className="text-cyan-300 hover:text-slate-100 underline"
                 >
                   Sair da supervisão
                 </button>
@@ -2047,7 +2047,7 @@ const ChatInterface: React.FC = () => {
                               )}
                               <Popover>
                                 <PopoverTrigger asChild>
-                                  <button className="text-slate-500 hover:text-white" title="Mais opções">
+                                  <button className="text-slate-500 hover:text-slate-100" title="Mais opções">
                                     <MoreVertical className="w-3.5 h-3.5" />
                                   </button>
                                 </PopoverTrigger>
@@ -2055,14 +2055,14 @@ const ChatInterface: React.FC = () => {
                                   <div className="space-y-1">
                                     <button
                                       onClick={() => setMessageInfoFor(msg)}
-                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 rounded-md transition-colors"
                                     >
                                       <Info className="w-4 h-4 text-slate-400" />
                                       Dados da mensagem
                                     </button>
                                     <button
                                       onClick={() => handleReplyToMessage(msg)}
-                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 rounded-md transition-colors"
                                     >
                                       <Reply className="w-4 h-4 text-cyan-400" />
                                       Responder
@@ -2070,7 +2070,7 @@ const ChatInterface: React.FC = () => {
                                     {msg.content && (
                                       <button
                                         onClick={() => handleCopyMessage(msg)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 rounded-md transition-colors"
                                       >
                                         <Copy className="w-4 h-4 text-slate-400" />
                                         Copiar
@@ -2082,7 +2082,7 @@ const ChatInterface: React.FC = () => {
                                         download
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100 rounded-md transition-colors"
                                       >
                                         <Download className="w-4 h-4 text-slate-400" />
                                         Salvar anexo
@@ -2124,7 +2124,7 @@ const ChatInterface: React.FC = () => {
                 </span>
                 <button
                   onClick={handleToggleContactBlock}
-                  className="text-red-300 hover:text-white underline shrink-0"
+                  className="text-red-300 hover:text-slate-100 underline shrink-0"
                 >
                   Desbloquear
                 </button>
@@ -2151,7 +2151,7 @@ const ChatInterface: React.FC = () => {
                     </div>
                     <button
                       onClick={() => setReplyingTo(null)}
-                      className="p-1 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white shrink-0"
+                      className="p-1 rounded-full hover:bg-slate-700 text-slate-400 hover:text-slate-100 shrink-0"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -2218,7 +2218,7 @@ const ChatInterface: React.FC = () => {
                     {/* Emoji picker */}
                     <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" title="Emojis" className="text-slate-400 hover:text-white rounded-full">
+                        <Button type="button" variant="ghost" size="icon" title="Emojis" className="text-slate-400 hover:text-slate-100 rounded-full">
                           <Smile className="w-5 h-5" />
                         </Button>
                       </PopoverTrigger>
@@ -2240,7 +2240,7 @@ const ChatInterface: React.FC = () => {
                       title="Enviar arquivo"
                       disabled={isUploadingFile}
                       onClick={() => fileInputRef.current?.click()}
-                      className="text-slate-400 hover:text-white rounded-full"
+                      className="text-slate-400 hover:text-slate-100 rounded-full"
                     >
                       {isUploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                     </Button>
@@ -2314,7 +2314,7 @@ const ChatInterface: React.FC = () => {
                       disabled={isSendingAudio}
                       onClick={startAudioRecording}
                       title="Gravar áudio"
-                      className="rounded-full w-12 h-12 p-0 shrink-0 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-white shadow-none"
+                      className="rounded-full w-12 h-12 p-0 shrink-0 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-100 shadow-none"
                     >
                       {isSendingAudio ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
                     </Button>
@@ -2360,7 +2360,7 @@ const ChatInterface: React.FC = () => {
             <div className="w-80 h-full flex flex-col">
               {/* Header */}
               <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 flex-shrink-0">
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-slate-100">
                   {isEditingContact ? 'Editando Contato' : 'Informações do Lead'}
                 </span>
                 <div className="flex items-center gap-0.5">
@@ -2376,7 +2376,7 @@ const ChatInterface: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setIsEditingContact(false)}
-                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
                         title="Cancelar edição"
                       >
                         <X className="w-4 h-4" />
@@ -2386,7 +2386,7 @@ const ChatInterface: React.FC = () => {
                     <>
                       <button
                         onClick={handleStartEditContact}
-                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
                         title="Editar contato"
                       >
                         <Pencil className="w-4 h-4" />
@@ -2400,7 +2400,7 @@ const ChatInterface: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setShowProfileInfo(false)}
-                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -2416,7 +2416,7 @@ const ChatInterface: React.FC = () => {
                   <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-cyan-500 to-teal-600 shadow-xl mb-4">
                     <img src={activeChat.contactAvatar} alt={activeChat.contactName} className="w-full h-full rounded-full object-cover border-2 border-slate-900" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-1">
+                  <h3 className="text-xl font-bold text-slate-100 mb-1">
                     {contactOverrides[activeChat.contactId]?.name ?? activeChat.contactName}
                   </h3>
                   <p className="text-sm text-slate-400 mb-4">
@@ -2727,14 +2727,14 @@ const ChatInterface: React.FC = () => {
 
         </div>
       ) : !isMobile ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-[#0B0E14] relative overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/20 to-transparent"></div>
           <div className="relative z-10 flex flex-col items-center p-8 text-center max-w-md">
             <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mb-6 shadow-2xl border border-slate-800 relative group">
               <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl group-hover:bg-cyan-500/30 transition-all duration-1000"></div>
               <MessageSquare className="w-10 h-10 text-cyan-500" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">{companyName} Workspace</h2>
+            <h2 className="text-2xl font-bold text-slate-100 mb-2">{companyName} Workspace</h2>
             <p className="text-slate-400 text-sm leading-relaxed">
               {conversations.length === 0 
                 ? 'Aguardando novas conversas. Configure o webhook do WhatsApp para começar a receber mensagens.'
@@ -2756,7 +2756,7 @@ const ChatInterface: React.FC = () => {
       <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
         <AlertDialogContent className="bg-slate-900 border-slate-700">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Finalizar Atendimento</AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-100">Finalizar Atendimento</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
               Tem certeza que deseja finalizar este atendimento? A conversa será arquivada e não aparecerá mais na lista de chats ativos.
             </AlertDialogDescription>
@@ -2784,7 +2784,7 @@ const ChatInterface: React.FC = () => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="bg-slate-900 border-slate-700">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Excluir Conversa</AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-100">Excluir Conversa</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
               <span className="text-red-400 font-semibold">Atenção!</span> Esta ação é irreversível. Todas as mensagens desta conversa serão permanentemente excluídas.
             </AlertDialogDescription>
@@ -2812,7 +2812,7 @@ const ChatInterface: React.FC = () => {
       <Dialog open={!!messageInfoFor} onOpenChange={(open) => !open && setMessageInfoFor(null)}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
+            <DialogTitle className="text-slate-100 flex items-center gap-2">
               <Info className="w-5 h-5 text-cyan-400" />
               Dados da mensagem
             </DialogTitle>
@@ -2863,7 +2863,7 @@ const ChatInterface: React.FC = () => {
       }}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
+            <DialogTitle className="text-slate-100 flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-cyan-400" />
               Nova Conversa
             </DialogTitle>
@@ -2953,7 +2953,7 @@ const ChatInterface: React.FC = () => {
                     {(selectedContactForConv.name || selectedContactForConv.phone_number).substring(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-white truncate">
+                    <p className="font-semibold text-slate-100 truncate">
                       {selectedContactForConv.name || 'Sem nome'}
                     </p>
                     <p className="text-sm text-slate-400 font-mono">{selectedContactForConv.phone_number}</p>
@@ -2962,7 +2962,7 @@ const ChatInterface: React.FC = () => {
                     variant="ghost" 
                     size="sm"
                     onClick={() => setSelectedContactForConv(null)}
-                    className="text-slate-400 hover:text-white"
+                    className="text-slate-400 hover:text-slate-100"
                   >
                     Trocar
                   </Button>

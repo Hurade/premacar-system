@@ -26,7 +26,7 @@ const MetricCard: React.FC<{ icon: React.ReactNode; label: string; value: string
       {icon}
       <span className="text-xs font-medium">{label}</span>
     </div>
-    <p className="text-2xl font-bold text-white">{value}</p>
+    <p className="text-2xl font-bold text-slate-100">{value}</p>
     {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
   </div>
 );
@@ -95,7 +95,7 @@ const BroadcastDetails: React.FC = () => {
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white">{campaign.name}</h1>
+              <h1 className="text-2xl font-bold text-slate-100">{campaign.name}</h1>
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusCfg.color}`}>
                 {statusCfg.label}
               </span>

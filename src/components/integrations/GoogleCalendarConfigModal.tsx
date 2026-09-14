@@ -95,7 +95,7 @@ const GoogleCalendarConfigModal: React.FC<Props> = ({ open, onClose, currentConf
               📅
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Google Calendar</h2>
+              <h2 className="text-lg font-semibold text-slate-100">Google Calendar</h2>
               <p className="text-sm text-slate-400">Agendamento automático de demos</p>
             </div>
           </div>
@@ -106,7 +106,7 @@ const GoogleCalendarConfigModal: React.FC<Props> = ({ open, onClose, currentConf
                 Configurado
               </span>
             )}
-            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-100 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -127,7 +127,7 @@ const GoogleCalendarConfigModal: React.FC<Props> = ({ open, onClose, currentConf
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">1</span>
-              <Label className="text-white text-sm font-medium">Service Account JSON</Label>
+              <Label className="text-slate-100 text-sm font-medium">Service Account JSON</Label>
             </div>
             <p className="text-xs text-slate-400 ml-7">
               Crie uma Service Account no Google Cloud Console, habilite a Google Calendar API,
@@ -145,7 +145,7 @@ const GoogleCalendarConfigModal: React.FC<Props> = ({ open, onClose, currentConf
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">2</span>
-              <Label className="text-white text-sm font-medium">Calendar ID</Label>
+              <Label className="text-slate-100 text-sm font-medium">Calendar ID</Label>
             </div>
             <p className="text-xs text-slate-400 ml-7">
               Use <code className="text-blue-300">primary</code> para o calendário principal
@@ -163,7 +163,7 @@ const GoogleCalendarConfigModal: React.FC<Props> = ({ open, onClose, currentConf
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">3</span>
-              <Label className="text-white text-sm font-medium">Configurações de Agenda</Label>
+              <Label className="text-slate-100 text-sm font-medium">Configurações de Agenda</Label>
             </div>
 
             <div className="ml-7 grid grid-cols-2 gap-4">
@@ -272,7 +272,7 @@ const GoogleCalendarConfigModal: React.FC<Props> = ({ open, onClose, currentConf
 
         {/* Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
-          <Button variant="ghost" onClick={onClose} className="text-slate-400 hover:text-white">
+          <Button variant="ghost" onClick={onClose} className="text-slate-400 hover:text-slate-100">
             Cancelar
           </Button>
           <Button

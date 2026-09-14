@@ -51,13 +51,13 @@ function WhatsAppPreview({ message }: { message: string }) {
   return (
     <div className="rounded-xl bg-[#0b1419] p-4 min-h-24 flex items-end">
       <div
-        className="max-w-xs rounded-2xl rounded-bl-sm px-4 py-2 text-sm text-white relative"
+        className="max-w-xs rounded-2xl rounded-bl-sm px-4 py-2 text-sm text-slate-100 relative"
         style={{ background: '#005c4b' }}
       >
         <p className="whitespace-pre-wrap leading-relaxed">
-          {message || <span className="text-white/40 italic">Sua mensagem aparecerá aqui…</span>}
+          {message || <span className="text-slate-500 italic">Sua mensagem aparecerá aqui…</span>}
         </p>
-        <span className="text-[10px] text-white/50 float-right mt-1 ml-4">
+        <span className="text-[10px] text-slate-500 float-right mt-1 ml-4">
           {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>

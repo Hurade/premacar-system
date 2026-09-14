@@ -90,7 +90,7 @@ const QuickRepliesSettings: React.FC = () => {
     <div className="max-w-2xl space-y-8">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
           <Zap className="w-5 h-5 text-cyan-400" />
           Respostas Rápidas
         </h3>
@@ -148,14 +148,14 @@ const QuickRepliesSettings: React.FC = () => {
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-mono">/</span>
                     <input
-                      className="bg-slate-950 border border-slate-700 rounded-lg pl-6 pr-3 py-2 text-sm text-white w-36 outline-none focus:border-cyan-600"
+                      className="bg-slate-950 border border-slate-700 rounded-lg pl-6 pr-3 py-2 text-sm text-slate-100 w-36 outline-none focus:border-cyan-600"
                       value={editTrigger}
                       onChange={e => setEditTrigger(e.target.value)}
                       placeholder="atalho"
                     />
                   </div>
                   <textarea
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-600 resize-none"
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-600 resize-none"
                     rows={2}
                     value={editText}
                     onChange={e => setEditText(e.target.value)}
@@ -165,7 +165,7 @@ const QuickRepliesSettings: React.FC = () => {
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={() => setEditingIdx(null)}
-                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-100 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
                   >
                     <X className="w-3 h-3" /> Cancelar
                   </button>
@@ -187,7 +187,7 @@ const QuickRepliesSettings: React.FC = () => {
                   <button
                     onClick={() => startEdit(idx)}
                     title="Editar"
-                    className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
@@ -224,7 +224,7 @@ const QuickRepliesSettings: React.FC = () => {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-mono">/</span>
                 <input
                   autoFocus
-                  className="bg-slate-950 border border-slate-700 rounded-lg pl-6 pr-3 py-2 text-sm text-white w-36 outline-none focus:border-cyan-600"
+                  className="bg-slate-950 border border-slate-700 rounded-lg pl-6 pr-3 py-2 text-sm text-slate-100 w-36 outline-none focus:border-cyan-600"
                   value={newTrigger}
                   onChange={e => setNewTrigger(e.target.value)}
                   placeholder="atalho"
@@ -232,7 +232,7 @@ const QuickRepliesSettings: React.FC = () => {
                 />
               </div>
               <textarea
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-600 resize-none"
+                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-600 resize-none"
                 rows={2}
                 value={newText}
                 onChange={e => setNewText(e.target.value)}
@@ -242,7 +242,7 @@ const QuickRepliesSettings: React.FC = () => {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => { setAdding(false); setNewTrigger(''); setNewText(''); }}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-100 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
               >
                 <X className="w-3 h-3" /> Cancelar
               </button>

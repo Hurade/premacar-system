@@ -295,7 +295,7 @@ const Team: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
         case 'active':
-            return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-950 border border-slate-700 text-white shadow-sm">Ativo</span>;
+            return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-950 border border-slate-700 text-slate-100 shadow-sm">Ativo</span>;
         case 'invited':
             return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-950 border border-amber-900/50 text-amber-500 shadow-sm">Pendente</span>;
         default:
@@ -330,7 +330,7 @@ const Team: React.FC = () => {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-100 flex items-center gap-3">
             <ShieldCheck className="w-8 h-8 text-primary" />
             Equipe
           </h2>
@@ -365,19 +365,19 @@ const Team: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 shadow-sm">
             <div className="text-sm font-medium text-slate-400 mb-2">Total de Usuários</div>
-            <div className="text-3xl font-bold text-white">{loading ? '-' : stats.total}</div>
+            <div className="text-3xl font-bold text-slate-100">{loading ? '-' : stats.total}</div>
         </div>
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 shadow-sm">
             <div className="text-sm font-medium text-slate-400 mb-2">Admins</div>
-            <div className="text-3xl font-bold text-white">{loading ? '-' : stats.admins}</div>
+            <div className="text-3xl font-bold text-slate-100">{loading ? '-' : stats.admins}</div>
         </div>
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 shadow-sm">
             <div className="text-sm font-medium text-slate-400 mb-2">Membros</div>
-            <div className="text-3xl font-bold text-white">{loading ? '-' : stats.members}</div>
+            <div className="text-3xl font-bold text-slate-100">{loading ? '-' : stats.members}</div>
         </div>
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 shadow-sm">
             <div className="text-sm font-medium text-slate-400 mb-2">Times Ativos</div>
-            <div className="text-3xl font-bold text-white">{stats.teams}</div>
+            <div className="text-3xl font-bold text-slate-100">{stats.teams}</div>
         </div>
       </div>
 
@@ -396,7 +396,7 @@ const Team: React.FC = () => {
       {/* Main Table Card */}
       <div className="bg-slate-900/30 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         <div className="p-6 border-b border-slate-800">
-            <h3 className="text-lg font-bold text-white">Usuários da Equipe</h3>
+            <h3 className="text-lg font-bold text-slate-100">Usuários da Equipe</h3>
             <p className="text-sm text-slate-500 mt-1">Gerencie roles e times dos usuários</p>
         </div>
 
@@ -546,14 +546,14 @@ const Team: React.FC = () => {
                                           <>
                                             <button
                                                 onClick={() => setScheduleMember(member)}
-                                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-100 transition-colors"
                                                 title="Configurar horário de trabalho"
                                             >
                                                 <Clock className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => handleEditClick(member)}
-                                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-100 transition-colors"
                                                 title="Editar membro"
                                             >
                                                 <Edit2 className="w-4 h-4" />
@@ -587,8 +587,8 @@ const Team: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-white">Criar Novo Usuário</h3>
-                    <button onClick={() => { setShowModal(false); setNewPassword(''); setConfirmPassword(''); }} className="text-slate-400 hover:text-white transition-colors">
+                    <h3 className="text-lg font-bold text-slate-100">Criar Novo Usuário</h3>
+                    <button onClick={() => { setShowModal(false); setNewPassword(''); setConfirmPassword(''); }} className="text-slate-400 hover:text-slate-100 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -599,7 +599,7 @@ const Team: React.FC = () => {
                         <input 
                             required
                             type="text" 
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                             placeholder="Ex: João da Silva"
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -610,7 +610,7 @@ const Team: React.FC = () => {
                         <input
                             required
                             type="email"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                             placeholder="colaborador@empresa.com"
                             value={formData.email}
                             onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -625,7 +625,7 @@ const Team: React.FC = () => {
                                 placeholder="Mínimo 6 caracteres"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none pr-10"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-slate-600 outline-none pr-10"
                             />
                             <button
                                 type="button"
@@ -644,7 +644,7 @@ const Team: React.FC = () => {
                             placeholder="Repita a senha"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-slate-600 outline-none"
                         />
                     </div>
                     <div className="space-y-2">
@@ -656,7 +656,7 @@ const Team: React.FC = () => {
                                     onClick={() => setFormData({...formData, role})}
                                     className={`cursor-pointer rounded-lg border p-2 text-center transition-all ${
                                         formData.role === role 
-                                        ? 'bg-slate-800 border-slate-500 text-white' 
+                                        ? 'bg-slate-800 border-slate-500 text-slate-100' 
                                         : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                                     }`}
                                 >
@@ -672,7 +672,7 @@ const Team: React.FC = () => {
                         <select
                             value={formData.team_id}
                             onChange={(e) => setFormData({...formData, team_id: e.target.value})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         >
                             <option value="">Sem time</option>
                             {teams.map(team => (
@@ -686,7 +686,7 @@ const Team: React.FC = () => {
                         <select
                             value={formData.function_id}
                             onChange={(e) => setFormData({...formData, function_id: e.target.value})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         >
                             <option value="">Sem função</option>
                             {functions.map(func => (
@@ -703,7 +703,7 @@ const Team: React.FC = () => {
                             max="10"
                             value={formData.weight}
                             onChange={(e) => setFormData({...formData, weight: parseInt(e.target.value)})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         />
                     </div>
 
@@ -714,7 +714,7 @@ const Team: React.FC = () => {
                             placeholder="Ex: 5548999998888"
                             value={formData.notification_phone}
                             onChange={(e) => setFormData({...formData, notification_phone: e.target.value})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         />
                         <p className="text-xs text-slate-500">Número que recebe o aviso quando uma conversa é transferida para uma fila deste atendente</p>
                     </div>
@@ -773,8 +773,8 @@ const Team: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-white">Editar Membro</h3>
-                    <button onClick={() => { setShowEditModal(false); setEditingMember(null); }} className="text-slate-400 hover:text-white transition-colors">
+                    <h3 className="text-lg font-bold text-slate-100">Editar Membro</h3>
+                    <button onClick={() => { setShowEditModal(false); setEditingMember(null); }} className="text-slate-400 hover:text-slate-100 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -785,7 +785,7 @@ const Team: React.FC = () => {
                         <input 
                             required
                             type="text" 
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                             value={editFormData.name}
                             onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
                         />
@@ -795,7 +795,7 @@ const Team: React.FC = () => {
                         <input 
                             required
                             type="email" 
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                             value={editFormData.email}
                             onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
                         />
@@ -809,7 +809,7 @@ const Team: React.FC = () => {
                                     onClick={() => setEditFormData({...editFormData, role})}
                                     className={`cursor-pointer rounded-lg border p-2 text-center transition-all ${
                                         editFormData.role === role 
-                                        ? 'bg-slate-800 border-slate-500 text-white' 
+                                        ? 'bg-slate-800 border-slate-500 text-slate-100' 
                                         : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                                     }`}
                                 >
@@ -825,7 +825,7 @@ const Team: React.FC = () => {
                         <select
                             value={editFormData.status}
                             onChange={(e) => setEditFormData({...editFormData, status: e.target.value as 'active' | 'invited' | 'disabled'})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         >
                             <option value="active">Ativo</option>
                             <option value="invited">Pendente</option>
@@ -838,7 +838,7 @@ const Team: React.FC = () => {
                         <select
                             value={editFormData.team_id}
                             onChange={(e) => setEditFormData({...editFormData, team_id: e.target.value})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         >
                             <option value="">Sem time</option>
                             {teams.map(team => (
@@ -852,7 +852,7 @@ const Team: React.FC = () => {
                         <select
                             value={editFormData.function_id}
                             onChange={(e) => setEditFormData({...editFormData, function_id: e.target.value})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         >
                             <option value="">Sem função</option>
                             {functions.map(func => (
@@ -869,7 +869,7 @@ const Team: React.FC = () => {
                             max="10"
                             value={editFormData.weight}
                             onChange={(e) => setEditFormData({...editFormData, weight: parseInt(e.target.value)})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         />
                     </div>
 
@@ -880,7 +880,7 @@ const Team: React.FC = () => {
                             placeholder="Ex: 5548999998888"
                             value={editFormData.notification_phone}
                             onChange={(e) => setEditFormData({...editFormData, notification_phone: e.target.value})}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                         />
                         <p className="text-xs text-slate-500">Número que recebe o aviso quando uma conversa é transferida para uma fila deste atendente</p>
                     </div>
@@ -943,7 +943,7 @@ const Team: React.FC = () => {
                                 placeholder="Nova senha (mín. 6 caracteres)"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-amber-600/50 outline-none pr-10"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-amber-600/50 outline-none pr-10"
                               />
                               <button
                                 type="button"
@@ -958,7 +958,7 @@ const Team: React.FC = () => {
                               placeholder="Confirmar nova senha"
                               value={confirmPassword}
                               onChange={(e) => setConfirmPassword(e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-amber-600/50 outline-none"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:ring-1 focus:ring-amber-600/50 outline-none"
                             />
                             <p className="text-xs text-slate-500">Deixe em branco para não alterar a senha.</p>
                           </div>

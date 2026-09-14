@@ -104,7 +104,7 @@ const DuplicateContacts: React.FC = () => {
     <div className="p-6 max-w-3xl mx-auto space-y-6 h-full overflow-y-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
             <Users className="w-7 h-7 text-cyan-400" />
             Contatos Duplicados
           </h1>
@@ -146,7 +146,7 @@ const DuplicateContacts: React.FC = () => {
                         onChange={() => setSelectedPrimary(prev => ({ ...prev, [group.normalizedPhone]: contact.id }))}
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">{contactLabel(contact)}</div>
+                        <div className="text-sm font-medium text-slate-100">{contactLabel(contact)}</div>
                         <div className="text-xs text-slate-500">
                           {contact.phone_number} · {contact.email || 'sem e-mail'} · criado em {new Date(contact.created_at).toLocaleDateString('pt-BR')}
                         </div>
@@ -182,7 +182,7 @@ const DuplicateContacts: React.FC = () => {
       <AlertDialog open={!!pendingMerge} onOpenChange={(open) => !open && setPendingMerge(null)}>
         <AlertDialogContent className="bg-slate-900 border-slate-800">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Mesclar Contatos</AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-100">Mesclar Contatos</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
               Esta ação é irreversível: {pendingMerge?.label}. Todo o histórico (conversas, negócios, campanhas, tarefas) do contato duplicado será movido para o principal, e o duplicado será excluído.
             </AlertDialogDescription>

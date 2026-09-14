@@ -93,7 +93,7 @@ const Filas: React.FC = () => {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
           <Layers className="w-7 h-7 text-cyan-400" />
           Filas de Atendimento
         </h1>
@@ -115,7 +115,7 @@ const Filas: React.FC = () => {
                 placeholder="Nome da fila (ex: Comercial, Suporte)"
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
               />
               <div className="flex items-center gap-2">
                 <input
@@ -135,7 +135,7 @@ const Filas: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-white hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-slate-100 hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Nova Fila
@@ -150,7 +150,7 @@ const Filas: React.FC = () => {
                     type="text"
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
                   />
                   <input
                     type="color"
@@ -171,21 +171,21 @@ const Filas: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-4 h-4 rounded-full" style={{ backgroundColor: queue.color }}></div>
-                    <div className={`text-sm font-medium ${queue.is_active ? 'text-white' : 'text-slate-500 line-through'}`}>
+                    <div className={`text-sm font-medium ${queue.is_active ? 'text-slate-100' : 'text-slate-500 line-through'}`}>
                       {queue.name}
                     </div>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleToggleActive(queue)}
-                      className="p-2 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 text-slate-400 hover:text-slate-100 transition-colors"
                       title={queue.is_active ? 'Desativar fila' : 'Ativar fila'}
                     >
                       {queue.is_active ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() => startEdit(queue)}
-                      className="p-2 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 text-slate-400 hover:text-slate-100 transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>

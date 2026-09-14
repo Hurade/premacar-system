@@ -91,7 +91,7 @@ const CustomFieldsSettings: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-white hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-4 text-slate-400 hover:text-slate-100 hover:border-slate-600 transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Novo Campo
@@ -113,7 +113,7 @@ const CustomFieldsSettings: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <ListPlus className="w-4 h-4 text-slate-500" />
                   <div>
-                    <div className="text-sm font-medium text-white flex items-center gap-2">
+                    <div className="text-sm font-medium text-slate-100 flex items-center gap-2">
                       {field.nome}
                       {!field.ativo && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">Inativo</span>}
                       {field.obrigatorio && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Obrigatório</span>}
@@ -127,12 +127,12 @@ const CustomFieldsSettings: React.FC = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleToggleAtivo(field.id, field.ativo)}
-                    className="text-xs text-slate-400 hover:text-white transition-colors px-2"
+                    className="text-xs text-slate-400 hover:text-slate-100 transition-colors px-2"
                     title={field.ativo ? 'Desativar' : 'Ativar'}
                   >
                     {field.ativo ? 'Desativar' : 'Ativar'}
                   </button>
-                  <button onClick={() => startEdit(field)} className="p-2 text-slate-400 hover:text-white transition-colors">
+                  <button onClick={() => startEdit(field)} className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(field.id, field.nome)} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
@@ -172,12 +172,12 @@ function FieldForm({
         placeholder="Nome do campo (ex: Segmento)"
         value={form.nome}
         onChange={(e) => setForm({ ...form, nome: e.target.value })}
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
       />
       <select
         value={form.tipo}
         onChange={(e) => setForm({ ...form, tipo: e.target.value as CustomFieldType })}
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
       >
         {Object.entries(TYPE_LABELS).map(([value, label]) => (
           <option key={value} value={value}>{label}</option>
@@ -189,7 +189,7 @@ function FieldForm({
           placeholder="Opções separadas por vírgula (ex: Oficina, Auto Center, Rede)"
           value={form.opcoesText}
           onChange={(e) => setForm({ ...form, opcoesText: e.target.value })}
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
         />
       )}
       <label className="flex items-center gap-2 text-xs text-slate-400">

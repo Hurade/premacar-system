@@ -26,7 +26,7 @@ export const OnboardingBanner: React.FC<OnboardingBannerProps> = ({ onOpenWizard
                 <Rocket className="w-5 h-5 text-cyan-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Complete a configuração do sistema</h3>
+                <h3 className="text-lg font-semibold text-slate-100">Complete a configuração do sistema</h3>
                 <p className="text-sm text-slate-400">Configure sua empresa para começar a usar o sistema</p>
               </div>
             </div>

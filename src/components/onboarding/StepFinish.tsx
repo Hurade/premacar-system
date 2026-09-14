@@ -185,7 +185,7 @@ export const StepFinish: React.FC<StepFinishProps> = ({
         >
           <Rocket className="w-8 h-8 text-emerald-400" />
         </motion.div>
-        <h3 className="text-xl font-semibold text-white mb-2">Validação do Sistema</h3>
+        <h3 className="text-xl font-semibold text-slate-100 mb-2">Validação do Sistema</h3>
         <p className="text-slate-400 text-sm max-w-md mx-auto">
           Verificando todas as configurações antes de começar.
         </p>
@@ -223,7 +223,7 @@ export const StepFinish: React.FC<StepFinishProps> = ({
                 <div className="flex items-center gap-3">
                   {getStatusIcon(validation.overallStatus)}
                   <div>
-                    <p className="text-sm font-medium text-white">{validation.message}</p>
+                    <p className="text-sm font-medium text-slate-100">{validation.message}</p>
                     <p className="text-xs text-slate-400">
                       {validation.summary.ok}/{validation.summary.total} verificações OK
                     </p>
@@ -285,7 +285,7 @@ export const StepFinish: React.FC<StepFinishProps> = ({
               value={testPhone}
               onChange={(e) => setTestPhone(e.target.value)}
               placeholder="5511999999999"
-              className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 font-mono"
+              className="bg-slate-800/50 border-slate-700 text-slate-100 placeholder:text-slate-500 font-mono"
             />
           </div>
 
@@ -297,7 +297,7 @@ export const StepFinish: React.FC<StepFinishProps> = ({
               id="testMessage"
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
-              className="bg-slate-800/50 border-slate-700 text-white"
+              className="bg-slate-800/50 border-slate-700 text-slate-100"
             />
           </div>
 

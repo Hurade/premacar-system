@@ -108,7 +108,7 @@ const SpecializedAgentsSection: React.FC = () => {
         <div className="flex items-center gap-3">
           <Bot className="w-5 h-5 text-cyan-400" />
           <div>
-            <h3 className="font-semibold text-white">Agentes de IA</h3>
+            <h3 className="font-semibold text-slate-100">Agentes de IA</h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Prompt, modelo e comportamento por fila ou campanha — cada atendimento usa o agente que melhor casar.
             </p>
@@ -155,7 +155,7 @@ const SpecializedAgentsSection: React.FC = () => {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-white text-sm">{agent.name}</span>
+                    <span className="font-medium text-slate-100 text-sm">{agent.name}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${badge.color}`}>
                       {badge.label}
                     </span>

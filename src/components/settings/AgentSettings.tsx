@@ -223,7 +223,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
             <div className="flex items-center gap-3 mb-4">
               <Building2 className="w-5 h-5 text-blue-400" />
-              <h3 className="font-semibold text-white">Informações da Empresa</h3>
+              <h3 className="font-semibold text-slate-100">Informações da Empresa</h3>
             </div>
             <div className="space-y-4">
               <div>
@@ -266,7 +266,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
                     type="button"
                     onClick={handleTestNotification}
                     disabled={testingNotif || !settings.scheduling_notify_phone?.trim()}
-                    className="h-9 px-3 flex-shrink-0 flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 text-xs text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="h-9 px-3 flex-shrink-0 flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 text-xs text-slate-300 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     {testingNotif ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -287,7 +287,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
             <div className="flex items-center gap-3 mb-4">
               <Calendar className="w-5 h-5 text-indigo-400" />
-              <h3 className="font-semibold text-white">Horário de Atendimento</h3>
+              <h3 className="font-semibold text-slate-100">Horário de Atendimento</h3>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -336,7 +336,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
           <div className="flex items-center gap-3 mb-4">
             <Bot className="w-5 h-5 text-violet-400" />
-            <h3 className="font-semibold text-white">Comportamento Geral</h3>
+            <h3 className="font-semibold text-slate-100">Comportamento Geral</h3>
             <p className="text-xs text-slate-500">
               Interruptores globais — prompt, modelo e comportamento de cada agente ficam na lista "Agentes de IA" abaixo.
             </p>

@@ -46,11 +46,11 @@ export function MemberScheduleModal({ teamMemberId, memberName, onClose }: Membe
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
             <Clock className="w-5 h-5 text-cyan-400" />
             Horário de {memberName}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-100 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

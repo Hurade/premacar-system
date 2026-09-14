@@ -66,7 +66,7 @@ const CsatPublic: React.FC = () => {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
         <div className="text-center space-y-3">
           <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto" />
-          <p className="text-white text-lg font-semibold">Obrigado pela sua avaliação!</p>
+          <p className="text-slate-100 text-lg font-semibold">Obrigado pela sua avaliação!</p>
           <p className="text-slate-400 text-sm">Sua opinião nos ajuda a melhorar continuamente.</p>
         </div>
       </div>
@@ -76,7 +76,7 @@ const CsatPublic: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
       <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-6 text-center">
-        <h1 className="text-lg font-bold text-white">Como foi seu atendimento?</h1>
+        <h1 className="text-lg font-bold text-slate-100">Como foi seu atendimento?</h1>
         <p className="text-sm text-slate-400">Sua avaliação é muito importante para nós.</p>
 
         <div className="flex items-center justify-center gap-2">
@@ -102,7 +102,7 @@ const CsatPublic: React.FC = () => {
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Deixe um comentário (opcional)"
-          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-white placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none"
+          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none"
           rows={3}
         />
 

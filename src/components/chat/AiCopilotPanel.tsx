@@ -54,11 +54,11 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
   }, [messages, contactName]);
 
   return (
-    <div className="flex flex-col h-full bg-[#111] border-l border-white/10">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+    <div className="flex flex-col h-full bg-slate-950 border-l border-slate-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
           <Bot className="w-4 h-4 text-purple-400" />
-          <span className="text-sm font-medium text-white">Copiloto IA</span>
+          <span className="text-sm font-medium text-slate-100">Copiloto IA</span>
         </div>
         <button
           onClick={analyze}
@@ -74,8 +74,8 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
         {!analysis && !loading && !error && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-8">
             <Bot className="w-10 h-10 text-purple-400/40" />
-            <p className="text-sm text-white/40">
-              Clique em <strong className="text-white/60">Analisar</strong> para receber dicas em tempo real sobre a conversa.
+            <p className="text-sm text-slate-500">
+              Clique em <strong className="text-slate-300">Analisar</strong> para receber dicas em tempo real sobre a conversa.
             </p>
           </div>
         )}
@@ -88,37 +88,37 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
 
         {analysis && (
           <>
-            <div className="bg-white/5 rounded-lg p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-white/50 mb-1">
+            <div className="bg-slate-800/50 rounded-lg p-3 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
                 <MessageSquare className="w-3 h-3" />
                 <span>Contexto</span>
               </div>
-              <p className="text-sm text-white/80">{analysis.context_summary}</p>
+              <p className="text-sm text-slate-200">{analysis.context_summary}</p>
               <span className="inline-block text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
                 Tom: {analysis.tone}
               </span>
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs text-white/50">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <Lightbulb className="w-3 h-3" />
                 <span>Dicas</span>
               </div>
               {analysis.tips.map((tip, i) => (
                 <div key={i} className="flex items-start gap-2 bg-yellow-500/5 border border-yellow-500/10 rounded-lg px-3 py-2">
                   <ChevronRight className="w-3 h-3 text-yellow-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-white/70">{tip}</p>
+                  <p className="text-xs text-slate-300">{tip}</p>
                 </div>
               ))}
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs text-white/50">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <TrendingUp className="w-3 h-3" />
                 <span>Resposta sugerida</span>
               </div>
               <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 space-y-2">
-                <p className="text-sm text-white/80 italic">"{analysis.suggested_reply}"</p>
+                <p className="text-sm text-slate-200 italic">"{analysis.suggested_reply}"</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => onUseReply(analysis.suggested_reply)}
@@ -128,7 +128,7 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
                   </button>
                   <button
                     onClick={() => navigator.clipboard.writeText(analysis.suggested_reply)}
-                    className="text-xs bg-white/10 hover:bg-white/15 text-white/70 px-2 py-1.5 rounded-lg transition-colors"
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1.5 rounded-lg transition-colors"
                     title="Copiar"
                   >
                     <Copy className="w-3 h-3" />
@@ -138,7 +138,7 @@ export function AiCopilotPanel({ messages, contactName, onUseReply }: AiCopilotP
             </div>
 
             <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
-              <p className="text-xs text-white/50 mb-0.5">Próxima ação</p>
+              <p className="text-xs text-slate-500 mb-0.5">Próxima ação</p>
               <p className="text-sm text-green-300">{analysis.next_action}</p>
             </div>
           </>

@@ -740,7 +740,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
                     <Settings2 className="w-5 h-5 text-cyan-400" />
                   </motion.div>
                   <div>
-                    <h2 className="text-xl font-semibold text-white">Configuração Inicial</h2>
+                    <h2 className="text-xl font-semibold text-slate-100">Configuração Inicial</h2>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-sm text-slate-400">Passo</span>
                       <motion.span 
@@ -760,7 +760,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
                   whileTap={{ scale: 0.9 }}
                   transition={{ type: "spring", stiffness: 400, damping: 15 }}
                   onClick={onClose}
-                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </motion.button>
@@ -924,7 +924,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCl
                           animate={{ x: [0, 3, 0] }}
                           transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1 }}
                         >
-                          <ChevronRight className="w-4 h-4 group-hover:text-white transition-colors" />
+                          <ChevronRight className="w-4 h-4 group-hover:text-slate-100 transition-colors" />
                         </motion.div>
                       </Button>
                     </motion.div>

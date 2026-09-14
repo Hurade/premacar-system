@@ -132,7 +132,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             <div className="p-2 bg-cyan-500/10 rounded-lg">
               <UserPlus className="w-5 h-5 text-cyan-400" />
             </div>
-            <h2 className="text-lg font-semibold text-white">Adicionar Contato</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Adicionar Contato</h2>
           </div>
           <button
             onClick={handleClose}

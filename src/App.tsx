@@ -213,14 +213,12 @@ const App: React.FC = () => {
                   <Route path="/apresentacoes/:id" element={<ApresentacaoDetalhe />} />
                 </Route>
 
-                {/* Proposta pública — sem autenticação */}
-                <Route path="/p/:slug" element={<PropostaPublica />} />
-
-                {/* Apresentação pública — sem autenticação */}
-                <Route path="/apresentacao/:slug" element={<ApresentacaoPublica />} />
-
-                {/* Avaliação CSAT pública — sem autenticação */}
-                <Route path="/csat/:token" element={<CsatPublic />} />
+                {/* Páginas públicas (abertas por clientes fora do app) — design
+                    sempre escuro, independente da preferência de tema do
+                    atendente que gerou o link nesse mesmo navegador. */}
+                <Route path="/p/:slug" element={<div className="dark"><PropostaPublica /></div>} />
+                <Route path="/apresentacao/:slug" element={<div className="dark"><ApresentacaoPublica /></div>} />
+                <Route path="/csat/:token" element={<div className="dark"><CsatPublic /></div>} />
 
                 {/* Catch all - redirect to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />

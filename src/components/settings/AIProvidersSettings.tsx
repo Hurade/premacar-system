@@ -193,7 +193,7 @@ const AIProvidersSettings: React.FC = () => {
               >
                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${p.is_active ? 'translate-x-4.5' : 'translate-x-1'}`} />
               </button>
-              <button onClick={() => openEdit(p)} title="Editar" className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => openEdit(p)} title="Editar" className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
                 <Pencil className="w-3.5 h-3.5" />
               </button>
               <button onClick={() => handleDelete(p)} title="Excluir" className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors">
@@ -208,8 +208,8 @@ const AIProvidersSettings: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">{editingId ? 'Editar Provedor' : 'Novo Provedor'}</h3>
-              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-white">
+              <h3 className="text-lg font-bold text-slate-100">{editingId ? 'Editar Provedor' : 'Novo Provedor'}</h3>
+              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -220,7 +220,7 @@ const AIProvidersSettings: React.FC = () => {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Ex: OpenAI, Anthropic Claude, Gemini direto"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100"
                 />
               </div>
               <div className="space-y-2">
@@ -231,7 +231,7 @@ const AIProvidersSettings: React.FC = () => {
                       key={kind}
                       type="button"
                       onClick={() => setForm({ ...form, kind })}
-                      className={`p-2 rounded-lg border text-xs font-medium ${form.kind === kind ? 'bg-slate-800 border-cyan-500/50 text-white' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                      className={`p-2 rounded-lg border text-xs font-medium ${form.kind === kind ? 'bg-slate-800 border-cyan-500/50 text-slate-100' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
                     >
                       {kind === 'anthropic' ? 'Anthropic (Claude)' : 'OpenAI-compatible'}
                     </button>
@@ -245,7 +245,7 @@ const AIProvidersSettings: React.FC = () => {
                   value={form.base_url}
                   onChange={(e) => setForm({ ...form, base_url: e.target.value })}
                   placeholder={form.kind === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1/chat/completions'}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 font-mono"
                 />
               </div>
               <div className="space-y-2">
@@ -254,7 +254,7 @@ const AIProvidersSettings: React.FC = () => {
                   value={form.api_key_secret_name}
                   onChange={(e) => setForm({ ...form, api_key_secret_name: e.target.value })}
                   placeholder="Ex: OPENAI_API_KEY"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 font-mono"
                 />
                 <p className="text-xs text-slate-500">A chave em si fica nas Secrets das Edge Functions do Supabase — aqui só o nome da variável.</p>
               </div>
@@ -265,7 +265,7 @@ const AIProvidersSettings: React.FC = () => {
                     value={form.fast_model}
                     onChange={(e) => setForm({ ...form, fast_model: e.target.value })}
                     placeholder="gpt-4o-mini"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 font-mono"
                   />
                 </div>
                 <div className="space-y-2">
@@ -274,7 +274,7 @@ const AIProvidersSettings: React.FC = () => {
                     value={form.smart_model}
                     onChange={(e) => setForm({ ...form, smart_model: e.target.value })}
                     placeholder="gpt-4o"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 font-mono"
                   />
                 </div>
               </div>
@@ -284,7 +284,7 @@ const AIProvidersSettings: React.FC = () => {
                   value={form.premium_model}
                   onChange={(e) => setForm({ ...form, premium_model: e.target.value })}
                   placeholder="Deixe em branco para usar o modelo avançado"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 font-mono"
                 />
               </div>
               <div className="pt-2 flex gap-3">

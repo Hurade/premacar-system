@@ -55,7 +55,7 @@ const AWSConfigModal: React.FC<AWSConfigModalProps> = ({ open, onClose, currentC
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-white max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-slate-100 max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">📧 AWS SES + Email Templates</DialogTitle>
         </DialogHeader>

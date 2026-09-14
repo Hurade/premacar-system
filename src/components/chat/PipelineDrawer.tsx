@@ -129,10 +129,10 @@ export function PipelineDrawer({
       <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
         <SheetContent
           side="right"
-          className="w-[440px] max-w-full bg-slate-900 border-slate-700 text-white overflow-y-auto"
+          className="w-[440px] max-w-full bg-slate-900 border-slate-700 text-slate-100 overflow-y-auto"
         >
           <SheetHeader className="border-b border-slate-800 pb-4 mb-2">
-            <SheetTitle className="text-white flex items-center gap-2 text-base">
+            <SheetTitle className="text-slate-100 flex items-center gap-2 text-base">
               <KanbanSquare className="w-5 h-5 text-cyan-500" />
               Pipeline — {contactName}
             </SheetTitle>

@@ -380,7 +380,7 @@ const Kanban: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4 flex-shrink-0">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Pipeline de Vendas</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-100">Pipeline de Vendas</h2>
           <p className="text-sm text-slate-400 mt-1">Gerencie oportunidades e acompanhe o fluxo de receita.</p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
@@ -491,12 +491,12 @@ const Kanban: React.FC = () => {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${getPriorityColor(deal.priority)}`}>
                            {deal.priority === 'high' ? 'Alta' : deal.priority === 'medium' ? 'Média' : 'Baixa'}
                         </span>
-                        <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
+                        <button className="text-slate-600 hover:text-slate-100 transition-colors opacity-0 group-hover:opacity-100">
                            <MoreHorizontal className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      <h4 className="font-semibold text-white text-sm mb-0.5 leading-tight">{deal.title}</h4>
+                      <h4 className="font-semibold text-slate-100 text-sm mb-0.5 leading-tight">{deal.title}</h4>
                       <p className="text-[10px] text-slate-400 mb-2">{deal.company}</p>
 
                       <div className="flex items-center gap-1.5 mb-2 flex-wrap">
@@ -553,13 +553,13 @@ const Kanban: React.FC = () => {
                         <div className="flex-1 min-w-0">
                             {isEditingDeal ? (
                               <input
-                                className="w-full text-xl font-bold bg-slate-800 text-white rounded-lg px-3 py-1.5 outline-none border border-slate-700 focus:border-cyan-500 mb-1"
+                                className="w-full text-xl font-bold bg-slate-800 text-slate-100 rounded-lg px-3 py-1.5 outline-none border border-slate-700 focus:border-cyan-500 mb-1"
                                 value={editDealData.title}
                                 onChange={e => setEditDealData({ ...editDealData, title: e.target.value })}
                                 placeholder="Título do deal"
                               />
                             ) : (
-                              <h2 className="text-xl font-bold text-white mb-1 truncate">{selectedDeal.title}</h2>
+                              <h2 className="text-xl font-bold text-slate-100 mb-1 truncate">{selectedDeal.title}</h2>
                             )}
                             <div className="flex items-center gap-2 text-slate-400 text-sm flex-wrap">
                                 <span className="font-semibold text-emerald-400">{formatCurrency(selectedDeal.value)}</span>
@@ -596,7 +596,7 @@ const Kanban: React.FC = () => {
                             </Button>
                             <button 
                                 onClick={() => setSelectedDeal(null)} 
-                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-100 transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -695,7 +695,7 @@ const Kanban: React.FC = () => {
                               <>
                                 <button
                                   onClick={() => setIsEditingDeal(false)}
-                                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg border border-slate-700 hover:border-slate-600"
+                                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-100 transition-colors rounded-lg border border-slate-700 hover:border-slate-600"
                                 >
                                   Cancelar
                                 </button>
@@ -711,7 +711,7 @@ const Kanban: React.FC = () => {
                             ) : (
                               <button
                                 onClick={() => setIsEditingDeal(true)}
-                                className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5"
+                                className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-100 transition-colors rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                                 Editar
@@ -1050,7 +1050,7 @@ const Kanban: React.FC = () => {
                                       <ActivityIcon className="w-3.5 h-3.5" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-medium transition-colors ${activity.isCompleted ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
+                                      <p className={`text-sm font-medium transition-colors ${activity.isCompleted ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-slate-100'}`}>
                                         {activity.title}
                                       </p>
                                       {activity.description && (

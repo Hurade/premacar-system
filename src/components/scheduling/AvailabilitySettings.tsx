@@ -203,7 +203,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
           <Settings2 className="w-5 h-5 text-cyan-400" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white">Disponibilidade para Agendamentos</h3>
+          <h3 className="text-lg font-semibold text-slate-100">Disponibilidade para Agendamentos</h3>
           <p className="text-sm text-slate-400">Configure os dias e horários disponíveis para a IA agendar leads</p>
         </div>
       </div>
@@ -243,7 +243,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
             type="time"
             value={config.scheduling_start_time}
             onChange={(e) => setConfig(prev => ({ ...prev, scheduling_start_time: e.target.value }))}
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
           />
         </div>
         <div className="space-y-2">
@@ -255,7 +255,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
             type="time"
             value={config.scheduling_end_time}
             onChange={(e) => setConfig(prev => ({ ...prev, scheduling_end_time: e.target.value }))}
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
           />
         </div>
       </div>
@@ -282,7 +282,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
                 type="time"
                 value={config.scheduling_lunch_start}
                 onChange={(e) => setConfig(prev => ({ ...prev, scheduling_lunch_start: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
               />
             </div>
             <div className="space-y-2">
@@ -291,7 +291,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
                 type="time"
                 value={config.scheduling_lunch_end}
                 onChange={(e) => setConfig(prev => ({ ...prev, scheduling_lunch_end: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
               />
             </div>
           </div>
@@ -305,7 +305,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
           <select
             value={config.scheduling_slot_duration}
             onChange={(e) => setConfig(prev => ({ ...prev, scheduling_slot_duration: Number(e.target.value) }))}
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
           >
             {SLOT_DURATIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -317,7 +317,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
           <select
             value={config.scheduling_buffer_between}
             onChange={(e) => setConfig(prev => ({ ...prev, scheduling_buffer_between: Number(e.target.value) }))}
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
           >
             {BUFFER_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -337,7 +337,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
           value={config.google_calendar_url || ''}
           onChange={(e) => setConfig(prev => ({ ...prev, google_calendar_url: e.target.value || null }))}
           placeholder="https://calendar.app.google/..."
-          className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+          className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
         />
         <p className="text-xs text-slate-500">
           Cole o link do seu Google Calendar Appointment Schedule para referência
@@ -370,7 +370,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
                 value={config.scheduling_notify_phone}
                 onChange={(e) => setConfig(prev => ({ ...prev, scheduling_notify_phone: e.target.value }))}
                 placeholder="5511999999999"
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
               />
             </div>
             <div className="space-y-2">
@@ -380,7 +380,7 @@ export const AvailabilitySettings: React.FC<{ onClose?: () => void }> = ({ onClo
                 value={config.scheduling_notify_evolution_instance}
                 onChange={(e) => setConfig(prev => ({ ...prev, scheduling_notify_evolution_instance: e.target.value }))}
                 placeholder="Deixe vazio para usar a instância padrão"
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
               />
             </div>
           </div>

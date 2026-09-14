@@ -155,7 +155,7 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
             <div className="p-2 bg-amber-500/10 rounded-lg">
               <Pencil className="w-5 h-5 text-amber-400" />
             </div>
-            <h2 className="text-lg font-semibold text-white">Editar Contato</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Editar Contato</h2>
           </div>
           <button
             onClick={handleClose}

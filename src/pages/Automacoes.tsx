@@ -51,7 +51,7 @@ const Automacoes: React.FC = () => {
     <div className="p-6 max-w-4xl mx-auto space-y-6 h-full overflow-y-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
             <Zap className="w-7 h-7 text-cyan-400" />
             Automações
           </h1>
@@ -64,7 +64,7 @@ const Automacoes: React.FC = () => {
             <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === 'list' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+                viewMode === 'list' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-slate-100'
               }`}
             >
               <List className="w-3.5 h-3.5" />
@@ -73,7 +73,7 @@ const Automacoes: React.FC = () => {
             <button
               onClick={() => setViewMode('canvas')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === 'canvas' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+                viewMode === 'canvas' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-slate-100'
               }`}
             >
               <Workflow className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ const Automacoes: React.FC = () => {
                 <div className="flex items-start gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-white text-sm">{rule.name}</span>
+                      <span className="font-medium text-slate-100 text-sm">{rule.name}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${badge.color}`}>{badge.label}</span>
                       <span className="text-[11px] text-slate-500">{rule.actions.length} ação(ões)</span>
                     </div>

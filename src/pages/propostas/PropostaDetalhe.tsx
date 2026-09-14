@@ -189,7 +189,7 @@ export default function PropostaDetalhe() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Plano</p>
                   {planoInfo && (
                     <span
-                      className="text-xs font-bold px-2.5 py-1 rounded-lg text-white inline-block"
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg text-slate-100 inline-block"
                       style={{ backgroundColor: planoInfo.cor }}
                     >
                       {proposta.plano?.nome ?? planoInfo.nome}

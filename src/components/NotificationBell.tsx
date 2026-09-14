@@ -58,7 +58,7 @@ const NotificationBell: React.FC = () => {
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
-          className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+          className="relative p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 transition-colors"
           title="Avisos"
         >
           <Bell className="w-5 h-5" />
@@ -71,7 +71,7 @@ const NotificationBell: React.FC = () => {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0 bg-slate-900 border-slate-700 max-h-96 overflow-y-auto">
         <div className="p-3 border-b border-slate-800">
-          <h4 className="text-sm font-semibold text-white">Avisos</h4>
+          <h4 className="text-sm font-semibold text-slate-100">Avisos</h4>
         </div>
         {loading ? (
           <p className="text-xs text-slate-500 text-center py-6">Carregando...</p>
@@ -81,7 +81,7 @@ const NotificationBell: React.FC = () => {
           <div className="divide-y divide-slate-800">
             {announcements.map((a) => (
               <div key={a.id} className="p-3">
-                <p className="text-sm font-medium text-white">{a.title}</p>
+                <p className="text-sm font-medium text-slate-100">{a.title}</p>
                 <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">{a.body}</p>
                 <p className="text-[10px] text-slate-500 mt-2">
                   {new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}

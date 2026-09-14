@@ -28,7 +28,7 @@ export function ContactHistoryModal({ isOpen, onClose, contactId, contactName }:
               <History className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Histórico de Conversas</h2>
+              <h2 className="text-lg font-semibold text-slate-100">Histórico de Conversas</h2>
               {contactName && <p className="text-xs text-slate-500">{contactName}</p>}
             </div>
           </div>
