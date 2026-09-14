@@ -645,14 +645,17 @@ function parseTimeToMinutes(timeStr: string): number {
 }
 
 // Agente Atendimento → agente de setor. Só define a fila e mantém a
-// conversa em modo IA — o agente especializado daquela fila assume a
-// partir da próxima mensagem (seleção de agente por conversations.queue_id,
-// ver selectAgentConfig).
+// conversa em modo IA — o agente especializado daquela fila assume
+// IMEDIATAMENTE, na mesma mensagem (ver o encadeamento logo após o loop
+// de tool calls em processQueueItem), sem esperar o cliente escrever de
+// novo — antes disso, o roteador dizia "já estou te encaminhando" mas só
+// o agente da fila (e um eventual transfer_to_human de verdade) rodava
+// na PRÓXIMA mensagem, deixando a promessa sem efeito imediato.
 async function routeToSector(
   supabase: any,
   conversation: any,
   args: { queue_slug: string; reason: string }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; queueId?: string; queueName?: string }> {
   console.log('[Nina] Route to sector requested:', args);
 
   const queueName = SECTOR_QUEUE_NAMES[args.queue_slug];
@@ -669,7 +672,7 @@ async function routeToSector(
 
   await supabase.from('conversations').update({ queue_id: queue.id }).eq('id', conversation.id);
   console.log(`[Nina] Conversation ${conversation.id} routed to queue "${queueName}"`);
-  return { success: true };
+  return { success: true, queueId: queue.id, queueName };
 }
 
 // Agente de setor → atendente humano. Marca a conversa como 'human',
@@ -1346,11 +1349,14 @@ async function processQueueItem(
   let handoffDone = false;
   const toolResults: { toolCall: any; result: any }[] = [];
 
+  let routeToSectorResult: { success: boolean; error?: string; queueId?: string; queueName?: string } | null = null;
+
   for (const toolCall of toolCalls) {
     if (toolCall.function?.name === 'route_to_sector') {
       try {
         const args = JSON.parse(toolCall.function.arguments);
         const routeResult = await routeToSector(supabase, conversation, args);
+        routeToSectorResult = routeResult;
         toolResults.push({ toolCall, result: routeResult });
       } catch (parseError) {
         console.error('[Nina] Error parsing route_to_sector:', parseError);
@@ -1379,6 +1385,70 @@ async function processQueueItem(
       } catch (parseError) {
         console.error('[Nina] Error parsing update_contact_info:', parseError);
       }
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // ENCADEAMENTO IMEDIATO: quando o roteador (Atendimento) chama
+  // route_to_sector, o agente da fila de destino (ex: Suporte) já processa
+  // a MESMA mensagem do cliente agora, em vez de só assumir na próxima
+  // mensagem — sem isso, a frase do roteador ("já estou te encaminhando")
+  // ficava sem efeito real até o cliente escrever de novo, e um
+  // transfer_to_human que devia acontecer na hora só rodava depois.
+  if (routeToSectorResult?.success && routeToSectorResult.queueId) {
+    try {
+      const chainedAgentConfig = await selectAgentConfig(supabase, { queueId: routeToSectorResult.queueId, campaignId: null });
+
+      if (chainedAgentConfig && chainedAgentConfig.trigger_type === 'queue') {
+        console.log(`[Nina] Encadeando na hora para o agente "${chainedAgentConfig.name}" (fila ${routeToSectorResult.queueName})`);
+
+        const chainedConversation = { ...conversation, queue_id: routeToSectorResult.queueId };
+        const chainedEnhancedPrompt = buildEnhancedPrompt(
+          chainedAgentConfig.system_prompt || systemPrompt, chainedConversation.contact, clientMemory,
+          origemConversa, message.content || '', knowledgeChunks, tagInstructions
+        );
+        const chainedProcessedPrompt = processPromptTemplate(chainedEnhancedPrompt, chainedConversation.contact, origemConversa, {
+          dealData, settings, conversationStatus: chainedConversation.status, totalMessages: totalMessages || 0, hasHistory, systemContext,
+        });
+
+        const chainedProvider = await resolveAgentProvider(supabase, chainedAgentConfig.ai_provider_id ?? null);
+        if (chainedProvider) {
+          const chainedAiSettings = resolveModelAndTemperature(
+            chainedProvider, settings?.ai_model_mode || 'flash', chainedAgentConfig.ai_model, conversationHistory, message, clientMemory
+          );
+
+          const chainedResult = await callAIProvider(chainedProvider, {
+            systemPrompt: chainedProcessedPrompt,
+            messages: conversationHistory,
+            tools: [updateContactInfoTool, transferToHumanTool],
+            model: chainedAiSettings.model,
+            temperature: chainedAiSettings.temperature,
+            maxTokens: 1000,
+          });
+
+          let chainedContent = chainedResult.content;
+          const chainedTransferCall = chainedResult.toolCalls.find((t: any) => t.function?.name === 'transfer_to_human');
+          if (chainedTransferCall) {
+            try {
+              const transferArgs = JSON.parse(chainedTransferCall.function.arguments);
+              await transferToHuman(supabase, chainedConversation, transferArgs);
+              chainedContent = chainedContent || 'Vou te passar para nossa equipe. Eles entrarão em contato em breve! 😊';
+              handoffDone = true;
+              conversation.queue_id = routeToSectorResult.queueId;
+            } catch (transferParseError) {
+              console.error('[Nina] Error parsing chained transfer_to_human:', transferParseError);
+            }
+          }
+
+          if (chainedContent?.trim()) {
+            aiContent = aiContent ? `${aiContent}\n\n${chainedContent.trim()}` : chainedContent.trim();
+          }
+        }
+      }
+    } catch (chainErr) {
+      // Encadeamento é um extra — se falhar, a resposta do roteador (já
+      // gerada) segue normalmente, só sem o passo imediato do agente da fila.
+      console.error('[Nina] Error chaining queue agent after route_to_sector:', chainErr);
     }
   }
 
