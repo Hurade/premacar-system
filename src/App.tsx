@@ -36,6 +36,7 @@ import CsatPublic from './pages/CsatPublic';
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { UserRoleProvider } from './hooks/useUserRole';
+import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { Toaster } from 'sonner';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { useOnlinePresence } from './hooks/useOnlinePresence';
@@ -118,8 +119,14 @@ const AppLayout: React.FC = () => {
   );
 };
 
+const ThemedToaster: React.FC = () => {
+  const { theme } = useTheme();
+  return <Toaster position="top-right" richColors theme={theme} />;
+};
+
 const App: React.FC = () => {
   return (
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <UserRoleProvider>
@@ -219,15 +226,12 @@ const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </BrowserRouter>
-            <Toaster 
-              position="top-right"
-              richColors
-              theme="dark"
-            />
+            <ThemedToaster />
           </CompanySettingsProvider>
         </UserRoleProvider>
       </AuthProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

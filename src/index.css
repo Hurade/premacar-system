@@ -6,6 +6,21 @@
   :root {
     /* Force Dark Mode as default - App is 100% dark themed */
     --background: 222.2 84% 4.9%;
+    /* Paleta slate (padrão do Tailwind) usada por quase todo componente do
+       app via classes utilitárias diretas (bg-slate-900, text-slate-400...).
+       Mantida idêntica ao default do Tailwind aqui para o modo escuro não
+       mudar em nada; o tom médio do modo claro é redefinido em .light. */
+    --slate-50: 248 250 252;
+    --slate-100: 241 245 249;
+    --slate-200: 226 232 240;
+    --slate-300: 203 213 225;
+    --slate-400: 148 163 184;
+    --slate-500: 100 116 139;
+    --slate-600: 71 85 105;
+    --slate-700: 51 65 85;
+    --slate-800: 30 41 59;
+    --slate-900: 15 23 42;
+    --slate-950: 2 6 23;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
@@ -40,6 +55,17 @@
   /* Dark class for compatibility - same values */
   .dark {
     --background: 222.2 84% 4.9%;
+    --slate-50: 248 250 252;
+    --slate-100: 241 245 249;
+    --slate-200: 226 232 240;
+    --slate-300: 203 213 225;
+    --slate-400: 148 163 184;
+    --slate-500: 100 116 139;
+    --slate-600: 71 85 105;
+    --slate-700: 51 65 85;
+    --slate-800: 30 41 59;
+    --slate-900: 15 23 42;
+    --slate-950: 2 6 23;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
@@ -67,6 +93,56 @@
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 187 85% 53%;
   }
+
+  /* Modo claro — tom médio inspirado no WhatsApp Web (nada de branco puro
+     na área de conteúdo, texto quase preto, cinzas médios em vez de claros
+     berrantes). Ativado via classe .light na <html>. */
+  .light {
+    --background: 210 16% 93%;
+    --foreground: 200 18% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 18% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 18% 12%;
+    --primary: 187 75% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 200 16% 90%;
+    --secondary-foreground: 200 18% 15%;
+    --muted: 200 16% 90%;
+    --muted-foreground: 200 8% 40%;
+    --accent: 263 60% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 13% 85%;
+    --input: 200 13% 88%;
+    --ring: 187 75% 38%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 200 18% 15%;
+    --sidebar-primary: 187 75% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 200 16% 93%;
+    --sidebar-accent-foreground: 200 18% 15%;
+    --sidebar-border: 200 13% 85%;
+    --sidebar-ring: 187 75% 38%;
+
+    /* Mesma paleta slate usada em todo o app, agora em tom médio claro —
+       os papéis (fundo de página, painel/card, campo de input, bordas,
+       texto) se invertem em relação ao escuro, mas sem chegar a branco
+       puro nem preto puro. */
+    --slate-50: 17 27 33;
+    --slate-100: 24 34 41;
+    --slate-200: 35 49 56;
+    --slate-300: 59 74 84;
+    --slate-400: 83 100 113;
+    --slate-500: 102 119 129;
+    --slate-600: 134 150 160;
+    --slate-700: 209 215 219;
+    --slate-800: 255 255 255;
+    --slate-900: 240 242 245;
+    --slate-950: 255 255 255;
+  }
 }
 
 @layer base {
@@ -93,11 +169,11 @@
   background: transparent; 
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(217.2 32.6% 25%);
+  background: rgb(var(--slate-600));
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(217.2 32.6% 35%);
+  background: rgb(var(--slate-500));
 }
 
 /* Focus ring styling */

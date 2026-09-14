@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, MessageSquarePlus, FileText, Zap, Presentation } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Send, BarChart3, MessageSquarePlus, FileText, Zap, Presentation, Sun, Moon } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, MENU_ROLE_REQUIREMENTS, TeamRole } from '@/hooks/useUserRole';
+import { useTheme } from '@/hooks/useTheme';
 import { Sidebar, SidebarBody, SidebarLink, useSidebar } from '@/components/ui/sidebar';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -91,6 +92,27 @@ const LogoIcon = () => {
       </div>
     </Link>;
 };
+const ThemeToggleRow: React.FC<{ open: boolean }> = ({ open }) => {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+  return (
+    <button
+      onClick={toggleTheme}
+      className="w-full flex items-center gap-3 p-2 mb-1 rounded-xl hover:bg-secondary/50 transition-colors text-muted-foreground hover:text-foreground"
+      title={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+    >
+      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0">
+        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+      </div>
+      {open && (
+        <span className="text-sm font-medium whitespace-nowrap">
+          {isDark ? 'Modo escuro' : 'Modo claro'}
+        </span>
+      )}
+    </button>
+  );
+};
+
 const SidebarContent = () => {
   const {
     companyName
@@ -175,6 +197,7 @@ const SidebarContent = () => {
 
       {/* User Footer */}
       <div className="border-t border-border/50 pt-4">
+        <ThemeToggleRow open={open} />
         <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer group">
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary/20 to-secondary flex items-center justify-center text-xs font-bold text-primary border border-border ring-2 ring-transparent group-hover:ring-primary/20 transition-all flex-shrink-0">
             {getUserInitials()}
