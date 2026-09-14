@@ -1992,7 +1992,7 @@ const ChatInterface: React.FC = () => {
                                   Comentário interno{msg.senderName ? ` — ${msg.senderName}` : ''}
                                 </span>
                               </div>
-                              <div className="px-4 py-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-100 text-sm leading-relaxed italic">
+                              <div className="px-4 py-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-100 text-sm leading-relaxed italic">
                                 {msg.content}
                               </div>
                               <span className="text-[10px] text-slate-500 mt-1">{msg.timestamp}</span>

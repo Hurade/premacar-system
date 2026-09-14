@@ -1103,8 +1103,8 @@ const Kanban: React.FC = () => {
                                       msg.from_type === 'user' 
                                         ? 'bg-slate-800 text-slate-200 ml-0 mr-8' 
                                         : msg.from_type === 'nina'
-                                          ? 'bg-cyan-900/30 text-cyan-100 ml-8 mr-0'
-                                          : 'bg-emerald-900/30 text-emerald-100 ml-8 mr-0'
+                                          ? 'bg-cyan-900/30 text-cyan-900 dark:text-cyan-100 ml-8 mr-0'
+                                          : 'bg-emerald-900/30 text-emerald-900 dark:text-emerald-100 ml-8 mr-0'
                                     }`}
                                   >
                                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
