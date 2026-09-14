@@ -49,7 +49,7 @@ function formatDate(iso: string) {
 // ─── WhatsApp Preview ─────────────────────────────────────────────────────────
 function WhatsAppPreview({ message }: { message: string }) {
   return (
-    <div className="rounded-xl bg-[#0b1419] p-4 min-h-24 flex items-end">
+    <div className="dark rounded-xl bg-[#0b1419] p-4 min-h-24 flex items-end">
       <div
         className="max-w-xs rounded-2xl rounded-bl-sm px-4 py-2 text-sm text-slate-100 relative"
         style={{ background: '#005c4b' }}

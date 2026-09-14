@@ -21,6 +21,10 @@
     --slate-800: 30 41 59;
     --slate-900: 15 23 42;
     --slate-950: 2 6 23;
+    /* Fundo da área de conversa do chat (papel de parede) — separado do
+       slate-950 porque este continua sendo usado como fundo de inputs/campos
+       em painéis de configuração, que devem continuar brancos no claro. */
+    --chat-wallpaper: 2 6 23;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
@@ -40,7 +44,7 @@
     --input: 217.2 32.6% 22%;
     --ring: 187 85% 53%;
     --radius: 0.5rem;
-    
+
     /* Sidebar - Dark themed */
     --sidebar-background: 222.2 84% 4.9%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -66,6 +70,7 @@
     --slate-800: 30 41 59;
     --slate-900: 15 23 42;
     --slate-950: 2 6 23;
+    --chat-wallpaper: 2 6 23;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
@@ -127,21 +132,27 @@
     --sidebar-border: 200 13% 85%;
     --sidebar-ring: 187 75% 38%;
 
-    /* Mesma paleta slate usada em todo o app, agora em tom médio claro —
-       os papéis (fundo de página, painel/card, campo de input, bordas,
-       texto) se invertem em relação ao escuro, mas sem chegar a branco
-       puro nem preto puro. */
-    --slate-50: 17 27 33;
-    --slate-100: 24 34 41;
-    --slate-200: 35 49 56;
-    --slate-300: 59 74 84;
-    --slate-400: 83 100 113;
-    --slate-500: 102 119 129;
-    --slate-600: 134 150 160;
-    --slate-700: 209 215 219;
-    --slate-800: 255 255 255;
-    --slate-900: 240 242 245;
-    --slate-950: 255 255 255;
+    /* Mesma paleta slate usada em todo o app, agora em tom médio claro.
+       É a rampa padrão do Tailwind invertida (50↔950, 100↔900...) — isso
+       preserva a MESMA diferença de contraste entre vizinhos que já existe
+       no escuro (ex: bg-slate-900 + border-slate-800 continuam se
+       distinguindo um do outro, só que em tons claros), em vez de forçar
+       tudo pro branco puro — daí "800" ainda ser um cinza claro visível,
+       não #fff, o que também evita bordas/cards somem contra fundo branco. */
+    --slate-50: 2 6 23;
+    --slate-100: 15 23 42;
+    --slate-200: 30 41 59;
+    --slate-300: 51 65 85;
+    --slate-400: 71 85 105;
+    --slate-500: 100 116 139;
+    --slate-600: 148 163 184;
+    --slate-700: 203 213 225;
+    --slate-800: 226 232 240;
+    --slate-900: 241 245 249;
+    --slate-950: 248 250 252;
+    /* Fundo da área de conversa — bege/verde-acinzentado do WhatsApp Web
+       (não branco puro, para não ficar "clarão" comparado ao resto). */
+    --chat-wallpaper: 234 227 216;
   }
 }
 
@@ -179,4 +190,16 @@
 /* Focus ring styling */
 *:focus-visible {
   @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* Papel de parede do chat — textura discreta de pontinhos, no estilo do
+   padrão do WhatsApp Web. Pontos claros no escuro, pontos escuros no claro
+   (a cor não dá pra fazer só com variável CSS porque muda o canal de
+   transparência, não só o RGB). */
+.chat-wallpaper-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.9) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.light .chat-wallpaper-pattern {
+  background-image: radial-gradient(rgba(17, 27, 33, 0.55) 1px, transparent 1px);
 }

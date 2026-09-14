@@ -1669,10 +1669,10 @@ const ChatInterface: React.FC = () => {
 
       {/* Right Area: Chat Window & Profile */}
       {activeChat ? (
-        <div className={`${isMobile && !selectedChatId ? 'hidden' : ''} flex-1 flex overflow-hidden bg-slate-950`}>
+        <div className={`${isMobile && !selectedChatId ? 'hidden' : ''} flex-1 flex overflow-hidden bg-[rgb(var(--chat-wallpaper))]`}>
           {/* Main Chat Content */}
           <div className="flex-1 flex flex-col min-w-0 relative">
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
+            <div className="absolute inset-0 opacity-[0.08] pointer-events-none chat-wallpaper-pattern"></div>
 
             {/* Chat Header */}
             <div className="min-h-16 py-2 px-4 md:px-6 flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10 shrink-0">
@@ -2727,7 +2727,7 @@ const ChatInterface: React.FC = () => {
 
         </div>
       ) : !isMobile ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 relative overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center bg-[rgb(var(--chat-wallpaper))] relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/20 to-transparent"></div>
           <div className="relative z-10 flex flex-col items-center p-8 text-center max-w-md">
             <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mb-6 shadow-2xl border border-slate-800 relative group">
