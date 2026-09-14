@@ -204,7 +204,7 @@ export const SidebarLink = ({
       className={cn(
         "flex items-center justify-start gap-3 group/sidebar py-3 px-3 rounded-xl transition-all duration-200 relative overflow-hidden",
         isActive
-          ? "bg-slate-800/80 text-cyan-400 shadow-lg shadow-black/20 ring-1 ring-slate-700/50"
+          ? "bg-slate-800/80 text-cyan-700 dark:text-cyan-400 shadow-lg shadow-black/20 ring-1 ring-slate-700/50"
           : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200",
         className
       )}
@@ -215,7 +215,7 @@ export const SidebarLink = ({
       )}
       <span className={cn(
         "flex-shrink-0 transition-colors",
-        isActive ? "text-cyan-400" : "text-slate-500 group-hover/sidebar:text-slate-300"
+        isActive ? "text-cyan-700 dark:text-cyan-400" : "text-slate-500 group-hover/sidebar:text-slate-300"
       )}>
         {link.icon}
       </span>
@@ -230,7 +230,7 @@ export const SidebarLink = ({
         }}
         className={cn(
           "text-sm font-medium group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre",
-          isActive && "text-cyan-50"
+          isActive && "text-cyan-800 dark:text-cyan-50"
         )}
       >
         {link.label}
