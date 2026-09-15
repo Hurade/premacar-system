@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface QrCodeModalProps {
   connectionId: string;
@@ -26,6 +26,7 @@ export function QrCodeModal({
 }: QrCodeModalProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const stableOnClose = useCallback(onClose, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -41,11 +42,20 @@ export function QrCodeModal({
       if (!active) return;
       if (result.already_connected) {
         setConnected(true);
+        setErrorMsg(null);
         active = false;
         setTimeout(() => stableOnClose(), 1500);
         return;
       }
-      if (result.base64) setQrCode(result.base64);
+      if (result.base64) {
+        setQrCode(result.base64);
+        setErrorMsg(null);
+      } else if (result.error) {
+        // Sem isso, uma falha na Evolution (instância recriada com outro
+        // nome/credencial, API fora do ar, etc.) deixava a tela presa em
+        // "Gerando QR Code..." pra sempre, sem nenhuma pista do que houve.
+        setErrorMsg(result.error);
+      }
     };
 
     // Detecção rápida de conexão via leitura passiva do banco (o webhook
@@ -80,7 +90,11 @@ export function QrCodeModal({
         <DialogHeader>
           <DialogTitle className="text-slate-100">Conectar {connectionName}</DialogTitle>
           <DialogDescription className="text-slate-400">
-            {connected ? 'WhatsApp conectado!' : 'Aguardando escaneamento do QR Code...'}
+            {connected
+              ? 'WhatsApp conectado!'
+              : errorMsg
+                ? 'Não foi possível gerar o QR Code'
+                : 'Aguardando escaneamento do QR Code...'}
           </DialogDescription>
         </DialogHeader>
 
@@ -96,6 +110,14 @@ export function QrCodeModal({
               alt="QR Code WhatsApp"
               className="w-64 h-64 rounded-xl border border-slate-700 bg-white p-2"
             />
+          ) : errorMsg ? (
+            <div className="w-64 h-64 flex flex-col items-center justify-center gap-3 rounded-xl border border-red-500/40 bg-red-500/5 p-4 text-center">
+              <AlertTriangle className="w-8 h-8 text-red-400 shrink-0" />
+              <p className="text-sm text-red-300 leading-relaxed">{errorMsg}</p>
+              <p className="text-xs text-slate-500">
+                Confira se o nome da instância e as credenciais em "Editar" ainda batem com o que existe na Evolution.
+              </p>
+            </div>
           ) : (
             <div className="w-64 h-64 flex flex-col items-center justify-center gap-3 rounded-xl border border-slate-700 bg-slate-800/50">
               <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
@@ -103,7 +125,7 @@ export function QrCodeModal({
             </div>
           )}
 
-          {!connected && (
+          {!connected && !errorMsg && (
             <p className="text-xs text-slate-400 text-center max-w-[260px] leading-relaxed">
               Abra o WhatsApp → <strong className="text-slate-300">Aparelhos conectados</strong> → Conectar aparelho e aponte a câmera
             </p>
