@@ -20,7 +20,8 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const aiGatewayUrl = Deno.env.get('AI_GATEWAY_URL');
+    const aiGatewaySecret = Deno.env.get('AI_GATEWAY_SECRET');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get user_id from auth token for multi-tenant filtering
@@ -36,20 +37,20 @@ Deno.serve(async (req) => {
 
     const results: HealthCheckResult[] = [];
 
-    // 1. Check LOVABLE_API_KEY
-    console.log('[health-check] Checking LOVABLE_API_KEY...');
-    if (lovableApiKey && lovableApiKey.length > 10) {
+    // 1. Check AI_GATEWAY_URL / AI_GATEWAY_SECRET
+    console.log('[health-check] Checking AI Gateway config...');
+    if (aiGatewayUrl && aiGatewaySecret && aiGatewaySecret.length > 10) {
       results.push({
-        component: 'lovable_api_key',
+        component: 'ai_gateway',
         status: 'ok',
-        message: 'LOVABLE_API_KEY está configurada',
+        message: 'AI Gateway está configurado',
         details: { configured: true },
       });
     } else {
       results.push({
-        component: 'lovable_api_key',
+        component: 'ai_gateway',
         status: 'error',
-        message: 'LOVABLE_API_KEY não está configurada. A IA não funcionará.',
+        message: 'AI_GATEWAY_URL/AI_GATEWAY_SECRET não configurados. A IA não funcionará.',
         details: { configured: false },
       });
     }

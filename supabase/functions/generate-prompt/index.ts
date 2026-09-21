@@ -1,3 +1,5 @@
+import { complete } from "../_shared/ai-gateway-client.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -54,13 +56,6 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-
   try {
     const body = await req.json();
 
@@ -89,24 +84,33 @@ Responda APENAS com JSON válido neste formato exato:
   "next_action": "próxima ação recomendada"
 }`;
 
-      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [{ role: 'user', content: copilotPrompt }],
-          max_tokens: 800,
-          temperature: 0.4,
-        }),
+      const copilotResult = await complete<{
+        context_summary: string;
+        tone: string;
+        tips: string[];
+        suggested_reply: string;
+        next_action: string;
+      }>({
+        system: 'Você é um assistente de vendas/suporte analisando uma conversa de WhatsApp da Prema (plataforma de pós-venda automotivo).',
+        messages: [{ role: 'user', content: `Conversa recente:\n---\n${transcript}\n---` }],
+        tool: {
+          name: 'analise_copiloto',
+          description: 'Registra a análise da conversa',
+          input_schema: {
+            type: 'object',
+            properties: {
+              context_summary: { type: 'string', description: 'Resumo do contexto em 1-2 frases' },
+              tone: { type: 'string', description: 'Tom percebido do cliente (ex: interessado, hesitante, frustrado, neutro)' },
+              tips: { type: 'array', items: { type: 'string' }, description: 'Dicas pra melhorar a conversa' },
+              suggested_reply: { type: 'string', description: 'Sugestão de resposta natural pro atendente enviar agora' },
+              next_action: { type: 'string', description: 'Próxima ação recomendada' },
+            },
+            required: ['context_summary', 'tone', 'tips', 'suggested_reply', 'next_action'],
+          },
+        },
       });
 
-      if (!aiResp.ok) throw new Error(`AI error: ${aiResp.status}`);
-      const aiData = await aiResp.json();
-      const text = aiData.choices?.[0]?.message?.content || '';
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('Resposta inválida da IA');
-
-      return new Response(jsonMatch[0], {
+      return new Response(JSON.stringify(copilotResult), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -242,44 +246,29 @@ INFORMAÇÕES DO USUÁRIO:
 
 Gere o prompt completo preenchido, mantendo TODA a estrutura XML e substituindo apenas os placeholders:`;
 
-    // Chamar Lovable AI Gateway com Gemini 3 Pro
-    console.log('[generate-prompt] Chamando Lovable AI Gateway...');
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-pro-preview',
-        messages: [
-          { role: 'user', content: metaPrompt }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[generate-prompt] AI Gateway error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Limite de taxa excedido. Tente novamente em alguns instantes.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Créditos insuficientes. Adicione créditos ao seu workspace Lovable.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      throw new Error(`AI Gateway error: ${response.status}`);
+    console.log('[generate-prompt] Chamando AI Gateway...');
+    let generatedPrompt: string | undefined;
+    try {
+      const result = await complete<{ generated_prompt: string }>({
+        system: 'Você é um especialista em criação de prompts para agentes de IA de vendas.',
+        messages: [{ role: 'user', content: metaPrompt }],
+        tool: {
+          name: 'entregar_prompt',
+          description: 'Entrega o prompt de sistema XML completo, gerado a partir do template e das informações do usuário',
+          input_schema: {
+            type: 'object',
+            properties: {
+              generated_prompt: { type: 'string', description: 'O XML completo do <system_instruction>, sem texto introdutório nem blocos de código markdown' },
+            },
+            required: ['generated_prompt'],
+          },
+        },
+      });
+      generatedPrompt = result.generated_prompt;
+    } catch (err) {
+      console.error('[generate-prompt] AI Gateway error:', err);
+      throw new Error('AI Gateway error');
     }
-
-    const data = await response.json();
-    const generatedPrompt = data.choices?.[0]?.message?.content;
 
     if (!generatedPrompt) {
       throw new Error('No prompt generated');

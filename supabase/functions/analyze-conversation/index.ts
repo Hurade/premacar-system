@@ -1,12 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { complete } from "../_shared/ai-gateway-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,7 +14,6 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
@@ -129,86 +127,69 @@ ${stagesCriteria}
 ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Novos Leads'}` : ''}
     `.trim();
 
-    // Build tools array - always include memory insights, conditionally include stage determination
-    const tools: any[] = [
-      {
-        type: "function",
-        function: {
-          name: "update_memory_insights",
-          description: "Extrair insights estruturados da conversa para atualizar memória do cliente",
-          parameters: {
-            type: "object",
-            properties: {
-              interests: {
-                type: "array",
-                items: { type: "string" },
-                description: "Lista de interesses ou necessidades mencionados pelo cliente (max 5)"
-              },
-              pain_points: {
-                type: "array",
-                items: { type: "string" },
-                description: "Dores, problemas ou desafios mencionados (max 5)"
-              },
-              qualification_score: {
-                type: "number",
-                description: "Score de qualificação de 0 a 100 baseado em: interesse demonstrado, budget implícito, urgência, fit com produto",
-                minimum: 0,
-                maximum: 100
-              },
-              next_best_action: {
-                type: "string",
-                enum: ["qualify", "demo", "followup", "close", "nurture"],
-                description: "Próxima melhor ação"
-              },
-              budget_indication: {
-                type: "string",
-                enum: ["unknown", "low", "medium", "high"],
-                description: "Indicação de orçamento baseado em sinais implícitos"
-              },
-              decision_timeline: {
-                type: "string",
-                enum: ["unknown", "immediate", "1month", "3months", "6months+"],
-                description: "Timeline de decisão baseado em urgência"
-              }
-            },
-            required: ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline"],
-            additionalProperties: false
-          }
-        }
+    // Tool única com os insights de memória sempre presentes e, quando há
+    // estágios gerenciados por IA, a sugestão de estágio aninhada — o AI
+    // Gateway (self-hosted) só aceita uma tool por chamada, diferente do
+    // formato "tools: [...]" de múltiplas functions do gateway anterior.
+    const insightProperties: Record<string, unknown> = {
+      interests: {
+        type: "array",
+        items: { type: "string" },
+        description: "Lista de interesses ou necessidades mencionados pelo cliente (max 5)"
+      },
+      pain_points: {
+        type: "array",
+        items: { type: "string" },
+        description: "Dores, problemas ou desafios mencionados (max 5)"
+      },
+      qualification_score: {
+        type: "number",
+        description: "Score de qualificação de 0 a 100 baseado em: interesse demonstrado, budget implícito, urgência, fit com produto",
+        minimum: 0,
+        maximum: 100
+      },
+      next_best_action: {
+        type: "string",
+        enum: ["qualify", "demo", "followup", "close", "nurture"],
+        description: "Próxima melhor ação"
+      },
+      budget_indication: {
+        type: "string",
+        enum: ["unknown", "low", "medium", "high"],
+        description: "Indicação de orçamento baseado em sinais implícitos"
+      },
+      decision_timeline: {
+        type: "string",
+        enum: ["unknown", "immediate", "1month", "3months", "6months+"],
+        description: "Timeline de decisão baseado em urgência"
       }
-    ];
+    };
+    const insightRequired = ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline"];
 
-    // Only add stage determination tool if there are AI-managed stages
     if (hasAiManagedStages) {
-      tools.push({
-        type: "function",
-        function: {
-          name: "determine_deal_stage",
-          description: "Determinar para qual estágio do pipeline o deal deve ir com base nos critérios",
-          parameters: {
-            type: "object",
-            properties: {
-              suggested_stage_id: {
-                type: "string",
-                enum: stages.map(s => s.id),
-                description: "ID do estágio sugerido"
-              },
-              confidence: {
-                type: "number",
-                minimum: 0,
-                maximum: 100,
-                description: "Confiança na sugestão (0-100)"
-              },
-              reasoning: {
-                type: "string",
-                description: "Justificativa breve para a mudança (max 200 chars)"
-              }
-            },
-            required: ["suggested_stage_id", "confidence", "reasoning"],
-            additionalProperties: false
+      insightProperties.stage_suggestion = {
+        type: "object",
+        description: "Sugestão de para qual estágio do pipeline o deal deve ir com base nos critérios",
+        properties: {
+          suggested_stage_id: {
+            type: "string",
+            enum: stages.map(s => s.id),
+            description: "ID do estágio sugerido"
+          },
+          confidence: {
+            type: "number",
+            minimum: 0,
+            maximum: 100,
+            description: "Confiança na sugestão (0-100)"
+          },
+          reasoning: {
+            type: "string",
+            description: "Justificativa breve para a mudança (max 200 chars)"
           }
-        }
-      });
+        },
+        required: ["suggested_stage_id", "confidence", "reasoning"]
+      };
+      insightRequired.push("stage_suggestion");
     }
 
     const systemPrompt = hasAiManagedStages
@@ -226,45 +207,33 @@ Regras para mudança de estágio:
       : `Você é um analista de conversas de vendas da Prema (plataforma de retenção de clientes para oficinas/centros automotivos). Analise a interação e extraia insights estruturados para atualizar o perfil do lead.`;
 
     // Call AI to extract insights AND determine deal stage (if applicable)
-    const analysisResponse = await fetch(LOVABLE_AI_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: conversationSnippet }
-        ],
-        tools: tools
-      })
-    });
+    type AnalysisResult = {
+      interests: string[];
+      pain_points: string[];
+      qualification_score: number;
+      next_best_action: string;
+      budget_indication: string;
+      decision_timeline: string;
+      stage_suggestion?: { suggested_stage_id: string; confidence: number; reasoning: string };
+    };
 
-    if (!analysisResponse.ok) {
-      console.error('[Analyze] AI analysis failed:', analysisResponse.status);
+    let insights: AnalysisResult | null = null;
+    let stageResult: { suggested_stage_id: string; confidence: number; reasoning: string } | null = null;
+    try {
+      const result = await complete<AnalysisResult>({
+        system: systemPrompt,
+        messages: [{ role: 'user', content: conversationSnippet }],
+        tool: {
+          name: 'analise_conversa',
+          description: 'Registra os insights extraídos da conversa e, se aplicável, a sugestão de estágio do pipeline',
+          input_schema: { type: 'object', properties: insightProperties, required: insightRequired, additionalProperties: false },
+        },
+      });
+      insights = result;
+      stageResult = result.stage_suggestion ?? null;
+    } catch (err) {
+      console.error('[Analyze] AI analysis failed:', err);
       throw new Error('AI analysis failed');
-    }
-
-    const analysisData = await analysisResponse.json();
-    const toolCalls = analysisData.choices?.[0]?.message?.tool_calls || [];
-    
-    if (toolCalls.length === 0) {
-      console.error('[Analyze] No tool calls in AI response');
-      throw new Error('No insights extracted');
-    }
-
-    // Extract insights from tool calls
-    let insights = null;
-    let stageResult = null;
-
-    for (const toolCall of toolCalls) {
-      if (toolCall.function?.name === 'update_memory_insights') {
-        insights = JSON.parse(toolCall.function.arguments);
-      } else if (toolCall.function?.name === 'determine_deal_stage') {
-        stageResult = JSON.parse(toolCall.function.arguments);
-      }
     }
 
     console.log('[Analyze] Insights extracted:', insights);

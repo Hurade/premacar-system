@@ -296,20 +296,21 @@ serve(async (req) => {
       }
     }
 
-    // 2. Check Lovable AI Key
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (lovableApiKey && lovableApiKey.length > 10) {
+    // 2. Check AI Gateway config
+    const aiGatewayUrl = Deno.env.get('AI_GATEWAY_URL');
+    const aiGatewaySecret = Deno.env.get('AI_GATEWAY_SECRET');
+    if (aiGatewayUrl && aiGatewaySecret && aiGatewaySecret.length > 10) {
       results.push({
         component: 'lovable_ai',
         status: 'ok',
-        message: 'Lovable AI configurada',
+        message: 'AI Gateway configurado',
       });
     } else {
       results.push({
         component: 'lovable_ai',
         status: 'error',
-        message: 'LOVABLE_API_KEY não configurada',
-        details: 'A IA não funcionará sem esta chave',
+        message: 'AI_GATEWAY_URL/AI_GATEWAY_SECRET não configurados',
+        details: 'A IA não funcionará sem essas variáveis',
       });
     }
 

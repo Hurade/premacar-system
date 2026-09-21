@@ -54,7 +54,7 @@ const componentLabels: Record<string, string> = {
   agent_prompt: 'Agente IA',
   elevenlabs: 'ElevenLabs',
   business_hours: 'Horário',
-  lovable_ai: 'Lovable AI',
+  lovable_ai: 'IA Backend',
   pipeline: 'Pipeline',
   profile: 'Perfil',
   nina_settings: 'Configurações',

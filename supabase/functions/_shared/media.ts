@@ -1,6 +1,8 @@
 // Módulo compartilhado de resolução de mídia do WhatsApp (áudio/imagem/documento).
 // Consolida lógica que antes existia duplicada em message-grouper e nina-orchestrator.
 
+import { complete, transcribe as gatewayTranscribe } from "./ai-gateway-client.ts";
+
 export interface MediaSettings {
   meta_access_token?: string | null;
   evolution_api_url?: string | null;
@@ -8,8 +10,6 @@ export interface MediaSettings {
   evolution_instance_name?: string | null;
 }
 
-const LOVABLE_TRANSCRIBE_URL = "https://ai.gateway.lovable.dev/v1/audio/transcriptions";
-const LOVABLE_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB — evita payload/latência excessiva no gateway
 
 export interface DownloadedMedia {
@@ -149,31 +149,20 @@ export async function getOrDownloadMedia(
   return fresh;
 }
 
-// Transcreve áudio no Lovable AI Gateway.
-// Modelo "whisper-1" não é mais aceito pelo gateway (catálogo de modelos
-// mudou) — usa openai/gpt-4o-mini-transcribe, um dos modelos de
-// transcrição atualmente suportados.
-export async function transcribeAudio(audioBuffer: ArrayBuffer, lovableApiKey: string): Promise<string | null> {
+// Transcreve áudio via AI Gateway (self-hosted). O parâmetro _lovableApiKey
+// é mantido só por compatibilidade com os call sites existentes — o
+// gateway novo lê suas próprias credenciais (AI_GATEWAY_URL/SECRET) direto
+// das env vars, não recebe chave por parâmetro.
+export async function transcribeAudio(audioBuffer: ArrayBuffer, _lovableApiKey?: string): Promise<string | null> {
   try {
     console.log('[Media] Transcribing audio, size:', audioBuffer.byteLength, 'bytes');
 
-    const formData = new FormData();
-    formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
-    formData.append('model', 'openai/gpt-4o-mini-transcribe');
-    formData.append('language', 'pt');
-
-    const response = await fetch(LOVABLE_TRANSCRIBE_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${lovableApiKey}` },
-      body: formData,
+    const result = await gatewayTranscribe({
+      audio_base64: arrayBufferToBase64(audioBuffer),
+      mime_type: 'audio/ogg',
+      language: 'pt',
     });
 
-    if (!response.ok) {
-      console.error('[Media] Transcription error:', response.status, await response.text());
-      return null;
-    }
-
-    const result = await response.json();
     return result.text || null;
   } catch (err) {
     console.error('[Media] Error transcribing audio:', err);
@@ -191,12 +180,12 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-// Analisa uma imagem via Gemini (visão nativa) no Lovable AI Gateway, retornando
+// Analisa uma imagem (visão nativa) via AI Gateway (self-hosted), retornando
 // uma descrição curta em PT-BR focada em contexto comercial automotivo.
 export async function describeImage(
   imageBuffer: ArrayBuffer,
   contentType: string,
-  lovableApiKey: string,
+  _lovableApiKey?: string,
   caption?: string
 ): Promise<string | null> {
   if (imageBuffer.byteLength > MAX_IMAGE_BYTES) {
@@ -204,46 +193,30 @@ export async function describeImage(
     return null;
   }
 
-  const dataUrl = `data:${contentType || 'image/jpeg'};base64,${arrayBufferToBase64(imageBuffer)}`;
-
   try {
-    const response = await fetch(LOVABLE_CHAT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lovableApiKey}`,
+    const result = await complete<{ description: string }>({
+      system: 'Descreva a imagem de forma objetiva e curta (máximo 3-4 frases), em português, focando em qualquer informação relevante para um atendimento comercial de pós-venda automotivo: placas, peças, defeitos visíveis, comprovantes, documentos, texto legível.',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            ...(caption ? [{ type: 'text' as const, text: caption }] : []),
+            { type: 'image' as const, source: { type: 'base64' as const, media_type: contentType || 'image/jpeg', data: arrayBufferToBase64(imageBuffer) } },
+          ],
+        },
+      ],
+      tool: {
+        name: 'descrever_imagem',
+        description: 'Registra a descrição da imagem',
+        input_schema: {
+          type: 'object',
+          properties: { description: { type: 'string' } },
+          required: ['description'],
+        },
       },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'Descreva a imagem de forma objetiva e curta (máximo 3-4 frases), em português, focando em qualquer informação relevante para um atendimento comercial de pós-venda automotivo: placas, peças, defeitos visíveis, comprovantes, documentos, texto legível.',
-          },
-          {
-            role: 'user',
-            content: [
-              ...(caption ? [{ type: 'text', text: caption }] : []),
-              { type: 'image_url', image_url: { url: dataUrl } },
-            ],
-          },
-        ],
-        max_tokens: 300,
-      }),
     });
 
-    if (response.status === 429 || response.status === 402) {
-      console.error('[Media] Gemini rate/credit limit reached:', response.status);
-      return null;
-    }
-
-    if (!response.ok) {
-      console.error('[Media] describeImage error:', response.status, await response.text());
-      return null;
-    }
-
-    const result = await response.json();
-    const description = result.choices?.[0]?.message?.content?.trim();
+    const description = result.description?.trim();
     console.log('[Media] Image description:', description?.substring(0, 100));
     return description || null;
   } catch (err) {
