@@ -1225,7 +1225,7 @@ async function processQueueItem(
   let knowledgeChunks: string[] = [];
   if (settings?.rag_enabled && message.content) {
     try {
-      const queryEmbedding = await generateEmbedding(message.content, lovableApiKey);
+      const queryEmbedding = await generateEmbedding(message.content, 'query');
       if (queryEmbedding) {
         const { data: matches, error: matchError } = await supabase.rpc('match_documents', {
           query_embedding: queryEmbedding,

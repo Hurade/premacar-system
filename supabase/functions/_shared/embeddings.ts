@@ -1,37 +1,44 @@
 // Módulo compartilhado de geração de embeddings (base de conhecimento RAG).
 //
-// Dimensão confirmada via edge function de diagnóstico
-// (check-embedding-dimension) contra o ambiente real do projeto: o modelo
-// "google/gemini-embedding-001" no Lovable AI Gateway retorna vetores de
-// 3072 dimensões. Isso excede o limite de indexação do pgvector (ivfflat/hnsw
-// suportam até 2000 dimensões) — por isso a migration cria a coluna
-// `vector(3072)` SEM índice vetorial (busca por similaridade funciona igual,
-// só faz sequential scan; aceitável para o volume esperado de uma base de
-// conhecimento interna). Se o corpus crescer muito e a busca ficar lenta,
-// a opção futura é usar `output_dimensionality` (se o gateway suportar) para
-// gerar vetores menores, ou reindexar com dimensionalidade reduzida.
+// Migrado do Lovable AI Gateway (google/gemini-embedding-001, 3072
+// dimensões) pro AI Gateway próprio (self-hosted, modelo local
+// intfloat/multilingual-e5-large via fastembed, 1024 dimensões — dentro do
+// limite de indexação do pgvector, diferente do modelo anterior).
+//
+// e5 exige um prefixo no texto pra funcionar bem: "query: " pro texto de
+// busca (pergunta do cliente), "passage: " pro texto sendo indexado (pedaço
+// de documento) — o próprio gateway aplica esse prefixo com base no
+// `input_type` enviado, não precisa fazer aqui.
 
-export const EMBEDDING_MODEL = 'google/gemini-embedding-001';
-export const EMBEDDING_DIMENSIONS = 3072;
+export const EMBEDDING_MODEL = 'intfloat/multilingual-e5-large';
+export const EMBEDDING_DIMENSIONS = 1024;
 
-const LOVABLE_EMBEDDINGS_URL = 'https://ai.gateway.lovable.dev/v1/embeddings';
+type EmbeddingInputType = 'query' | 'passage';
 
-export async function generateEmbedding(text: string, lovableApiKey: string): Promise<number[] | null> {
-  const results = await generateEmbeddingsBatch([text], lovableApiKey);
+function getGatewayConfig(): { url: string; secret: string } {
+  const url = Deno.env.get('AI_GATEWAY_URL');
+  const secret = Deno.env.get('AI_GATEWAY_SECRET');
+  if (!url || !secret) throw new Error('AI_GATEWAY_URL/AI_GATEWAY_SECRET não configurados');
+  return { url: url.replace(/\/$/, ''), secret };
+}
+
+export async function generateEmbedding(text: string, inputType: EmbeddingInputType = 'passage'): Promise<number[] | null> {
+  const results = await generateEmbeddingsBatch([text], inputType);
   return results[0];
 }
 
-export async function generateEmbeddingsBatch(texts: string[], lovableApiKey: string): Promise<(number[] | null)[]> {
+export async function generateEmbeddingsBatch(texts: string[], inputType: EmbeddingInputType = 'passage'): Promise<(number[] | null)[]> {
   if (texts.length === 0) return [];
 
   try {
-    const response = await fetch(LOVABLE_EMBEDDINGS_URL, {
+    const { url, secret } = getGatewayConfig();
+    const response = await fetch(`${url}/v1/embeddings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-gateway-secret': secret,
       },
-      body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts }),
+      body: JSON.stringify({ input: texts, input_type: inputType }),
     });
 
     if (!response.ok) {

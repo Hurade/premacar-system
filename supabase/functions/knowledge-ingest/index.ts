@@ -18,11 +18,62 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { document_id } = await req.json();
+    const body = await req.json();
+
+    // Reprocessa embeddings de chunks já existentes (content preservado),
+    // sem precisar re-baixar/re-extrair o arquivo original — usado uma vez
+    // após trocar de modelo/dimensão de embeddings (ver migration
+    // 20260921020000, que zera embedding e marca os documentos afetados
+    // como 'pending').
+    if (body.reembed_all) {
+      const { data: chunks, error: chunksError } = await supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, content')
+        .is('embedding', null);
+
+      if (chunksError) throw new Error(`Falha ao listar chunks: ${chunksError.message}`);
+
+      let reembedded = 0;
+      const affectedDocuments = new Set<string>();
+      for (let i = 0; i < (chunks || []).length; i += EMBEDDING_BATCH_SIZE) {
+        const batch = (chunks || []).slice(i, i + EMBEDDING_BATCH_SIZE);
+        const embeddings = await generateEmbeddingsBatch(batch.map((c) => c.content), 'passage');
+
+        for (let idx = 0; idx < batch.length; idx++) {
+          if (!embeddings[idx]) continue;
+          const { error: updateError } = await supabase
+            .from('knowledge_chunks')
+            .update({ embedding: embeddings[idx] })
+            .eq('id', batch[idx].id);
+          if (!updateError) {
+            reembedded++;
+            affectedDocuments.add(batch[idx].document_id);
+          }
+        }
+      }
+
+      for (const docId of affectedDocuments) {
+        const { count } = await supabase
+          .from('knowledge_chunks')
+          .select('id', { count: 'exact', head: true })
+          .eq('document_id', docId)
+          .is('embedding', null);
+        if ((count ?? 0) === 0) {
+          await supabase.from('knowledge_documents')
+            .update({ status: 'ready', error_message: null })
+            .eq('id', docId);
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, reembedded, documents: affectedDocuments.size }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { document_id } = body;
     if (!document_id) {
       return new Response(JSON.stringify({ error: 'document_id é obrigatório' }), {
         status: 400,
@@ -70,7 +121,7 @@ serve(async (req) => {
       let savedCount = 0;
       for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
         const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
-        const embeddings = await generateEmbeddingsBatch(batch, lovableApiKey);
+        const embeddings = await generateEmbeddingsBatch(batch, 'passage');
 
         const rows = batch.map((content, idx) => ({
           document_id,
