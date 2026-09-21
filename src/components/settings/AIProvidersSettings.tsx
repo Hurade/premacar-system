@@ -237,7 +237,7 @@ const AIProvidersSettings: React.FC = () => {
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-slate-500">OpenAI-compatible cobre OpenAI, Gemini, Groq e o gateway atual (Lovable AI).</p>
+                <p className="text-xs text-slate-500">OpenAI-compatible cobre OpenAI, Gemini, Groq e o gateway próprio atual.</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-300">URL base *</label>
