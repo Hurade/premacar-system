@@ -1,4 +1,3 @@
-// touch: força re-sync do Lovable Cloud (deploy travado em versão antiga)
 export type Json =
   | string
   | number
@@ -11,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1355,6 +1354,7 @@ export type Database = {
           contact_id: string
           created_at: string
           dispatch_sent_at: string | null
+          follow_me_notified_message_id: string | null
           id: string
           is_active: boolean
           is_favorite: boolean
@@ -1383,6 +1383,7 @@ export type Database = {
           contact_id: string
           created_at?: string
           dispatch_sent_at?: string | null
+          follow_me_notified_message_id?: string | null
           id?: string
           is_active?: boolean
           is_favorite?: boolean
@@ -1411,6 +1412,7 @@ export type Database = {
           contact_id?: string
           created_at?: string
           dispatch_sent_at?: string | null
+          follow_me_notified_message_id?: string | null
           id?: string
           is_active?: boolean
           is_favorite?: boolean
@@ -1456,6 +1458,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_follow_me_notified_message_id_fkey"
+            columns: ["follow_me_notified_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -3297,6 +3306,8 @@ export type Database = {
           avatar: string | null
           created_at: string
           email: string
+          follow_me_delay_minutes: number
+          follow_me_enabled: boolean
           function_id: string | null
           id: string
           last_active: string | null
@@ -3313,6 +3324,8 @@ export type Database = {
           avatar?: string | null
           created_at?: string
           email: string
+          follow_me_delay_minutes?: number
+          follow_me_enabled?: boolean
           function_id?: string | null
           id?: string
           last_active?: string | null
@@ -3329,6 +3342,8 @@ export type Database = {
           avatar?: string | null
           created_at?: string
           email?: string
+          follow_me_delay_minutes?: number
+          follow_me_enabled?: boolean
           function_id?: string | null
           id?: string
           last_active?: string | null
@@ -3863,12 +3878,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3892,11 +3907,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3917,11 +3932,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3942,11 +3957,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3959,11 +3974,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
