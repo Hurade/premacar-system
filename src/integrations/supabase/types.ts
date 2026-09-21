@@ -1,3 +1,4 @@
+// touch: força re-sync do Lovable Cloud (deploy travado em versão antiga)
 export type Json =
   | string
   | number
