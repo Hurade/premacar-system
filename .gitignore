@@ -36,3 +36,6 @@ preview-*.html
 *.sln
 *.sw?
 .vercel
+
+# Supabase CLI — estado local de link/sessão, não é código
+supabase/.temp/

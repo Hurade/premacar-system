@@ -4,7 +4,12 @@
 
 -- Habilita Realtime na tabela (hoje ausente — necessário para a UI
 -- acompanhar o status da ligação em tempo real no chat)
-ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_calls;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'voice_calls') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_calls;
+  END IF;
+END $$;
 
 -- Rastreia origem da ligação (manual via Chat vs. automática de campanha)
 -- e quem disparou, para exibir na UI e auditoria.

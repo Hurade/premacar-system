@@ -31,4 +31,9 @@ CREATE TRIGGER update_appointments_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Habilitar realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'appointments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
+  END IF;
+END $$;

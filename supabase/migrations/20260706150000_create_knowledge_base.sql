@@ -54,7 +54,7 @@ CREATE OR REPLACE FUNCTION public.match_documents(
   document_id UUID,
   content TEXT,
   similarity FLOAT
-) LANGUAGE sql STABLE AS $$
+) LANGUAGE sql STABLE SET search_path = public, extensions AS $$
   SELECT kc.id, kc.document_id, kc.content,
          1 - (kc.embedding <=> query_embedding) AS similarity
   FROM public.knowledge_chunks kc
