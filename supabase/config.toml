@@ -15,6 +15,13 @@ verify_jwt = false
 [functions.db-backup-sync]
 verify_jwt = false
 
+# migrate-data-to-new-project: função temporária pra migração de infra
+# (sair do Lovable) — gate próprio via header x-migration-secret, chamada
+# direto por mim (Claude), não pelo frontend. Remover depois que a
+# migração terminar.
+[functions.migrate-data-to-new-project]
+verify_jwt = false
+
 [functions.recurring-campaign-processor]
 verify_jwt = false
 
