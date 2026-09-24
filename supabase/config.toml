@@ -1,4 +1,4 @@
-project_id = "tkwwpcgmpemkrsubilhi"
+project_id = "qzvswhfjuxfebpvlbysd"
 
 [functions.validate-setup]
 verify_jwt = false
@@ -9,17 +9,17 @@ verify_jwt = false
 [functions.meta-webhook]
 verify_jwt = false
 
+# whatsapp-webhook: recebe POST direto da Evolution API (sem JWT do Supabase).
+# No projeto antigo (Lovable) isso foi configurado direto no dashboard, nunca
+# ficou neste arquivo — só descoberto ao testar o webhook no projeto novo
+# (retornava 401 sem isso).
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 [functions.test-meta-webhook]
 verify_jwt = false
 
 [functions.db-backup-sync]
-verify_jwt = false
-
-# migrate-data-to-new-project: função temporária pra migração de infra
-# (sair do Lovable) — gate próprio via header x-migration-secret, chamada
-# direto por mim (Claude), não pelo frontend. Remover depois que a
-# migração terminar.
-[functions.migrate-data-to-new-project]
 verify_jwt = false
 
 [functions.recurring-campaign-processor]
