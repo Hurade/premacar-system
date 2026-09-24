@@ -63,3 +63,7 @@ ADD COLUMN IF NOT EXISTS meta_template_id UUID REFERENCES public.meta_templates(
 
 -- Adicionar comentário explicativo
 COMMENT ON TABLE public.meta_templates IS 'Templates aprovados pela Meta API para envio de mensagens de prospecção. A Meta exige templates pré-aprovados para INICIAR conversas.';
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.meta_templates TO authenticated;
+GRANT ALL ON public.meta_templates TO service_role;

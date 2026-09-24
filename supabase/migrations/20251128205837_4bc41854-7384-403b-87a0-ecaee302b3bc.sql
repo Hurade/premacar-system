@@ -37,3 +37,7 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
   END IF;
 END $$;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.appointments TO authenticated;
+GRANT ALL ON public.appointments TO service_role;

@@ -68,3 +68,7 @@ FROM contacts
 WHERE NOT EXISTS (
   SELECT 1 FROM deals WHERE deals.contact_id = contacts.id
 );
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.deals TO authenticated;
+GRANT ALL ON public.deals TO service_role;

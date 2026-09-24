@@ -63,3 +63,7 @@ $$ language plpgsql security definer;
 create trigger trg_remove_followup_tag_on_expire
   after update of window_status on conversations
   for each row execute function remove_followup_tag_on_window_expire();
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.followup_settings TO authenticated;
+GRANT ALL ON public.followup_settings TO service_role;

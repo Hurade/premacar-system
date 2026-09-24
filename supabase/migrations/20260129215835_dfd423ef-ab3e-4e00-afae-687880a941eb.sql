@@ -150,8 +150,18 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  UPDATE public.campaigns 
+  UPDATE public.campaigns
   SET sent_today = 0, updated_at = now()
   WHERE status IN ('active', 'paused');
 END;
 $$;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.message_templates TO authenticated;
+GRANT ALL ON public.message_templates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.campaigns TO authenticated;
+GRANT ALL ON public.campaigns TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.campaign_leads TO authenticated;
+GRANT ALL ON public.campaign_leads TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.campaign_blacklist TO authenticated;
+GRANT ALL ON public.campaign_blacklist TO service_role;

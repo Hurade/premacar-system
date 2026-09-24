@@ -54,3 +54,9 @@ CREATE POLICY "Authenticated users can manage custom_field_definitions"
 CREATE POLICY "Authenticated users can manage contact_custom_field_values"
   ON public.contact_custom_field_values FOR ALL TO authenticated
   USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.custom_field_definitions TO authenticated;
+GRANT ALL ON public.custom_field_definitions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.contact_custom_field_values TO authenticated;
+GRANT ALL ON public.contact_custom_field_values TO service_role;

@@ -33,3 +33,7 @@ CREATE TRIGGER update_deal_activities_updated_at
 BEFORE UPDATE ON public.deal_activities
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.deal_activities TO authenticated;
+GRANT ALL ON public.deal_activities TO service_role;

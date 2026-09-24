@@ -41,3 +41,7 @@ ALTER TABLE public.deal_products ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can manage deal_products"
   ON public.deal_products FOR ALL TO authenticated
   USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.deal_products TO authenticated;
+GRANT ALL ON public.deal_products TO service_role;

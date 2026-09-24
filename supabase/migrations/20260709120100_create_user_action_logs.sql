@@ -29,3 +29,7 @@ ALTER TABLE public.user_action_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can manage user_action_logs"
   ON public.user_action_logs FOR ALL TO authenticated
   USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_action_logs TO authenticated;
+GRANT ALL ON public.user_action_logs TO service_role;

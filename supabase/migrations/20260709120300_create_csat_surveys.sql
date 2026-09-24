@@ -82,3 +82,9 @@ $$;
 
 REVOKE ALL ON FUNCTION public.get_csat_survey_by_token(TEXT) FROM public;
 GRANT EXECUTE ON FUNCTION public.get_csat_survey_by_token(TEXT) TO anon, authenticated;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+-- Nenhum grant para `anon`: acesso público é só via as funções SECURITY
+-- DEFINER acima, que não dependem de GRANT de tabela.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.csat_surveys TO authenticated;
+GRANT ALL ON public.csat_surveys TO service_role;

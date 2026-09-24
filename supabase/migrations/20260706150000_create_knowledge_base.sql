@@ -103,3 +103,9 @@ CREATE POLICY "Authenticated users can read knowledge-base"
 CREATE POLICY "Authenticated users can delete from knowledge-base"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'knowledge-base');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.knowledge_documents TO authenticated;
+GRANT ALL ON public.knowledge_documents TO service_role;
+GRANT SELECT ON public.knowledge_chunks TO authenticated;
+GRANT ALL ON public.knowledge_chunks TO service_role;

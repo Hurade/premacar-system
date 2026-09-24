@@ -76,3 +76,11 @@ ALTER TABLE public.automation_rule_runs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can read automation_rule_runs"
   ON public.automation_rule_runs FOR SELECT TO authenticated
   USING (auth.role() = 'authenticated');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.automation_rules TO authenticated;
+GRANT ALL ON public.automation_rules TO service_role;
+GRANT SELECT ON public.automation_execution_logs TO authenticated;
+GRANT ALL ON public.automation_execution_logs TO service_role;
+GRANT SELECT ON public.automation_rule_runs TO authenticated;
+GRANT ALL ON public.automation_rule_runs TO service_role;

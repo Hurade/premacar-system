@@ -121,3 +121,7 @@ BEGIN
   RETURN v_chosen_id;
 END;
 $$;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.team_member_schedules TO authenticated;
+GRANT ALL ON public.team_member_schedules TO service_role;

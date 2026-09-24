@@ -102,3 +102,7 @@ $$;
 INSERT INTO public.round_robin_state (team_member_id, current_weight)
 SELECT id, 0 FROM public.team_members WHERE status = 'active'
 ON CONFLICT (team_member_id) DO NOTHING;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.round_robin_state TO authenticated;
+GRANT ALL ON public.round_robin_state TO service_role;

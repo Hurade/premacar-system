@@ -39,6 +39,10 @@ INSERT INTO public.pipeline_stages (title, color, position, is_system) VALUES
   ('Fechado / Ganho', 'border-emerald-500', 4, true),
   ('Perdido', 'border-red-500', 5, true);
 
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pipeline_stages TO authenticated;
+GRANT ALL ON public.pipeline_stages TO service_role;
+
 -- Update deals table to reference pipeline_stages instead of hardcoded stage names
 -- Add a new column for the stage_id
 ALTER TABLE public.deals ADD COLUMN IF NOT EXISTS stage_id UUID REFERENCES public.pipeline_stages(id);

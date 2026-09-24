@@ -121,6 +121,10 @@ END;
 $$;
 
 -- Add unique constraint on nina_processing_queue to prevent duplicate processing
-CREATE UNIQUE INDEX IF NOT EXISTS idx_nina_queue_unique_pending 
-ON public.nina_processing_queue (conversation_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nina_queue_unique_pending
+ON public.nina_processing_queue (conversation_id)
 WHERE status IN ('pending', 'processing');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ai_message_control TO authenticated;
+GRANT ALL ON public.ai_message_control TO service_role;

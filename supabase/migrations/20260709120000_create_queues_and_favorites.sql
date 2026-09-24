@@ -35,3 +35,7 @@ INSERT INTO public.queues (name, color) VALUES
   ('Suporte', '#d33115'),
   ('Financeiro', '#1273de'),
   ('Pós-venda', '#7b64ff');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.queues TO authenticated;
+GRANT ALL ON public.queues TO service_role;

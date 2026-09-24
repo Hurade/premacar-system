@@ -40,3 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_calendar_events_scheduled ON public.calendar_even
 CREATE INDEX IF NOT EXISTS idx_conversations_calendar_flow
   ON public.conversations USING GIN(calendar_flow)
   WHERE calendar_flow IS NOT NULL;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.calendar_events TO authenticated;
+GRANT ALL ON public.calendar_events TO service_role;

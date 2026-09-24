@@ -587,3 +587,25 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.contacts;
   END IF;
 END $$;
+
+-- PARTE 11: Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.contacts TO authenticated;
+GRANT ALL ON public.contacts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.conversations TO authenticated;
+GRANT ALL ON public.conversations TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.messages TO authenticated;
+GRANT ALL ON public.messages TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.conversation_states TO authenticated;
+GRANT ALL ON public.conversation_states TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.message_grouping_queue TO authenticated;
+GRANT ALL ON public.message_grouping_queue TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.message_processing_queue TO authenticated;
+GRANT ALL ON public.message_processing_queue TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nina_processing_queue TO authenticated;
+GRANT ALL ON public.nina_processing_queue TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.send_queue TO authenticated;
+GRANT ALL ON public.send_queue TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nina_settings TO authenticated;
+GRANT ALL ON public.nina_settings TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tag_definitions TO authenticated;
+GRANT ALL ON public.tag_definitions TO service_role;

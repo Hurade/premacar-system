@@ -99,3 +99,11 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.team_members;
   END IF;
 END $$;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.teams TO authenticated;
+GRANT ALL ON public.teams TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.team_functions TO authenticated;
+GRANT ALL ON public.team_functions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.team_members TO authenticated;
+GRANT ALL ON public.team_members TO service_role;

@@ -124,3 +124,13 @@ INSERT INTO apresentacoes_templates (tipo, nome, descricao, ativo, ordem) VALUES
   TRUE, 0
 )
 ON CONFLICT (tipo) DO NOTHING;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+-- Nenhum grant para `anon`: acesso público é só via as funções SECURITY
+-- DEFINER acima, que não dependem de GRANT de tabela.
+GRANT SELECT, INSERT, UPDATE, DELETE ON apresentacoes_templates TO authenticated;
+GRANT ALL ON apresentacoes_templates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON apresentacoes_comerciais TO authenticated;
+GRANT ALL ON apresentacoes_comerciais TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON apresentacoes_historico TO authenticated;
+GRANT ALL ON apresentacoes_historico TO service_role;

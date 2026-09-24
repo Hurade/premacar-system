@@ -122,3 +122,16 @@ INSERT INTO planos_propostas (tipo, nome, preco_mensal, recursos, descricao) VAL
   'Para recuperar clientes parados e reativar a base completa com automação inteligente.'
 )
 ON CONFLICT DO NOTHING;
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+-- Nenhum grant para `anon`: acesso público a propostas é só via as funções
+-- SECURITY DEFINER get_proposta_publica/atualizar_status_proposta_publica
+-- (ver 20260731124257_...sql), que não dependem de GRANT de tabela.
+GRANT SELECT, INSERT, UPDATE, DELETE ON leads_comerciais TO authenticated;
+GRANT ALL ON leads_comerciais TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON planos_propostas TO authenticated;
+GRANT ALL ON planos_propostas TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON propostas_comerciais TO authenticated;
+GRANT ALL ON propostas_comerciais TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON propostas_historico TO authenticated;
+GRANT ALL ON propostas_historico TO service_role;

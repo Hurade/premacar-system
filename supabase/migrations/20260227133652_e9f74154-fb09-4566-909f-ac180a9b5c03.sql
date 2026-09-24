@@ -91,3 +91,9 @@ CREATE TRIGGER update_integration_settings_updated_at
 CREATE TRIGGER update_email_templates_updated_at
   BEFORE UPDATE ON public.email_templates
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.integration_settings TO authenticated;
+GRANT ALL ON public.integration_settings TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.email_templates TO authenticated;
+GRANT ALL ON public.email_templates TO service_role;

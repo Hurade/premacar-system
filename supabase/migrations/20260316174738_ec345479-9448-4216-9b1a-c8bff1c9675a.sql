@@ -141,3 +141,7 @@ CREATE TRIGGER trigger_update_conversation_window
 AFTER INSERT ON public.messages
 FOR EACH ROW
 EXECUTE FUNCTION public.update_conversation_window();
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.whatsapp_connections TO authenticated;
+GRANT ALL ON public.whatsapp_connections TO service_role;

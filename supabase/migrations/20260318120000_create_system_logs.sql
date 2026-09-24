@@ -28,3 +28,7 @@ create policy "Authenticated users can insert their own logs" on system_logs
   for insert with check (
     auth.role() = 'authenticated' and (user_id is null or auth.uid() = user_id)
   );
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT ON public.system_logs TO authenticated;
+GRANT ALL ON public.system_logs TO service_role;

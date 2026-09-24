@@ -135,3 +135,9 @@ CREATE TRIGGER update_campaign_contacts_updated_at
   BEFORE UPDATE ON public.campaign_contacts
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.recurring_campaigns TO authenticated;
+GRANT ALL ON public.recurring_campaigns TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.campaign_contacts TO authenticated;
+GRANT ALL ON public.campaign_contacts TO service_role;

@@ -37,3 +37,9 @@ CREATE POLICY "Authenticated users can manage announcements"
 CREATE POLICY "Authenticated users can manage announcement_reads"
   ON public.announcement_reads FOR ALL TO authenticated
   USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- Data API grants (Supabase remove o auto-grant em tabelas novas a partir de 30/10/2026)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.announcements TO authenticated;
+GRANT ALL ON public.announcements TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.announcement_reads TO authenticated;
+GRANT ALL ON public.announcement_reads TO service_role;
