@@ -16,6 +16,12 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+# media-proxy: usado direto como src de <img>/<audio> no chat (não dá pra
+# mandar Authorization header nesse caso) — mesmo problema do
+# whatsapp-webhook, só descoberto ao testar áudio/imagem no projeto novo.
+[functions.media-proxy]
+verify_jwt = false
+
 [functions.test-meta-webhook]
 verify_jwt = false
 
