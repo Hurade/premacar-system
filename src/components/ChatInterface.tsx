@@ -449,6 +449,48 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  // "📇 Contato compartilhado: Nome (+55 11 99690-1533)" — mensagem de vCard
+  // recebida do WhatsApp (whatsapp-webhook/meta-webhook só guardam como
+  // texto formatado, sem campos estruturados — parseia aqui na exibição).
+  const parseSharedContact = (content: string): { name: string; phone: string | null } | null => {
+    const match = content.match(/^📇 Contato compartilhado: (.+?)(?:\s\(([^)]+)\))?$/);
+    if (!match) return null;
+    return { name: match[1].trim(), phone: match[2]?.trim() || null };
+  };
+
+  const handleAddSharedContact = async (name: string, rawPhone: string) => {
+    const digits = rawPhone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      toast.error('Número de telefone inválido pra salvar');
+      return;
+    }
+    const phone = digits.startsWith('55') ? digits : `55${digits}`;
+
+    try {
+      const { data: existing } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('phone_number', phone)
+        .maybeSingle();
+
+      if (existing) {
+        toast.info('Esse contato já está cadastrado');
+        return;
+      }
+
+      const { error } = await supabase.from('contacts').insert({
+        phone_number: phone,
+        name,
+        last_activity: new Date().toISOString(),
+      });
+      if (error) throw error;
+      toast.success(`${name} adicionado aos contatos`);
+    } catch (err) {
+      console.error('[ChatInterface] Error adding shared contact:', err);
+      toast.error('Erro ao adicionar contato');
+    }
+  };
+
   const uploadAndSendAttachment = async (file: File) => {
     if (!activeChat) return;
     setIsUploadingFile(true);
@@ -1137,6 +1179,35 @@ const ChatInterface: React.FC = () => {
           {isLikelyFileName ? msg.content : 'Anexo indisponível'}
         </p>
       );
+    }
+
+    if (msg.type === MessageType.TEXT && msg.content) {
+      const shared = parseSharedContact(msg.content);
+      if (shared) {
+        return (
+          <div className="flex items-center gap-3 min-w-[220px] py-1">
+            <div className={`flex items-center justify-center w-9 h-9 rounded-full shrink-0 ${
+              msg.direction === MessageDirection.OUTGOING ? 'bg-white/15' : 'bg-cyan-500/20'
+            }`}>
+              <UserPlus className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{shared.name}</p>
+              {shared.phone && <p className="text-xs opacity-70">{shared.phone}</p>}
+              {shared.phone && (
+                <button
+                  onClick={() => handleAddSharedContact(shared.name, shared.phone!)}
+                  className={`mt-1 text-xs font-medium underline underline-offset-2 ${
+                    msg.direction === MessageDirection.OUTGOING ? 'text-white' : 'text-cyan-400'
+                  }`}
+                >
+                  Adicionar aos contatos
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
     }
 
     return <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>;
