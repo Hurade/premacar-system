@@ -139,6 +139,7 @@ const ChatInterface: React.FC = () => {
   });
   const [showQuickRepliesPanel, setShowQuickRepliesPanel] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [sharedContactStatus, setSharedContactStatus] = useState<Record<string, 'exists' | 'added'>>({});
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isSendingAudio, setIsSendingAudio] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -475,6 +476,7 @@ const ChatInterface: React.FC = () => {
 
       if (existing) {
         toast.info('Esse contato já está cadastrado');
+        setSharedContactStatus((prev) => ({ ...prev, [phone]: 'exists' }));
         return;
       }
 
@@ -485,6 +487,7 @@ const ChatInterface: React.FC = () => {
       });
       if (error) throw error;
       toast.success(`${name} adicionado aos contatos`);
+      setSharedContactStatus((prev) => ({ ...prev, [phone]: 'added' }));
     } catch (err) {
       console.error('[ChatInterface] Error adding shared contact:', err);
       toast.error('Erro ao adicionar contato');
@@ -1194,16 +1197,27 @@ const ChatInterface: React.FC = () => {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{shared.name}</p>
               {shared.phone && <p className="text-xs opacity-70">{shared.phone}</p>}
-              {shared.phone && (
-                <button
-                  onClick={() => handleAddSharedContact(shared.name, shared.phone!)}
-                  className={`mt-1 text-xs font-medium underline underline-offset-2 ${
-                    msg.direction === MessageDirection.OUTGOING ? 'text-white' : 'text-cyan-400'
-                  }`}
-                >
-                  Adicionar aos contatos
-                </button>
-              )}
+              {shared.phone && (() => {
+                const normalizedDigits = shared.phone.replace(/\D/g, '');
+                const phoneKey = normalizedDigits.startsWith('55') ? normalizedDigits : `55${normalizedDigits}`;
+                const status = sharedContactStatus[phoneKey];
+                if (status === 'added') {
+                  return <p className="mt-1 text-xs font-medium opacity-70">✓ Adicionado aos contatos</p>;
+                }
+                if (status === 'exists') {
+                  return <p className="mt-1 text-xs font-medium opacity-70">Já cadastrado no CRM</p>;
+                }
+                return (
+                  <button
+                    onClick={() => handleAddSharedContact(shared.name, shared.phone!)}
+                    className={`mt-1 text-xs font-medium underline underline-offset-2 ${
+                      msg.direction === MessageDirection.OUTGOING ? 'text-white' : 'text-cyan-400'
+                    }`}
+                  >
+                    Adicionar aos contatos
+                  </button>
+                );
+              })()}
             </div>
           </div>
         );
