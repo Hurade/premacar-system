@@ -61,7 +61,11 @@ const getSystemStageIds = async (): Promise<{ ganhoId: string | null; perdidoId:
     .eq('is_system', true)
     .eq('is_active', true);
   
-  const ganhoStage = stages?.find(s => s.title.toLowerCase() === 'ganho');
+  // Etapa "Ganho" foi removida — negócio ganho vira direto "Cliente" (etapa
+  // que assumiu is_system=true no lugar dela). ganhoId aqui aponta pra
+  // Cliente; nome da variável mantido pra não precisar tocar em todos os
+  // call sites (markDealWon, moveDealStage).
+  const ganhoStage = stages?.find(s => s.title.toLowerCase() === 'cliente');
   const perdidoStage = stages?.find(s => s.title.toLowerCase() === 'perdido');
   
   const result = {
