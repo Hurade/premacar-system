@@ -155,7 +155,7 @@ serve(async (req) => {
       // Get in_progress contacts for this campaign
       const { data: contacts, error: contactsError } = await supabase
         .from("campaign_contacts")
-        .select("id, contact_id, current_day, status, day_statuses, metadata")
+        .select("id, contact_id, current_day, status, day_statuses, metadata, created_at")
         .eq("campaign_id", campaign.id)
         .eq("status", "in_progress");
 
@@ -194,6 +194,47 @@ serve(async (req) => {
         const dayStatuses = (cc.day_statuses as Record<string, any>) || {};
         if (dayStatuses[dayKey]?.sent_at) {
           console.log(`[recurring-processor] Day ${cc.current_day} already sent for contact ${cc.contact_id}`);
+          continue;
+        }
+
+        // Momento em que o contato ficou elegível pro dia atual: sent_at do
+        // dia anterior, ou created_at (entrada na campanha) se for o dia 1.
+        const prevDayKey = `day${cc.current_day - 1}`;
+        const eligibleSince = new Date(dayStatuses[prevDayKey]?.sent_at || cc.created_at);
+
+        // Respeita o atraso configurado (timing.hours) entre dias — sem
+        // isso todos os dias disparavam em sequência, em minutos.
+        if (dayConfig.timing?.type === "delay" && dayConfig.timing?.hours) {
+          const readyAt = new Date(eligibleSince.getTime() + dayConfig.timing.hours * 3_600_000);
+          if (now2 < readyAt) {
+            continue; // ainda não chegou a hora — tenta de novo no próximo tick
+          }
+        }
+
+        // Para a cadência se o contato já respondeu desde o último envio —
+        // evita mandar o dia seguinte pra quem já engajou.
+        const { data: reply } = await supabase
+          .from("messages")
+          .select("id, conversations!inner(contact_id)")
+          .eq("conversations.contact_id", cc.contact_id)
+          .eq("from_type", "user")
+          .gt("sent_at", eligibleSince.toISOString())
+          .limit(1)
+          .maybeSingle();
+
+        if (reply) {
+          console.log(`[recurring-processor] Contato ${cc.contact_id} respondeu — parando cadência (sucesso)`);
+          await supabase
+            .from("campaign_contacts")
+            .update({
+              status: "success",
+              success_at: new Date().toISOString(),
+              completed_at: new Date().toISOString(),
+              metadata: { ...(cc.metadata || {}), stopped_reason: "replied" },
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq("id", cc.id);
+          sentCount++;
           continue;
         }
 
