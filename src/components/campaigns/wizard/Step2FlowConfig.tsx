@@ -335,6 +335,18 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
                       <p className="text-xs text-muted-foreground">Variáveis: {'{{nome}}'}, {'{{empresa}}'}, {'{{telefone}}'}</p>
                     </div>
                   )}
+
+                  <div className="space-y-2">
+                    <Label>Tag automática ao entregar (opcional)</Label>
+                    <Input
+                      value={editConfig.config?.tag_on_delivered || ''}
+                      onChange={(e) => setEditConfig({ ...editConfig, config: { ...editConfig.config, tag_on_delivered: e.target.value } })}
+                      placeholder="ex: Recuperar_Dia1_Enviado"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Aplicada ao contato quando esta mensagem é enviada com sucesso
+                    </p>
+                  </div>
                 </div>
               )}
 

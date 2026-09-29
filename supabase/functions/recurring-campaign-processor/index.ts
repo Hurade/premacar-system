@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
 import { resolveSendCredentials, SendCredentials } from "../_shared/connection-resolver.ts";
+import { selectVariation, CampaignVariationLike } from "../_shared/campaign-variations.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +67,91 @@ serve(async (req) => {
 
     for (const campaign of campaigns || []) {
       const flowConfig = campaign.flow_config as Record<string, any>;
-      
+      const now2 = new Date();
+
+      // ── Paginação anti-ban (portado do campaign-processor/Disparos) ──
+      // anti_ban_enabled nasce false: campanhas já existentes (poucos
+      // contatos/dia) continuam disparando na hora, sem esses gates.
+      let sendRules: any = null;
+      if (campaign.anti_ban_enabled) {
+        if (campaign.paused_until && new Date(campaign.paused_until) > now2) {
+          results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "anti_ban_pause" });
+          continue;
+        }
+
+        if (campaign.business_hours_enabled) {
+          const localTimeStr = now2.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
+          const localDate = new Date(localTimeStr);
+          const [startHour, startMin] = (campaign.business_hours_start || "09:00").split(":").map(Number);
+          const [endHour, endMin] = (campaign.business_hours_end || "18:00").split(":").map(Number);
+          const currentTimeMinutes = localDate.getHours() * 60 + localDate.getMinutes();
+          const startTimeMinutes = startHour * 60 + startMin;
+          const endTimeMinutes = endHour * 60 + endMin;
+          const businessDays: number[] = campaign.business_days || [1, 2, 3, 4, 5];
+
+          if (
+            currentTimeMinutes < startTimeMinutes ||
+            currentTimeMinutes > endTimeMinutes ||
+            !businessDays.includes(localDate.getDay())
+          ) {
+            results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "outside_business_hours" });
+            continue;
+          }
+        }
+
+        if ((campaign.sent_today || 0) >= (campaign.daily_limit || 100)) {
+          results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "daily_limit_reached" });
+          continue;
+        }
+
+        const { data: rulesRow } = await supabase
+          .from("recurring_campaign_send_rules")
+          .select("*")
+          .eq("campaign_id", campaign.id)
+          .maybeSingle();
+        sendRules = rulesRow;
+
+        if (sendRules?.auto_pause_on_errors) {
+          const windowSize = sendRules.error_window_sends || 30;
+          const { data: recentSends } = await supabase
+            .from("system_logs")
+            .select("metadata")
+            .eq("source", "recurring-campaign-processor")
+            .contains("metadata", { campaign_id: campaign.id, type: "whatsapp" })
+            .order("created_at", { ascending: false })
+            .limit(windowSize);
+
+          if (recentSends && recentSends.length >= windowSize) {
+            const errors = recentSends.filter((l: any) => l.metadata?.success === false).length;
+            const errorRatePct = (errors / recentSends.length) * 100;
+            if (errorRatePct >= (sendRules.error_rate_threshold || 15)) {
+              const pauseUntil = new Date(Date.now() + (sendRules.pause_duration_minutes || 60) * 60_000).toISOString();
+              await supabase
+                .from("recurring_campaigns")
+                .update({ status: "paused", paused_until: pauseUntil })
+                .eq("id", campaign.id);
+              await saveLog(supabase, {
+                source: "recurring-campaign-processor",
+                level: "warn",
+                message: `Auto-pause anti-bloqueio: ${campaign.name} (${errorRatePct.toFixed(1)}% erros)`,
+                metadata: { campaign_id: campaign.id, error_rate: errorRatePct, threshold: sendRules.error_rate_threshold },
+              });
+              results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "auto_paused_error_rate" });
+              continue;
+            }
+          }
+        }
+      }
+
+      // Variações A/B ativas (independe de anti_ban_enabled)
+      const { data: variationsData } = await supabase
+        .from("recurring_campaign_variations")
+        .select("*")
+        .eq("campaign_id", campaign.id)
+        .eq("is_active", true)
+        .order("label");
+      const variations = (variationsData ?? []) as (CampaignVariationLike & { meta_template_id: string | null })[];
+
       // Get in_progress contacts for this campaign
       const { data: contacts, error: contactsError } = await supabase
         .from("campaign_contacts")
@@ -93,6 +178,8 @@ serve(async (req) => {
 
       let sentCount = 0;
       let failedCount = 0;
+      let whatsappSentThisTick = false;
+      let sentTodayDelta = 0;
 
       for (const cc of contacts) {
         const dayKey = `day${cc.current_day}`;
@@ -132,8 +219,35 @@ serve(async (req) => {
           continue;
         }
 
+        // Blacklist global do usuário (portado do campaign-processor/Disparos)
+        if (dayConfig.type === "whatsapp" && contact.phone_number && campaign.user_id) {
+          const { data: blocked } = await supabase
+            .from("campaign_blacklist")
+            .select("id")
+            .eq("user_id", campaign.user_id)
+            .eq("phone", contact.phone_number)
+            .maybeSingle();
+          if (blocked) {
+            console.log(`[recurring-processor] Telefone na blacklist, cancelando na campanha: ${contact.phone_number}`);
+            await supabase
+              .from("campaign_contacts")
+              .update({ status: "cancelled" })
+              .eq("id", cc.id);
+            continue;
+          }
+        }
+
+        // Paginação anti-ban: no máximo 1 envio de WhatsApp por execução
+        // do cron quando a campanha tem anti_ban_enabled — mesmo modelo
+        // do campaign-processor (1 lead pendente por tick).
+        if (dayConfig.type === "whatsapp" && campaign.anti_ban_enabled && whatsappSentThisTick) {
+          console.log(`[recurring-processor] Anti-ban: já enviou 1 WhatsApp nesta execução para "${campaign.name}", contato ${cc.contact_id} fica pra próxima`);
+          continue;
+        }
+
         const contactName = contact.name || contact.call_name || "Cliente";
         let sendResult = { success: false, error: "" };
+        let selectedVariation: (CampaignVariationLike & { meta_template_id: string | null }) | null = null;
 
         try {
           if (dayConfig.type === "email") {
@@ -154,7 +268,27 @@ serve(async (req) => {
               });
             }
             console.log(`[recurring-processor] WhatsApp creds resolved: api_type=${whatsappCreds.api_type}, campaign=${campaign.name}`);
-            sendResult = await sendWhatsApp(contact, dayConfig, whatsappCreds, supabase);
+
+            // Seleção A/B: variação escolhida substitui o meta_template_id do dia
+            let effectiveDayConfig = dayConfig;
+            if (variations.length > 0) {
+              const { variation } = selectVariation(variations);
+              selectedVariation = variation;
+              console.log(`[recurring-processor] A/B: variação "${variation.label}" selecionada (peso ${variation.weight}%)`);
+              if (variation.meta_template_id) {
+                effectiveDayConfig = {
+                  ...dayConfig,
+                  config: { ...dayConfig.config, meta_template_id: variation.meta_template_id },
+                };
+              }
+            }
+
+            sendResult = await sendWhatsApp(contact, effectiveDayConfig, whatsappCreds, supabase);
+
+            if (campaign.anti_ban_enabled && sendResult.success) {
+              whatsappSentThisTick = true;
+              sentTodayDelta++;
+            }
           } else if (dayConfig.type === "sms") {
             sendResult = { success: false, error: "SMS não implementado ainda" };
           } else if (dayConfig.type === "call") {
@@ -200,6 +334,59 @@ serve(async (req) => {
         if (sendResult.success) {
           sentCount++;
           console.log(`[recurring-processor] ✅ Sent ${dayConfig.type} to ${contactName} (Day ${cc.current_day})`);
+
+          if (dayConfig.type === "whatsapp") {
+            if (selectedVariation) {
+              await supabase
+                .from("recurring_campaign_variations")
+                .update({ total_sent: selectedVariation.total_sent + 1, updated_at: new Date().toISOString() })
+                .eq("id", selectedVariation.id);
+
+              if (sendRules?.ab_auto_winner && !variations.some((v) => v.is_winner)) {
+                const minSends = sendRules.ab_winner_min_sends || 100;
+                if (variations.every((v) => v.total_sent >= minSends)) {
+                  const { data: varMetrics } = await supabase
+                    .from("recurring_campaign_variations")
+                    .select("id, label, total_sent, total_delivered, total_read, total_replied")
+                    .eq("campaign_id", campaign.id)
+                    .eq("is_active", true);
+                  if (varMetrics && varMetrics.length >= 2) {
+                    const metric = sendRules.ab_winner_metric || "reply_rate";
+                    const scored = varMetrics
+                      .map((v: any) => ({
+                        id: v.id,
+                        label: v.label,
+                        score:
+                          metric === "reply_rate"
+                            ? v.total_replied / Math.max(v.total_sent, 1)
+                            : metric === "read_rate"
+                            ? v.total_read / Math.max(v.total_sent, 1)
+                            : v.total_delivered / Math.max(v.total_sent, 1),
+                      }))
+                      .sort((a: any, b: any) => b.score - a.score);
+                    const winnerId = scored[0].id;
+                    await supabase.from("recurring_campaign_variations").update({ is_winner: false }).eq("campaign_id", campaign.id);
+                    await supabase.from("recurring_campaign_variations").update({ is_winner: true }).eq("id", winnerId);
+                    await supabase.from("recurring_campaign_variations").update({ is_active: false }).eq("campaign_id", campaign.id).neq("id", winnerId);
+                    console.log(`[recurring-processor] 🏆 Auto-winner: variação "${scored[0].label}" (métrica: ${metric})`);
+                  }
+                }
+              }
+            }
+
+            // Auto-tag configurada no dia (tag_on_delivered), reaproveitando contacts.tags
+            const tagOnDelivered = dayConfig.config?.tag_on_delivered as string | undefined;
+            if (tagOnDelivered) {
+              const { data: freshContact } = await supabase.from("contacts").select("tags").eq("id", contact.id).single();
+              const currentTags = (freshContact?.tags as string[]) || [];
+              if (!currentTags.includes(tagOnDelivered)) {
+                await supabase
+                  .from("contacts")
+                  .update({ tags: [...currentTags, tagOnDelivered], last_activity: new Date().toISOString() })
+                  .eq("id", contact.id);
+              }
+            }
+          }
 
           // Check if this is the last day
           const nextDayKey = `day${cc.current_day + 1}`;
@@ -254,6 +441,9 @@ serve(async (req) => {
           success_count: (campaign.success_count || 0) + sentCount,
           failed_count: (campaign.failed_count || 0) + failedCount,
           in_progress_count: Math.max(0, (campaign.in_progress_count || 0) - sentCount - failedCount),
+          ...(sentTodayDelta > 0
+            ? { sent_today: (campaign.sent_today || 0) + sentTodayDelta, last_sent_at: new Date().toISOString() }
+            : {}),
           updated_at: new Date().toISOString(),
         } as any)
         .eq("id", campaign.id);

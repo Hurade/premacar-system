@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
 import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
+import { selectVariation } from "../_shared/campaign-variations.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,26 +104,6 @@ interface SendRules {
   ab_auto_winner: boolean;
   ab_winner_min_sends: number;
   ab_winner_metric: string;
-}
-
-// Weighted random selection of A/B variation
-function selectVariation(variations: CampaignVariation[]): { variation: CampaignVariation; index: number } {
-  const winner = variations.find(v => v.is_winner && v.is_active);
-  if (winner) {
-    return { variation: winner, index: variations.indexOf(winner) };
-  }
-  const active = variations.filter(v => v.is_active);
-  if (active.length === 0) return { variation: variations[0], index: 0 };
-  const totalWeight = active.reduce((s, v) => s + v.weight, 0);
-  const rand = Math.random() * totalWeight;
-  let cumulative = 0;
-  for (let i = 0; i < active.length; i++) {
-    cumulative += active[i].weight;
-    if (rand <= cumulative) {
-      return { variation: active[i], index: variations.indexOf(active[i]) };
-    }
-  }
-  return { variation: active[0], index: 0 };
 }
 
 // Função para enviar template via Meta API

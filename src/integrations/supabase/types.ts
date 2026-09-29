@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agent_configs: {
@@ -2447,7 +2472,7 @@ export type Database = {
           business_hours_start: string
           company_name: string | null
           created_at: string
-          csat_survey_enabled: boolean | null
+          csat_survey_enabled: boolean
           elevenlabs_api_key: string | null
           elevenlabs_model: string | null
           elevenlabs_similarity_boost: number
@@ -2508,7 +2533,7 @@ export type Database = {
           business_hours_start?: string
           company_name?: string | null
           created_at?: string
-          csat_survey_enabled?: boolean | null
+          csat_survey_enabled?: boolean
           elevenlabs_api_key?: string | null
           elevenlabs_model?: string | null
           elevenlabs_similarity_boost?: number
@@ -2569,7 +2594,7 @@ export type Database = {
           business_hours_start?: string
           company_name?: string | null
           created_at?: string
-          csat_survey_enabled?: boolean | null
+          csat_survey_enabled?: boolean
           elevenlabs_api_key?: string | null
           elevenlabs_model?: string | null
           elevenlabs_similarity_boost?: number
@@ -2926,12 +2951,149 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_campaign_send_rules: {
+        Row: {
+          ab_auto_winner: boolean
+          ab_winner_metric: string
+          ab_winner_min_sends: number
+          auto_pause_on_errors: boolean
+          campaign_id: string
+          created_at: string
+          error_rate_threshold: number
+          error_window_sends: number
+          id: string
+          max_interval_seconds: number
+          max_per_day: number
+          max_per_hour: number
+          min_interval_seconds: number
+          pause_duration_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          ab_auto_winner?: boolean
+          ab_winner_metric?: string
+          ab_winner_min_sends?: number
+          auto_pause_on_errors?: boolean
+          campaign_id: string
+          created_at?: string
+          error_rate_threshold?: number
+          error_window_sends?: number
+          id?: string
+          max_interval_seconds?: number
+          max_per_day?: number
+          max_per_hour?: number
+          min_interval_seconds?: number
+          pause_duration_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          ab_auto_winner?: boolean
+          ab_winner_metric?: string
+          ab_winner_min_sends?: number
+          auto_pause_on_errors?: boolean
+          campaign_id?: string
+          created_at?: string
+          error_rate_threshold?: number
+          error_window_sends?: number
+          id?: string
+          max_interval_seconds?: number
+          max_per_day?: number
+          max_per_hour?: number
+          min_interval_seconds?: number
+          pause_duration_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_campaign_send_rules_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_campaign_variations: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_winner: boolean
+          label: string
+          meta_template_id: string | null
+          name: string
+          total_delivered: number
+          total_errors: number
+          total_read: number
+          total_replied: number
+          total_sent: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_winner?: boolean
+          label: string
+          meta_template_id?: string | null
+          name?: string
+          total_delivered?: number
+          total_errors?: number
+          total_read?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_winner?: boolean
+          label?: string
+          meta_template_id?: string | null
+          name?: string
+          total_delivered?: number
+          total_errors?: number
+          total_read?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_campaign_variations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_campaign_variations_meta_template_id_fkey"
+            columns: ["meta_template_id"]
+            isOneToOne: false
+            referencedRelation: "meta_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_campaigns: {
         Row: {
           actual_cost: number | null
+          anti_ban_enabled: boolean
+          business_days: number[] | null
+          business_hours_enabled: boolean
+          business_hours_end: string | null
+          business_hours_start: string | null
           connection_id: string | null
           created_at: string | null
           created_by: string | null
+          daily_limit: number
           description: string | null
           ended_at: string | null
           estimated_cost: number | null
@@ -2939,8 +3101,17 @@ export type Database = {
           flow_config: Json
           id: string
           in_progress_count: number | null
+          interval_max: number
+          interval_min: number
+          interval_type: string
+          last_sent_at: string | null
           name: string
           objective: string | null
+          pause_after_count: number | null
+          pause_duration_minutes: number | null
+          paused_until: string | null
+          scheduled_start: string | null
+          sent_today: number
           started_at: string | null
           status: string | null
           success_count: number | null
@@ -2950,9 +3121,15 @@ export type Database = {
         }
         Insert: {
           actual_cost?: number | null
+          anti_ban_enabled?: boolean
+          business_days?: number[] | null
+          business_hours_enabled?: boolean
+          business_hours_end?: string | null
+          business_hours_start?: string | null
           connection_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          daily_limit?: number
           description?: string | null
           ended_at?: string | null
           estimated_cost?: number | null
@@ -2960,8 +3137,17 @@ export type Database = {
           flow_config?: Json
           id?: string
           in_progress_count?: number | null
+          interval_max?: number
+          interval_min?: number
+          interval_type?: string
+          last_sent_at?: string | null
           name: string
           objective?: string | null
+          pause_after_count?: number | null
+          pause_duration_minutes?: number | null
+          paused_until?: string | null
+          scheduled_start?: string | null
+          sent_today?: number
           started_at?: string | null
           status?: string | null
           success_count?: number | null
@@ -2971,9 +3157,15 @@ export type Database = {
         }
         Update: {
           actual_cost?: number | null
+          anti_ban_enabled?: boolean
+          business_days?: number[] | null
+          business_hours_enabled?: boolean
+          business_hours_end?: string | null
+          business_hours_start?: string | null
           connection_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          daily_limit?: number
           description?: string | null
           ended_at?: string | null
           estimated_cost?: number | null
@@ -2981,8 +3173,17 @@ export type Database = {
           flow_config?: Json
           id?: string
           in_progress_count?: number | null
+          interval_max?: number
+          interval_min?: number
+          interval_type?: string
+          last_sent_at?: string | null
           name?: string
           objective?: string | null
+          pause_after_count?: number | null
+          pause_duration_minutes?: number | null
+          paused_until?: string | null
+          scheduled_start?: string | null
+          sent_today?: number
           started_at?: string | null
           status?: string | null
           success_count?: number | null
@@ -3141,7 +3342,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          level?: string
+          level: string
           message: string
           metadata?: Json | null
           source: string
@@ -3743,7 +3944,6 @@ export type Database = {
       get_apresentacao_publica: { Args: { p_slug: string }; Returns: Json }
       get_auth_user_id: { Args: never; Returns: string }
       get_campaign_funnel: { Args: { p_campaign_id: string }; Returns: Json }
-      get_csat_enabled: { Args: never; Returns: boolean }
       get_csat_survey_by_token: {
         Args: { p_token: string }
         Returns: {
@@ -3787,6 +3987,7 @@ export type Database = {
         Returns: undefined
       }
       is_active_team_member: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_user: { Args: { _user_id: string }; Returns: boolean }
       is_team_member_available_now: {
         Args: { p_team_member_id: string }
         Returns: boolean
@@ -3818,6 +4019,7 @@ export type Database = {
         Returns: undefined
       }
       reset_campaign_daily_counts: { Args: never; Returns: undefined }
+      reset_recurring_campaign_daily_counts: { Args: never; Returns: undefined }
       submit_csat_response: {
         Args: { p_comment?: string; p_rating: number; p_token: string }
         Returns: boolean
@@ -3988,6 +4190,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user"],
