@@ -31,6 +31,13 @@ verify_jwt = false
 [functions.recurring-campaign-processor]
 verify_jwt = false
 
+# follow-me-processor: existe desde 11/09 (feat "Siga-me"), mas nunca foi
+# agendado via pg_cron nem teve essa entrada aqui — o toggle na tela de
+# Equipe nunca teve efeito real, em nenhum dos dois projetos. Corrigido
+# junto com o cron job (ver migration).
+[functions.follow-me-processor]
+verify_jwt = false
+
 [functions.voice-call-twiml]
 verify_jwt = false
 
