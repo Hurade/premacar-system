@@ -35,14 +35,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check caller has admin role
+    // Check caller has admin role. Usa .maybeSingle() com filtro direto em
+    // vez de .single() sem filtro: um usuário pode ter mais de uma linha em
+    // user_roles (ex: 'admin' e 'user' ao mesmo tempo) — .single() sem
+    // filtro por role quebra com "multiple rows returned" nesse caso,
+    // negando acesso a admins de verdade com um 403 mascarado de erro
+    // genérico no frontend.
     const { data: roleData } = await callerClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .eq('role', 'admin')
+      .maybeSingle();
 
-    if (!roleData || roleData.role !== 'admin') {
+    if (!roleData) {
       return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
