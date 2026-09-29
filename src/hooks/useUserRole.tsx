@@ -27,8 +27,6 @@ export type Permission =
   | 'manage_chat'
   | 'view_contacts'
   | 'manage_contacts'
-  | 'view_broadcasts'
-  | 'manage_broadcasts'
   | 'view_scheduling'
   | 'manage_scheduling'
   | 'view_team'
@@ -48,8 +46,6 @@ const ROLE_PERMISSIONS: Record<TeamRole | 'user', Permission[]> = {
     'manage_chat',
     'view_contacts',
     'manage_contacts',
-    'view_broadcasts',
-    'manage_broadcasts',
     'view_scheduling',
     'manage_scheduling',
     'view_team',
@@ -67,8 +63,6 @@ const ROLE_PERMISSIONS: Record<TeamRole | 'user', Permission[]> = {
     'manage_chat',
     'view_contacts',
     'manage_contacts',
-    'view_broadcasts',
-    'manage_broadcasts',
     'view_scheduling',
     'manage_scheduling',
     'view_team',
@@ -96,7 +90,6 @@ export const MENU_ROLE_REQUIREMENTS: Record<string, TeamRole[]> = {
   pipeline: ['admin', 'manager', 'agent'],
   chat: ['admin', 'manager', 'agent'],
   contacts: ['admin', 'manager', 'agent'],
-  broadcasts: ['admin', 'manager'],
   campanhas: ['admin', 'manager'],
   scheduling: ['admin', 'manager', 'agent'],
   team: ['admin', 'manager'],

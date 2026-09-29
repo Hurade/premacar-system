@@ -5,33 +5,32 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  CampaignVariation,
-  useCampaignVariations,
-  useUpsertVariation,
-  useDeleteVariation,
-  useSelectWinner,
-  useClearWinner,
+  RecurringCampaignVariation,
+  useRecurringCampaignVariations,
+  useUpsertRecurringVariation,
+  useDeleteRecurringVariation,
+  useSelectRecurringWinner,
+  useClearRecurringWinner,
   deliveryRate,
   readRate,
   replyRate,
-} from '@/hooks/useCampaignVariations';
+} from '@/hooks/useRecurringCampaignVariations';
 
 const LABELS = ['A', 'B', 'C', 'D'];
 const METRIC_COLORS = ['bg-cyan-500', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500'];
 
 interface VariationModalProps {
   campaignId: string;
-  existing: CampaignVariation | null;
+  existing: RecurringCampaignVariation | null;
   usedLabels: string[];
   onClose: () => void;
 }
 
 const VariationModal: React.FC<VariationModalProps> = ({ campaignId, existing, usedLabels, onClose }) => {
-  const upsert = useUpsertVariation();
+  const upsert = useUpsertRecurringVariation();
   const [templates, setTemplates] = useState<{ id: string; display_name: string; name: string; body_text: string }[]>([]);
   const [form, setForm] = useState({
     label: existing?.label ?? LABELS.find(l => !usedLabels.includes(l)) ?? 'A',
@@ -159,8 +158,6 @@ const VariationModal: React.FC<VariationModalProps> = ({ campaignId, existing, u
   );
 };
 
-// ── Metric bar ────────────────────────────────────────────────────
-
 const MetricBar: React.FC<{ label: string; value: number; color: string; max?: number }> = ({
   label, value, color, max = 100
 }) => (
@@ -178,19 +175,17 @@ const MetricBar: React.FC<{ label: string; value: number; color: string; max?: n
   </div>
 );
 
-// ── Main component ────────────────────────────────────────────────
-
 interface Props {
   campaignId: string;
   campaignName: string;
 }
 
-const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
-  const { data: variations = [], isLoading } = useCampaignVariations(campaignId);
-  const deleteVar = useDeleteVariation();
-  const selectWinner = useSelectWinner();
-  const clearWinner = useClearWinner();
-  const [modalTarget, setModalTarget] = useState<CampaignVariation | null | 'new'>(null);
+const RecurringCampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
+  const { data: variations = [], isLoading } = useRecurringCampaignVariations(campaignId);
+  const deleteVar = useDeleteRecurringVariation();
+  const selectWinner = useSelectRecurringWinner();
+  const clearWinner = useClearRecurringWinner();
+  const [modalTarget, setModalTarget] = useState<RecurringCampaignVariation | null | 'new'>(null);
 
   const usedLabels = variations.map(v => v.label);
   const hasWinner = variations.some(v => v.is_winner);
@@ -210,7 +205,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
@@ -218,7 +212,7 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
             Teste A/B de Templates
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Distribua envios entre variações e acompanhe qual converte melhor.
+            Só se aplica aos dias de WhatsApp desta campanha — distribua envios entre variações e acompanhe qual converte melhor.
           </p>
         </div>
         {variations.length < 4 && (
@@ -229,7 +223,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         )}
       </div>
 
-      {/* Weight warning */}
       {variations.length > 0 && !weightOk && (
         <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -237,7 +230,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         </div>
       )}
 
-      {/* Winner active banner */}
       {hasWinner && winner && (
         <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
           <div className="flex items-center gap-2 text-amber-300 text-sm font-medium">
@@ -257,7 +249,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         </div>
       )}
 
-      {/* Empty state */}
       {variations.length === 0 && (
         <div className="text-center py-12 border border-dashed border-slate-700 rounded-xl">
           <FlaskConical className="w-10 h-10 mx-auto mb-3 text-slate-600" />
@@ -270,7 +261,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         </div>
       )}
 
-      {/* Variation cards */}
       {variations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {variations.map((v, idx) => {
@@ -286,7 +276,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
                     : 'border-slate-700 bg-slate-900/40'
                 }`}
               >
-                {/* Card header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-slate-100 font-bold text-sm ${METRIC_COLORS[idx] || 'bg-slate-700'}`}>
@@ -331,7 +320,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
                   </div>
                 </div>
 
-                {/* Stats row */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   {[
                     { label: 'Enviados', value: v.total_sent },
@@ -345,14 +333,12 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
                   ))}
                 </div>
 
-                {/* Metric bars */}
                 <div className="space-y-2">
                   <MetricBar label="Entrega" value={deliveryRate(v)} color={METRIC_COLORS[idx] || 'bg-slate-600'} />
                   <MetricBar label="Leitura" value={readRate(v)} color={METRIC_COLORS[idx] || 'bg-slate-600'} />
                   <MetricBar label="Resposta" value={replyRate(v)} color={METRIC_COLORS[idx] || 'bg-slate-600'} />
                 </div>
 
-                {/* Definir vencedor */}
                 {!v.is_winner && v.total_sent >= 50 && !hasWinner && (
                   <Button
                     size="sm"
@@ -379,7 +365,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         </div>
       )}
 
-      {/* Comparison summary (only when all have data) */}
       {variations.length >= 2 && variations.every(v => v.total_sent >= 10) && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <p className="text-xs text-slate-400 font-medium mb-3">Comparativo de resposta (Taxa de resposta %)</p>
@@ -403,7 +388,6 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
         </div>
       )}
 
-      {/* Modal */}
       {modalTarget && (
         <VariationModal
           campaignId={campaignId}
@@ -416,4 +400,4 @@ const CampaignVariations: React.FC<Props> = ({ campaignId, campaignName }) => {
   );
 };
 
-export default CampaignVariations;
+export default RecurringCampaignVariations;

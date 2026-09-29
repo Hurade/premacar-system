@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
-  CampaignSendRules as Rules,
-  DEFAULT_SEND_RULES,
-  useCampaignSendRules,
-  useUpsertSendRules,
-} from '@/hooks/useCampaignVariations';
+  RecurringCampaignSendRules as Rules,
+  DEFAULT_RECURRING_SEND_RULES,
+  useRecurringCampaignSendRules,
+  useUpsertRecurringSendRules,
+} from '@/hooks/useRecurringCampaignVariations';
 
 interface Props {
   campaignId: string;
@@ -84,15 +84,15 @@ const NumberInput: React.FC<{
   </div>
 );
 
-const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
-  const { data: saved, isLoading } = useCampaignSendRules(campaignId);
-  const upsert = useUpsertSendRules();
-  const [form, setForm] = useState<Rules>({ campaign_id: campaignId, ...DEFAULT_SEND_RULES });
+const RecurringCampaignSendRules: React.FC<Props> = ({ campaignId }) => {
+  const { data: saved, isLoading } = useRecurringCampaignSendRules(campaignId);
+  const upsert = useUpsertRecurringSendRules();
+  const [form, setForm] = useState<Rules>({ campaign_id: campaignId, ...DEFAULT_RECURRING_SEND_RULES });
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (saved) {
-      setForm({ ...DEFAULT_SEND_RULES, ...saved, campaign_id: campaignId });
+      setForm({ ...DEFAULT_RECURRING_SEND_RULES, ...saved, campaign_id: campaignId });
     }
   }, [saved, campaignId]);
 
@@ -118,10 +118,10 @@ const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
         <div>
           <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
             <Shield className="w-4 h-4 text-cyan-400" />
-            Regras de Envio
+            Regras de Envio (Anti-Ban)
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Configure limites, intervalos e proteção automática contra bloqueios da Meta.
+            Só valem para os dias de WhatsApp desta campanha, quando "Proteção Anti-Ban" está ligada.
           </p>
         </div>
         <Button
@@ -134,13 +134,11 @@ const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
         </Button>
       </div>
 
-      {/* Meta-only notice */}
       <div className="flex items-center gap-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5 text-xs text-blue-300">
         <Info className="w-3.5 h-3.5 flex-shrink-0" />
-        Campanhas usam exclusivamente a <strong className="text-blue-200 ml-1">API Oficial Meta</strong> — apenas templates aprovados são enviados.
+        Suporta Meta Oficial e Evolution API — templates só são obrigatórios para envios via Meta.
       </div>
 
-      {/* Rate limits */}
       <Section icon={<Zap className="w-4 h-4" />} title="Limites de Velocidade">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <RangeField
@@ -185,7 +183,6 @@ const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
         </div>
       </Section>
 
-      {/* Block protection */}
       <Section icon={<Shield className="w-4 h-4" />} title="Proteção Contra Bloqueio">
         <div className="flex items-center justify-between">
           <div>
@@ -241,19 +238,13 @@ const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
         )}
       </Section>
 
-      {/* Business hours */}
       <Section icon={<Clock className="w-4 h-4" />} title="Horário de Envio">
         <p className="text-xs text-slate-500">
-          Os horários de envio são herdados das configurações da campanha (campo "Horário Comercial").
-          Os limites acima se aplicam dentro do horário permitido.
+          Horário comercial e limite diário foram definidos na etapa "Envio" ao criar a campanha
+          (Proteção Anti-Ban). Os limites acima se aplicam dentro do horário permitido.
         </p>
-        <div className="bg-slate-800/50 rounded-lg px-3 py-2.5 text-xs text-slate-300 flex items-center gap-2">
-          <Clock className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-          Para alterar horários e dias úteis, edite as configurações da campanha na aba principal.
-        </div>
       </Section>
 
-      {/* A/B auto-winner */}
       <Section icon={<FlaskConical className="w-4 h-4" />} title="A/B — Seleção Automática de Vencedor">
         <div className="flex items-center justify-between">
           <div>
@@ -310,4 +301,4 @@ const CampaignSendRules: React.FC<Props> = ({ campaignId }) => {
   );
 };
 
-export default CampaignSendRules;
+export default RecurringCampaignSendRules;

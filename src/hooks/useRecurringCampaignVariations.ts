@@ -141,6 +141,51 @@ export function useDeleteRecurringVariation() {
   });
 }
 
+export function useSelectRecurringWinner() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ variationId, campaignId }: { variationId: string; campaignId: string }) => {
+      await supabase
+        .from('recurring_campaign_variations')
+        .update({ is_winner: false })
+        .eq('campaign_id', campaignId);
+      const { error } = await supabase
+        .from('recurring_campaign_variations')
+        .update({ is_winner: true, is_active: true })
+        .eq('id', variationId);
+      if (error) throw error;
+      await supabase
+        .from('recurring_campaign_variations')
+        .update({ is_active: false })
+        .eq('campaign_id', campaignId)
+        .neq('id', variationId);
+    },
+    onSuccess: (_, { campaignId }) => {
+      queryClient.invalidateQueries({ queryKey: ['recurring-campaign-variations', campaignId] });
+      toast.success('Vencedor definido — apenas esta variação será usada.');
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
+export function useClearRecurringWinner() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (campaignId: string) => {
+      const { error } = await supabase
+        .from('recurring_campaign_variations')
+        .update({ is_winner: false, is_active: true })
+        .eq('campaign_id', campaignId);
+      if (error) throw error;
+    },
+    onSuccess: (_, campaignId) => {
+      queryClient.invalidateQueries({ queryKey: ['recurring-campaign-variations', campaignId] });
+      toast.success('Teste A/B retomado — todas as variações ativas.');
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
 export function useUpsertRecurringSendRules() {
   const queryClient = useQueryClient();
   return useMutation({

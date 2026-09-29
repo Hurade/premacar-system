@@ -9,13 +9,11 @@ import Settings from './components/Settings';
 import Team from './components/Team';
 import Scheduling from './components/Scheduling';
 import Kanban from './components/Kanban';
-import Broadcasts from './pages/Broadcasts';
 import Campanhas from './pages/Campanhas';
 import CreateCampaign from './pages/CreateCampaign';
 import CampaignDetails from './pages/CampaignDetails';
 import Followup from './pages/Followup';
 import Automacoes from './pages/Automacoes';
-import BroadcastDetails from './pages/BroadcastDetails';
 import Auth from './pages/Auth';
 import OAuthConsent from './pages/OAuthConsent';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -58,8 +56,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/chat': 'PremaCar - Chat',
   '/contacts': 'PremaCar - Contatos',
   '/pipeline': 'PremaCar - Pipeline',
-  '/broadcasts': 'PremaCar - Disparos',
-  '/broadcasts/:id': 'PremaCar - Detalhe do Disparo',
   '/campanhas': 'PremaCar - Campanhas',
   '/scheduling': 'PremaCar - Agendamentos',
   '/team': 'PremaCar - Equipe',
@@ -150,11 +146,6 @@ const App: React.FC = () => {
                   <Route path="/pipeline" element={<Kanban />} />
                   <Route path="/chat" element={<ChatInterface />} />
                   <Route path="/contacts" element={<Contacts />} />
-                  <Route path="/broadcasts" element={
-                    <RoleGate allowedRoles={['admin', 'manager']}>
-                      <Broadcasts />
-                    </RoleGate>
-                  } />
                   <Route path="/campanhas" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
                       <Campanhas />
@@ -184,11 +175,6 @@ const App: React.FC = () => {
                   <Route path="/followup" element={
                     <RoleGate allowedRoles={['admin', 'manager']}>
                       <Followup />
-                    </RoleGate>
-                  } />
-                  <Route path="/broadcasts/:id" element={
-                    <RoleGate allowedRoles={['admin', 'manager']}>
-                      <BroadcastDetails />
                     </RoleGate>
                   } />
                   <Route path="/automacoes" element={

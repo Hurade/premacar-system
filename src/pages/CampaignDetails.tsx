@@ -9,6 +9,8 @@ import { CampaignDetailMetrics } from '@/components/campaigns/CampaignDetailMetr
 import { CampaignFunnel } from '@/components/campaigns/CampaignFunnel';
 import { DayDistribution } from '@/components/campaigns/DayDistribution';
 import { CampaignContactsList } from '@/components/campaigns/CampaignContactsList';
+import RecurringCampaignVariations from '@/components/campaigns/RecurringCampaignVariations';
+import RecurringCampaignSendRules from '@/components/campaigns/RecurringCampaignSendRules';
 import { toast } from 'sonner';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
@@ -164,6 +166,14 @@ const CampaignDetailsPage: React.FC = () => {
 
       {/* Contacts */}
       <CampaignContactsList campaignId={campaign.id} />
+
+      {/* Envio & A/B — só relevante quando a campanha tem algum dia de WhatsApp */}
+      {Object.values((campaign as any).flow_config || {}).some((d: any) => d?.type === 'whatsapp') && (
+        <>
+          <RecurringCampaignSendRules campaignId={campaign.id} />
+          <RecurringCampaignVariations campaignId={campaign.id} campaignName={campaign.name} />
+        </>
+      )}
     </div>
   );
 };
