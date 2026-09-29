@@ -111,6 +111,9 @@ const ChatInterface: React.FC = () => {
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [selectedQueueId, setSelectedQueueId] = useState('');
   const [newContactMode, setNewContactMode] = useState(false);
+  const [prefillContactName, setPrefillContactName] = useState<string | null>(null);
+  const [prefillContactPhone, setPrefillContactPhone] = useState('');
+  const [pendingSharedContactKey, setPendingSharedContactKey] = useState<string | null>(null);
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [audioDurations, setAudioDurations] = useState<Record<string, number>>({});
@@ -459,40 +462,6 @@ const ChatInterface: React.FC = () => {
     return { name: match[1].trim(), phone: match[2]?.trim() || null };
   };
 
-  const handleAddSharedContact = async (name: string, rawPhone: string) => {
-    const digits = rawPhone.replace(/\D/g, '');
-    if (digits.length < 10) {
-      toast.error('Número de telefone inválido pra salvar');
-      return;
-    }
-    const phone = digits.startsWith('55') ? digits : `55${digits}`;
-
-    try {
-      const { data: existing } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('phone_number', phone)
-        .maybeSingle();
-
-      if (existing) {
-        toast.info('Esse contato já está cadastrado');
-        setSharedContactStatus((prev) => ({ ...prev, [phone]: 'exists' }));
-        return;
-      }
-
-      const { error } = await supabase.from('contacts').insert({
-        phone_number: phone,
-        name,
-        last_activity: new Date().toISOString(),
-      });
-      if (error) throw error;
-      toast.success(`${name} adicionado aos contatos`);
-      setSharedContactStatus((prev) => ({ ...prev, [phone]: 'added' }));
-    } catch (err) {
-      console.error('[ChatInterface] Error adding shared contact:', err);
-      toast.error('Erro ao adicionar contato');
-    }
-  };
 
   const uploadAndSendAttachment = async (file: File) => {
     if (!activeChat) return;
@@ -799,6 +768,9 @@ const ChatInterface: React.FC = () => {
     setSelectedConnectionId('');
     setSelectedQueueId('');
     setNewContactMode(false);
+    setPrefillContactName(null);
+    setPrefillContactPhone('');
+    setPendingSharedContactKey(null);
     setShowNewConversationModal(true);
     searchContacts('');
   };
@@ -809,6 +781,55 @@ const ChatInterface: React.FC = () => {
   const handleInlineContactCreated = (contactId: string, name: string | null, phoneNumber: string) => {
     setNewContactMode(false);
     setSelectedContactForConv({ id: contactId, name, phone_number: phoneNumber });
+    if (pendingSharedContactKey) {
+      setSharedContactStatus((prev) => ({ ...prev, [pendingSharedContactKey]: 'added' }));
+      setPendingSharedContactKey(null);
+    }
+  };
+
+  // Clique em "Adicionar aos contatos" num card de contato compartilhado do
+  // WhatsApp: em vez de criar direto, abre o mesmo modal de "Nova Conversa"
+  // já preenchido (ou já com o contato existente selecionado), pra também
+  // guiar o usuário a iniciar a conversa — não só cadastrar.
+  const handleAddSharedContact = async (name: string, rawPhone: string) => {
+    const digits = rawPhone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      toast.error('Número de telefone inválido pra salvar');
+      return;
+    }
+    const phone = digits.startsWith('55') ? digits : `55${digits}`;
+
+    try {
+      const { data: existing } = await supabase
+        .from('contacts')
+        .select('id, name, phone_number')
+        .eq('phone_number', phone)
+        .maybeSingle();
+
+      setContactSearchQuery('');
+      setSelectedTagsForConv([]);
+      setSelectedApiSource('evolution');
+      setSelectedTemplateId('');
+      setSelectedConnectionId('');
+      setSelectedQueueId('');
+
+      if (existing) {
+        setSharedContactStatus((prev) => ({ ...prev, [phone]: 'exists' }));
+        setPendingSharedContactKey(null);
+        setNewContactMode(false);
+        setSelectedContactForConv({ id: existing.id, name: existing.name, phone_number: existing.phone_number });
+      } else {
+        setPendingSharedContactKey(phone);
+        setPrefillContactName(name);
+        setPrefillContactPhone(phone);
+        setSelectedContactForConv(null);
+        setNewContactMode(true);
+      }
+      setShowNewConversationModal(true);
+    } catch (err) {
+      console.error('[ChatInterface] Error preparing shared contact:', err);
+      toast.error('Erro ao abrir cadastro do contato');
+    }
   };
 
   const handleSelectContactForConv = (contact: ContactOption) => {
@@ -1201,12 +1222,11 @@ const ChatInterface: React.FC = () => {
                 const normalizedDigits = shared.phone.replace(/\D/g, '');
                 const phoneKey = normalizedDigits.startsWith('55') ? normalizedDigits : `55${normalizedDigits}`;
                 const status = sharedContactStatus[phoneKey];
-                if (status === 'added') {
-                  return <p className="mt-1 text-xs font-medium opacity-70">✓ Adicionado aos contatos</p>;
-                }
-                if (status === 'exists') {
-                  return <p className="mt-1 text-xs font-medium opacity-70">Já cadastrado no CRM</p>;
-                }
+                const label = status === 'added'
+                  ? '✓ Adicionado — iniciar conversa'
+                  : status === 'exists'
+                    ? 'Já cadastrado — iniciar conversa'
+                    : 'Adicionar aos contatos e iniciar conversa';
                 return (
                   <button
                     onClick={() => handleAddSharedContact(shared.name, shared.phone!)}
@@ -1214,7 +1234,7 @@ const ChatInterface: React.FC = () => {
                       msg.direction === MessageDirection.OUTGOING ? 'text-white' : 'text-cyan-400'
                     }`}
                   >
-                    Adicionar aos contatos
+                    {label}
                   </button>
                 );
               })()}
@@ -2944,6 +2964,9 @@ const ChatInterface: React.FC = () => {
           setSelectedTemplateId('');
           setSelectedConnectionId('');
           setSelectedQueueId('');
+          setPrefillContactName(null);
+          setPrefillContactPhone('');
+          setPendingSharedContactKey(null);
         }
       }}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
@@ -2966,6 +2989,8 @@ const ChatInterface: React.FC = () => {
               <InlineCreateContact
                 onContactCreated={handleInlineContactCreated}
                 onCancel={() => setNewContactMode(false)}
+                initialName={prefillContactName}
+                initialPhone={prefillContactPhone}
               />
             ) : !selectedContactForConv ? (
               <>

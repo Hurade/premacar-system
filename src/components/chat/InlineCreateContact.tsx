@@ -25,11 +25,13 @@ interface FolderDef {
 interface InlineCreateContactProps {
   onContactCreated: (contactId: string, name: string | null, phoneNumber: string) => void;
   onCancel: () => void;
+  initialName?: string | null;
+  initialPhone?: string;
 }
 
-const InlineCreateContact: React.FC<InlineCreateContactProps> = ({ onContactCreated, onCancel }) => {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+const InlineCreateContact: React.FC<InlineCreateContactProps> = ({ onContactCreated, onCancel, initialName, initialPhone }) => {
+  const [name, setName] = useState(initialName || '');
+  const [phone, setPhone] = useState(initialPhone || '');
   const [oficina, setOficina] = useState('');
   const [email, setEmail] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
