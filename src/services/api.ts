@@ -929,14 +929,32 @@ export const api = {
       .limit(1)
       .maybeSingle();
 
-    const { data, error } = await supabase
-      .from('deals')
-      .select(`
-        *,
-        contact:contacts(name, call_name, phone_number, email, client_memory),
-        owner:team_members(name, avatar)
-      `)
-      .order('created_at', { ascending: false });
+    // Busca paginada: o PostgREST corta em 1000 linhas por padrão — sem
+    // isso, com mais de 1000 deals no banco só os mais recentes voltavam
+    // (escondendo deals antigos que já avançaram no funil, e reintroduzindo
+    // o fallback de "conversa sem deal" pra quem ficasse de fora do corte).
+    const data: any[] = [];
+    let error: any = null;
+    const PAGE_SIZE = 1000;
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data: page, error: pageError } = await supabase
+        .from('deals')
+        .select(`
+          *,
+          contact:contacts(name, call_name, phone_number, email, client_memory),
+          owner:team_members(name, avatar)
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (pageError) {
+        error = pageError;
+        break;
+      }
+      if (!page || page.length === 0) break;
+      data.push(...page);
+      if (page.length < PAGE_SIZE) break;
+    }
 
     if (error) {
       console.error('[API] Error fetching pipeline:', error);
