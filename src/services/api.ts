@@ -937,6 +937,15 @@ export const api = {
     // isso, com mais de 1000 deals no banco só os mais recentes voltavam
     // (escondendo deals antigos que já avançaram no funil, e reintroduzindo
     // o fallback de "conversa sem deal" pra quem ficasse de fora do corte).
+    //
+    // Ordenar só por created_at NÃO BASTA: os 7661 deals do backfill de
+    // contatos sem deal (rodados numa única transação) têm o EXATO mesmo
+    // created_at, até o microssegundo. Com paginação por OFFSET/LIMIT, o
+    // Postgres não garante ordem estável entre linhas empatadas — cada
+    // página podia devolver os empates numa ordem relativa diferente,
+    // fazendo alguns deals somem (nunca aparecem em nenhuma página) ou
+    // dupliquem entre execuções. id como desempate garante ordenação
+    // determinística.
     const data: any[] = [];
     let error: any = null;
     const PAGE_SIZE = 1000;
@@ -949,6 +958,7 @@ export const api = {
           owner:team_members(name, avatar)
         `)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
 
       if (pageError) {
