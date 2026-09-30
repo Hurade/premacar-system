@@ -65,11 +65,28 @@ serve(async (req) => {
         const waitedMs = Date.now() - new Date(lastMsg.sent_at).getTime();
         if (waitedMs < delayMs) continue;
 
-        const { data: contact } = await supabase
-          .from('contacts')
-          .select('name, call_name, phone_number, company')
-          .eq('id', conv.contact_id)
-          .maybeSingle();
+        // Busca com 1 retry: uma falha de rede/timeout na primeira tentativa
+        // não pode virar silenciosamente "Contato"/"não informado" na
+        // notificação — o erro da query nunca era checado antes, então um
+        // hiccup pontual passava batido sem deixar rastro nos logs.
+        let contact: { name: string | null; call_name: string | null; phone_number: string | null; company: string | null } | null = null;
+        for (let attempt = 1; attempt <= 2 && !contact; attempt++) {
+          const { data, error } = await supabase
+            .from('contacts')
+            .select('name, call_name, phone_number, company')
+            .eq('id', conv.contact_id)
+            .maybeSingle();
+          if (error) {
+            console.error(`${TAG} Erro buscando contato ${conv.contact_id} (tentativa ${attempt}):`, error.message);
+          }
+          contact = data;
+          if (!contact && attempt === 1) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        }
+        if (!contact) {
+          console.error(`${TAG} Contato ${conv.contact_id} não encontrado após retry — notificação da conversa ${conv.id} vai sair com dados genéricos`);
+        }
 
         const displayName = contact?.call_name || contact?.name || 'Contato';
         const typeLabel = lastMsg.type === 'audio' ? '🎤 Mensagem de áudio'
@@ -95,10 +112,15 @@ serve(async (req) => {
         );
 
         if (sent) {
-          await supabase
+          const { error: markError } = await supabase
             .from('conversations')
             .update({ follow_me_notified_message_id: lastMsg.id })
             .eq('id', conv.id);
+          if (markError) {
+            // Se isso falhar, a mesma mensagem nunca marca "já avisado" e o
+            // atendente leva o mesmo aviso de novo a cada execução do cron.
+            console.error(`${TAG} Erro ao marcar conversa ${conv.id} como avisada (vai repetir o aviso):`, markError.message);
+          }
           notified++;
           console.log(`${TAG} Avisado ${teamMember.name} sobre conversa ${conv.id}`);
         } else {
