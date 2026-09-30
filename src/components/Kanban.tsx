@@ -101,6 +101,27 @@ const Kanban: React.FC = () => {
     }
   };
 
+  // fetchPipeline() é uma busca cara (milhares de deals com join de contato e
+  // dono) — mudanças reais no banco (novo deal, IA movendo estágio, cliente
+  // respondendo) disparam várias das 3 subscriptions abaixo quase juntas.
+  // Sem debounce, cada uma rodava fetchPipeline() por conta própria; com
+  // volume de mensagens/deals da empresa, isso repetia essa busca pesada
+  // dezenas de vezes por minuto com a tela aberta. Agenda 1 fetch por vez,
+  // reiniciando o timer se outro evento chegar antes de rodar.
+  const pipelineRefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefetchPipeline = () => {
+    if (pipelineRefetchTimer.current) clearTimeout(pipelineRefetchTimer.current);
+    pipelineRefetchTimer.current = setTimeout(async () => {
+      pipelineRefetchTimer.current = null;
+      try {
+        const data = await api.fetchPipeline();
+        setDeals(data);
+      } catch (error) {
+        console.error("Erro ao recarregar pipeline", error);
+      }
+    }, 1500);
+  };
+
   useEffect(() => {
     const loadStages = async () => {
       try {
@@ -145,10 +166,7 @@ const Kanban: React.FC = () => {
           schema: 'public',
           table: 'deals'
         },
-        async () => {
-          const data = await api.fetchPipeline();
-          setDeals(data);
-        }
+        () => scheduleRefetchPipeline()
       )
       .subscribe();
 
@@ -179,10 +197,7 @@ const Kanban: React.FC = () => {
           table: 'conversations',
           filter: 'status=in.(nina,human)'
         },
-        async () => {
-          const data = await api.fetchPipeline();
-          setDeals(data);
-        }
+        () => scheduleRefetchPipeline()
       )
       .subscribe();
 
@@ -190,6 +205,7 @@ const Kanban: React.FC = () => {
       supabase.removeChannel(dealsChannel);
       supabase.removeChannel(stagesChannel);
       supabase.removeChannel(convsChannel);
+      if (pipelineRefetchTimer.current) clearTimeout(pipelineRefetchTimer.current);
     };
   }, []);
 

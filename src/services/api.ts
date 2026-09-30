@@ -924,15 +924,6 @@ export const api = {
    * Fetch pipeline/deals with real data
    */
   fetchPipeline: async (): Promise<Deal[]> => {
-    // Buscar primeiro estágio (usado no filtro JS abaixo)
-    const { data: firstStage } = await supabase
-      .from('pipeline_stages')
-      .select('id')
-      .eq('is_active', true)
-      .order('position', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
     // Busca paginada: o PostgREST corta em 1000 linhas por padrão — sem
     // isso, com mais de 1000 deals no banco só os mais recentes voltavam
     // (escondendo deals antigos que já avançaram no funil, e reintroduzindo
@@ -946,33 +937,52 @@ export const api = {
     // fazendo alguns deals somem (nunca aparecem em nenhuma página) ou
     // dupliquem entre execuções. id como desempate garante ordenação
     // determinística.
-    const data: any[] = [];
-    let error: any = null;
     const PAGE_SIZE = 1000;
-    for (let from = 0; ; from += PAGE_SIZE) {
-      const { data: page, error: pageError } = await supabase
-        .from('deals')
-        .select(`
-          *,
-          contact:contacts(name, call_name, phone_number, email, client_memory),
-          owner:team_members(name, avatar)
-        `)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: true })
-        .range(from, from + PAGE_SIZE - 1);
+    const dealsPageQuery = (from: number) => supabase
+      .from('deals')
+      .select(`
+        *,
+        contact:contacts(name, call_name, phone_number, email, client_memory),
+        owner:team_members(name, avatar)
+      `)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
 
-      if (pageError) {
-        error = pageError;
-        break;
-      }
-      if (!page || page.length === 0) break;
-      data.push(...page);
-      if (page.length < PAGE_SIZE) break;
+    // Estágio inicial (filtro JS abaixo), contagem total (pra saber quantas
+    // páginas existem) e a 1ª página de deals — em paralelo em vez de 3
+    // buscas em sequência, já que nenhuma depende do resultado da outra.
+    const [firstStageResult, countResult, firstPageResult] = await Promise.all([
+      supabase.from('pipeline_stages').select('id').eq('is_active', true).order('position', { ascending: true }).limit(1).maybeSingle(),
+      supabase.from('deals').select('id', { count: 'exact', head: true }),
+      dealsPageQuery(0)
+    ]);
+
+    const firstStage = firstStageResult.data;
+
+    if (firstPageResult.error) {
+      console.error('[API] Error fetching pipeline:', firstPageResult.error);
+      return [];
     }
 
-    if (error) {
-      console.error('[API] Error fetching pipeline:', error);
-      return [];
+    const data: any[] = [...(firstPageResult.data || [])];
+    const totalCount = countResult.count ?? data.length;
+
+    // Páginas restantes (se houver) buscadas todas em paralelo — antes era
+    // 1 round-trip de rede por página, em sequência, o maior contribuinte
+    // pro tempo de carregamento do Pipeline com milhares de deals.
+    if (totalCount > PAGE_SIZE && data.length === PAGE_SIZE) {
+      const remainingFroms: number[] = [];
+      for (let from = PAGE_SIZE; from < totalCount; from += PAGE_SIZE) remainingFroms.push(from);
+
+      const remainingPages = await Promise.all(remainingFroms.map(from => dealsPageQuery(from)));
+      for (const page of remainingPages) {
+        if (page.error) {
+          console.error('[API] Error fetching pipeline page:', page.error);
+          continue;
+        }
+        if (page.data) data.push(...page.data);
+      }
     }
 
     // Buscar conversations para cada deal com contact_id (incluindo status ativo e última mensagem)
@@ -1077,15 +1087,8 @@ export const api = {
     });
 
     if (orphanConvs.length > 0) {
-      // Filtrar is_active=true para garantir que o ID corresponde ao primeiro stage ativo do Kanban
-      const { data: firstStage } = await supabase
-        .from('pipeline_stages')
-        .select('id, title')
-        .eq('is_active', true)
-        .order('position', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
+      // firstStage já foi buscado no início da função — reaproveita em vez
+      // de repetir a mesma query de novo aqui.
       for (const conv of orphanConvs) {
         const contact = conv.contact as any;
         finalDeals.push({
