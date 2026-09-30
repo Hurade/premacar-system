@@ -65,7 +65,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager, teamMemberId } = useUserRole();
   const canSupervise = isAdmin || isManager;
@@ -249,9 +249,18 @@ const ChatInterface: React.FC = () => {
         searchParams.delete('conversation');
         setSearchParams(searchParams, { replace: true });
       } else if (!loading && refetchedForConvParam.current !== conversationParam) {
-        // Conversa não está na lista ainda (ex: acabou de ser reaberta) — refetch uma vez
+        // Conversa não está na lista ainda. Pode ser só uma reabertura recente
+        // (refetch resolve) OU um link direto (ex: "Ver Conversa Completa" no
+        // Pipeline) pra uma conversa de disparo sem resposta do cliente — essas
+        // ficam de fora da lista normal do Chat de propósito, então um refetch
+        // comum nunca a encontra. Busca essa conversa específica direto,
+        // ignorando esse filtro (o pedido de ver ela é explícito).
         refetchedForConvParam.current = conversationParam;
-        refetch();
+        fetchAndAddConversation(conversationParam, true).then((found) => {
+          if (!found) {
+            toast.error('Conversa não encontrada');
+          }
+        });
       }
     } else if (newContactParam && !isCreatingConversation && !showNewConversationModal) {
       // Não cria a conversa direto — abre o modal "Nova Conversa" já com o
@@ -287,7 +296,7 @@ const ChatInterface: React.FC = () => {
       })();
     }
     // Removido: auto-seleção do primeiro chat ao entrar na página
-  }, [conversations, loading, selectedChatId, searchParams, setSearchParams, isCreatingConversation, showNewConversationModal, refetch]);
+  }, [conversations, loading, selectedChatId, searchParams, setSearchParams, isCreatingConversation, showNewConversationModal, refetch, fetchAndAddConversation]);
 
   // Mark as read when selecting conversation
   useEffect(() => {

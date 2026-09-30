@@ -102,48 +102,55 @@ export function useConversations() {
     return false;
   }, []);
 
-  // Fetch a single conversation and add it to state
-  const fetchAndAddConversation = useCallback(async (conversationId: string) => {
+  // Fetch a single conversation and add it to state. `bypassDispatchFilter`
+  // ignora o filtro "disparo sem resposta" — usado quando o usuário pediu
+  // explicitamente por ESSA conversa via link direto (ex: "Ver Conversa
+  // Completa" no Pipeline), caso em que a intenção de ver é explícita mesmo
+  // que o cliente nunca tenha respondido o disparo.
+  const fetchAndAddConversation = useCallback(async (conversationId: string, bypassDispatchFilter = false): Promise<boolean> => {
     // Prevent duplicate fetches
     if (fetchingConversationIds.current.has(conversationId)) {
       console.log('[Realtime] Already fetching conversation:', conversationId);
-      return;
+      return true;
     }
-    
+
     fetchingConversationIds.current.add(conversationId);
     console.log('[Realtime] 🔍 Fetching new conversation:', conversationId);
-    
+
     try {
       const { data: convData, error: convError } = await supabase
         .from('conversations')
         .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
         .eq('id', conversationId)
         .maybeSingle();
-      
+
       if (convError || !convData) {
         console.error('[Realtime] Error fetching conversation:', convError);
-        return;
+        return false;
       }
 
       // Filtro de disparo: só adiciona ao Chat se tiver resposta do cliente
-      const include = await shouldIncludeInChat(conversationId, convData.dispatch_sent_at);
-      if (!include) return;
-      
+      // (a menos que o pedido seja explícito, via link direto)
+      if (!bypassDispatchFilter) {
+        const include = await shouldIncludeInChat(conversationId, convData.dispatch_sent_at);
+        if (!include) return false;
+      }
+
       const { data: messages, error: msgError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
         .order('sent_at', { ascending: true });
-      
+
       if (msgError) {
         console.error('[Realtime] Error fetching messages:', msgError);
       }
-      
+
       const uiConversation = transformDBToUIConversation(
         convData as unknown as DBConversation,
         (messages || []) as DBMessage[]
       );
-      
+
       // Add new conversation to state (at top, sorted by recency)
       setConversations(prev => {
         // Check if already added by another event
@@ -154,12 +161,14 @@ export function useConversations() {
         console.log('[Realtime] ✅ Adding new conversation to state:', uiConversation.id);
         return [uiConversation, ...prev];
       });
-      
+
       // Mark messages as processed
       (messages || []).forEach(m => processedMessageIds.current.add(m.id));
-      
+      return true;
+
     } catch (err) {
       console.error('[Realtime] Error in fetchAndAddConversation:', err);
+      return false;
     } finally {
       fetchingConversationIds.current.delete(conversationId);
     }
@@ -1043,6 +1052,7 @@ export function useConversations() {
     deleteConversation,
     deleteMessage,
     createConversation,
-    refetch: fetchConversations
+    refetch: fetchConversations,
+    fetchAndAddConversation
   };
 }
