@@ -69,11 +69,18 @@ serve(async (req) => {
         // não pode virar silenciosamente "Contato"/"não informado" na
         // notificação — o erro da query nunca era checado antes, então um
         // hiccup pontual passava batido sem deixar rastro nos logs.
-        let contact: { name: string | null; call_name: string | null; phone_number: string | null; company: string | null } | null = null;
+        //
+        // Causa raiz real do "Contato"/"não informado" (achada invocando a
+        // function manualmente e capturando o erro real no retorno): esse
+        // select pedia `contacts.company`, coluna que nunca existiu —
+        // contacts usa `oficina`. Toda chamada batia nesse erro 42703
+        // ("column does not exist"), 100% das vezes, pra qualquer contato —
+        // por isso o retry sozinho não resolvia nada.
+        let contact: { name: string | null; call_name: string | null; phone_number: string | null; oficina: string | null } | null = null;
         for (let attempt = 1; attempt <= 2 && !contact; attempt++) {
           const { data, error } = await supabase
             .from('contacts')
-            .select('name, call_name, phone_number, company')
+            .select('name, call_name, phone_number, oficina')
             .eq('id', conv.contact_id)
             .maybeSingle();
           if (error) {
@@ -99,7 +106,7 @@ serve(async (req) => {
         const waitedMin = Math.max(1, Math.round(waitedMs / 60000));
 
         const notifMessage = `👋 *Siga-me*\n\n` +
-          `👤 *Cliente:* ${displayName}${contact?.company ? ` (${contact.company})` : ''}\n` +
+          `👤 *Cliente:* ${displayName}${contact?.oficina ? ` (${contact.oficina})` : ''}\n` +
           `📱 *Telefone:* ${contact?.phone_number || 'não informado'}\n\n` +
           `💬 *Sem resposta há ${waitedMin} min:*\n${contentPreview}\n\n` +
           `_Responda assim que possível — esse aviso não se repete pra essa mesma mensagem._`;
