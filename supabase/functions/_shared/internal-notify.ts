@@ -1,30 +1,30 @@
 import { resolveSendCredentials } from "./connection-resolver.ts";
 
-// Envia um texto simples via a conexão de origem da conversa (Evolution ou
-// Meta, conforme resolveSendCredentials) — usado para avisos internos ao
-// atendente (transferência, "Siga-me"), não passa pelo send_queue porque
-// não é uma mensagem do atendimento, é um aviso pro atendente.
+// Avisos internos ao atendente (transferência, "Siga-me") SEMPRE pela
+// Evolution, nunca pela conexão de origem da conversa do cliente — mesmo
+// quando essa conversa é via Meta API oficial. A Meta só entrega mensagem
+// livre pra quem mandou mensagem pro número nas últimas 24h, e o atendente
+// notificado quase nunca cumpre essa janela (ele não é o cliente), então o
+// aviso falhava silenciosamente sempre que a conversa era via Meta. Não
+// passa pelo send_queue porque não é uma mensagem do atendimento, é um
+// aviso pro atendente.
 export async function sendInternalNotification(
   supabase: any,
-  connectionId: string | null,
   toPhone: string,
   text: string
 ): Promise<boolean> {
   try {
-    const creds = await resolveSendCredentials(supabase, { connectionId, apiSource: 'evolution' });
-    const cleanPhone = toPhone.replace(/\D/g, '');
+    const { data: evolutionConn } = await supabase
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('api_type', 'evolution')
+      .eq('is_active', true)
+      .order('is_connected', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (creds.api_type === 'meta') {
-      const response = await fetch(`https://graph.facebook.com/v18.0/${creds.meta_phone_number_id}/messages`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${creds.meta_access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp', recipient_type: 'individual', to: cleanPhone,
-          type: 'text', text: { body: text },
-        }),
-      });
-      return response.ok;
-    }
+    const creds = await resolveSendCredentials(supabase, { connectionId: evolutionConn?.id ?? null, apiSource: 'evolution' });
+    const cleanPhone = toPhone.replace(/\D/g, '');
 
     const baseUrl = (creds.evolution_api_url || '').replace(/\/$/, '');
     const response = await fetch(`${baseUrl}/message/sendText/${creds.evolution_instance_name}`, {

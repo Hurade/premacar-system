@@ -757,7 +757,7 @@ _A conversa já está em modo humano no sistema._`;
     let notified = 0;
     for (const recipient of recipients) {
       try {
-        const sent = await sendInternalNotification(supabase, conversation.connection_id ?? null, recipient.notification_phone, notifMessage);
+        const sent = await sendInternalNotification(supabase, recipient.notification_phone, notifMessage);
         if (sent) notified++;
       } catch (err) {
         console.error(`[Nina] Falha ao notificar ${recipient.name}:`, err);

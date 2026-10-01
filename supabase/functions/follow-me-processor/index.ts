@@ -113,7 +113,6 @@ serve(async (req) => {
 
         const sent = await sendInternalNotification(
           supabase,
-          conv.connection_id ?? null,
           teamMember.notification_phone,
           notifMessage
         );
