@@ -275,7 +275,7 @@ export const MetaTemplatesManager: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!template.meta_template_id && (
+                  {(!template.meta_template_id || template.status === 'rejected' || template.submission_error) && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -288,7 +288,7 @@ export const MetaTemplatesManager: React.FC = () => {
                       ) : (
                         <Send className="w-4 h-4 mr-1" />
                       )}
-                      {template.submission_error ? 'Reenviar pra Meta' : 'Enviar pra Meta'}
+                      {template.meta_template_id ? 'Reenviar pra Meta' : 'Enviar pra Meta'}
                     </Button>
                   )}
                   {template.status === 'pending' && (
