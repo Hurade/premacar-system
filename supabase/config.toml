@@ -41,6 +41,12 @@ verify_jwt = false
 [functions.voice-call-twiml]
 verify_jwt = false
 
+# check-meta-template-status: só chamada via pg_cron (Bearer anon key, sem
+# JWT de usuário) — mesmo padrão do follow-me-processor/recurring-campaign-
+# processor.
+[functions.check-meta-template-status]
+verify_jwt = false
+
 # make-voice-call: verify_jwt removido (Fase 3.2) — a função estava pública
 # sem autenticação, permitindo disparar ligações reais no Twilio sem login.
 # O único chamador legítimo (recurring-campaign-processor) já envia
