@@ -17,6 +17,8 @@ export interface MetaTemplate {
   parameters_mapping: Array<{ index: number; field: string }>;
   approved_at: string | null;
   rejected_reason: string | null;
+  meta_template_id: string | null;
+  submission_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -203,6 +205,43 @@ export function useApproveMetaTemplate() {
     },
     onError: (error: Error) => {
       toast.error(`Erro ao aprovar template: ${error.message}`);
+    },
+  });
+}
+
+// Envia o template pra aprovação de verdade da Meta (Graph API, nível da
+// WABA) e atualiza o registro local com o retorno (meta_template_id,
+// status real, ou o erro de envio).
+export interface SubmitMetaTemplateResult {
+  success: boolean;
+  error?: string;
+  metaTemplateId?: string;
+  metaStatus?: string;
+  metaCategory?: string;
+}
+
+export function useSubmitMetaTemplate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (templateId: string): Promise<SubmitMetaTemplateResult> => {
+      const { data, error } = await supabase.functions.invoke('submit-meta-template', {
+        body: { templateId }
+      });
+
+      if (error) throw error;
+      return data as SubmitMetaTemplateResult;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['meta-templates'] });
+      if (data.success) {
+        toast.success(`Enviado para a Meta! Status: ${data.metaStatus || 'PENDING'}`);
+      } else {
+        toast.error(`Meta recusou o template: ${data.error}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao enviar template para a Meta: ${error.message}`);
     },
   });
 }

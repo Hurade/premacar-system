@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  useMetaTemplates, 
-  useCreateMetaTemplate, 
-  useUpdateMetaTemplate, 
+import {
+  useMetaTemplates,
+  useCreateMetaTemplate,
+  useUpdateMetaTemplate,
   useDeleteMetaTemplate,
   useApproveMetaTemplate,
-  MetaTemplate 
+  useSubmitMetaTemplate,
+  MetaTemplate
 } from '@/hooks/useMetaTemplates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +89,7 @@ export const MetaTemplatesManager: React.FC = () => {
   const updateTemplate = useUpdateMetaTemplate();
   const deleteTemplate = useDeleteMetaTemplate();
   const approveTemplate = useApproveMetaTemplate();
+  const submitTemplate = useSubmitMetaTemplate();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MetaTemplate | null>(null);
@@ -160,11 +162,18 @@ export const MetaTemplatesManager: React.FC = () => {
     if (editingTemplate) {
       await updateTemplate.mutateAsync({ id: editingTemplate.id, ...templateData });
     } else {
-      await createTemplate.mutateAsync(templateData);
+      const created = await createTemplate.mutateAsync(templateData);
+      // Cadastrar localmente não bastava — precisa mandar pra Meta de
+      // verdade pra entrar na fila de aprovação deles.
+      submitTemplate.mutate(created.id);
     }
 
     setIsDialogOpen(false);
     setFormData(defaultFormData);
+  };
+
+  const handleSubmitToMeta = (id: string) => {
+    submitTemplate.mutate(id);
   };
 
   const handleDelete = (id: string) => {
@@ -206,10 +215,10 @@ export const MetaTemplatesManager: React.FC = () => {
         <div className="text-sm text-blue-300">
           <p className="font-medium mb-1">Importante sobre Templates da Meta</p>
           <ul className="list-disc list-inside space-y-1 text-blue-300/80">
-            <li>Templates devem ser criados e aprovados no <strong>Meta Business Suite</strong> antes de usar aqui</li>
-            <li>O nome técnico deve ser <strong>exatamente igual</strong> ao cadastrado no Meta</li>
+            <li>Ao salvar um template novo, ele já é enviado automaticamente pra aprovação da Meta</li>
             <li>Use variáveis como <code className="bg-blue-500/20 px-1 rounded">{"{{1}}"}</code>, <code className="bg-blue-500/20 px-1 rounded">{"{{2}}"}</code> no texto</li>
-            <li>Após cadastrar, marque como "Aprovado" quando o template for aprovado pela Meta</li>
+            <li>A aprovação da Meta é assíncrona (pode levar algumas horas) — quando sair, marque como "Aprovado" aqui</li>
+            <li>Se a Meta recusar de cara (nome duplicado, formato inválido), o erro aparece no card do template</li>
           </ul>
         </div>
       </div>
@@ -257,13 +266,35 @@ export const MetaTemplatesManager: React.FC = () => {
                       {' • '}
                       {template.parameters_count} parâmetros
                     </p>
+                    {template.submission_error && (
+                      <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                        Meta recusou o envio: {template.submission_error}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {!template.meta_template_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-400"
+                      disabled={submitTemplate.isPending}
+                      onClick={(e) => { e.stopPropagation(); handleSubmitToMeta(template.id); }}
+                    >
+                      {submitTemplate.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-1" />
+                      )}
+                      {template.submission_error ? 'Reenviar pra Meta' : 'Enviar pra Meta'}
+                    </Button>
+                  )}
                   {template.status === 'pending' && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-green-400"
                       onClick={(e) => { e.stopPropagation(); handleApprove(template.id); }}
                     >
@@ -305,6 +336,12 @@ export const MetaTemplatesManager: React.FC = () => {
 
               {expandedTemplate === template.id && (
                 <div className="px-4 pb-4 space-y-3 border-t border-border/50 pt-3">
+                  {template.meta_template_id && (
+                    <div className="bg-secondary/30 rounded-lg p-3">
+                      <span className="text-xs text-muted-foreground mb-1 block">ID na Meta</span>
+                      <p className="text-sm text-foreground font-mono">{template.meta_template_id}</p>
+                    </div>
+                  )}
                   {template.header_text && (
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <span className="text-xs text-muted-foreground mb-1 block">Cabeçalho</span>
@@ -348,7 +385,9 @@ export const MetaTemplatesManager: React.FC = () => {
               {editingTemplate ? 'Editar Template Meta' : 'Novo Template Meta'}
             </DialogTitle>
             <DialogDescription>
-              Cadastre o template exatamente como foi criado no Meta Business Suite
+              {editingTemplate
+                ? 'Isso atualiza só o registro local — a Meta não permite editar um template já enviado, então mudanças aqui não refletem lá.'
+                : 'Ao salvar, o template já é enviado automaticamente pra aprovação da Meta.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -363,7 +402,7 @@ export const MetaTemplatesManager: React.FC = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Deve ser exatamente igual ao cadastrado no Meta
+                  Só letras minúsculas, números e underline — vira o nome oficial na Meta, não dá pra mudar depois de enviado
                 </p>
               </div>
               <div className="space-y-2">
@@ -500,7 +539,7 @@ export const MetaTemplatesManager: React.FC = () => {
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
               <Save className="w-4 h-4" />
-              Salvar Template
+              {editingTemplate ? 'Salvar Template' : 'Salvar e Enviar pra Meta'}
             </Button>
           </DialogFooter>
         </DialogContent>
