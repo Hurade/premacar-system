@@ -689,9 +689,12 @@ async function transferToHuman(
   try {
     let contact = conversation.contact ?? null;
     if (!contact && conversation.contact_id) {
+      // oficina, não company — contacts não tem coluna "company" (mesmo
+      // engano já visto e corrigido no follow-me-processor: select
+      // quebrava com 42703 sempre que esse fallback precisava rodar).
       const { data: freshContact } = await supabase
         .from('contacts')
-        .select('name, call_name, phone_number, company, tags')
+        .select('name, call_name, phone_number, oficina, tags')
         .eq('id', conversation.contact_id)
         .maybeSingle();
       contact = freshContact;
@@ -742,7 +745,7 @@ async function transferToHuman(
     const notifMessage = `🔔 *Nova conversa transferida — ${queueName}*
 
 👤 *Cliente:* ${displayName || 'Sem nome'}
-📱 *Telefone:* ${displayPhone || 'Não informado'}${contact?.company ? `\n🏢 *Empresa:* ${contact.company}` : ''}
+📱 *Telefone:* ${displayPhone || 'Não informado'}${contact?.oficina ? `\n🏢 *Oficina:* ${contact.oficina}` : ''}
 ${args.origem ? `\n📊 *Origem:* ${args.origem}` : ''}
 
 📋 *Contexto:*
