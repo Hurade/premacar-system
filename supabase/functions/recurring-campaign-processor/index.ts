@@ -69,6 +69,16 @@ serve(async (req) => {
       const flowConfig = campaign.flow_config as Record<string, any>;
       const now2 = new Date();
 
+      // scheduled_start: campanha só começa a processar contatos a partir
+      // dessa data/hora, não importa quando foi ativada nem quando os
+      // contatos entraram (campaign_contacts.created_at pode ser muito
+      // antes). Sem isso, não havia como agendar o "dia 1" pra uma data
+      // específica no calendário — coluna existia mas nunca era lida aqui.
+      if (campaign.scheduled_start && new Date(campaign.scheduled_start) > now2) {
+        results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "scheduled_start_not_reached" });
+        continue;
+      }
+
       // ── Paginação anti-ban (portado do campaign-processor/Disparos) ──
       // anti_ban_enabled nasce false: campanhas já existentes (poucos
       // contatos/dia) continuam disparando na hora, sem esses gates.
@@ -180,6 +190,17 @@ serve(async (req) => {
       let failedCount = 0;
       let whatsappSentThisTick = false;
       let sentTodayDelta = 0;
+      // E-mail não tinha NENHUM limite por execução (só WhatsApp tem, via
+      // whatsappSentThisTick) — com scheduled_start liberando centenas/
+      // milhares de contatos de uma vez no mesmo "dia 1", a primeira
+      // execução depois do horário agendado tentava mandar todos os
+      // e-mails na mesma invocação (risco de estourar limite de taxa do
+      // SES e parecer disparo em massa pra reputação do remetente). Sem o
+      // anti-ban do WhatsApp (não há risco de bloqueio de número), um teto
+      // mais alto por execução já resolve, espalhando o envio ao longo de
+      // ~1h em vez de uma rajada só.
+      let emailsSentThisTick = 0;
+      const EMAIL_PER_TICK_CAP = 25;
 
       for (const cc of contacts) {
         const dayKey = `day${cc.current_day}`;
@@ -286,6 +307,11 @@ serve(async (req) => {
           continue;
         }
 
+        if (dayConfig.type === "email" && emailsSentThisTick >= EMAIL_PER_TICK_CAP) {
+          console.log(`[recurring-processor] Limite de ${EMAIL_PER_TICK_CAP} e-mails desta execução atingido para "${campaign.name}", contato ${cc.contact_id} fica pra próxima`);
+          continue;
+        }
+
         const contactName = contact.name || contact.call_name || "Cliente";
         let sendResult = { success: false, error: "" };
         let selectedVariation: (CampaignVariationLike & { meta_template_id: string | null }) | null = null;
@@ -293,6 +319,7 @@ serve(async (req) => {
         try {
           if (dayConfig.type === "email") {
             sendResult = await sendEmail(contact, dayConfig, integrationSettings);
+            if (sendResult.success) emailsSentThisTick++;
           } else if (dayConfig.type === "whatsapp") {
             // Resolve credenciais via shared resolver (mesmo que campaign-processor/Disparos usa)
             // Prefere Meta; se Meta não configurado, tenta Evolution
@@ -529,7 +556,12 @@ async function sendEmail(
   }
 
   const config = dayConfig.config || {};
-  const subject = (config.subject || "Campanha")
+  // subject_options: teste A/B simples (50/50 por contato) — se presente,
+  // sorteia 1 dos assuntos a cada envio; senão usa o subject único de sempre.
+  const rawSubject = Array.isArray(config.subject_options) && config.subject_options.length > 0
+    ? config.subject_options[Math.floor(Math.random() * config.subject_options.length)]
+    : (config.subject || "Campanha");
+  const subject = rawSubject
     .replace(/\{\{nome\}\}/g, contact.name || contact.call_name || "Cliente")
     .replace(/\{\{empresa\}\}/g, contact.oficina || "");
 
@@ -546,7 +578,9 @@ async function sendEmail(
   const accessKeyId = settings.aws_access_key_id;
   const secretAccessKey = settings.aws_secret_access_key;
   const fromEmail = settings.aws_ses_email_from;
-  const fromName = settings.aws_ses_email_from_name || "PremaCar";
+  // from_name por dia/campanha (ex: "Marco - Prema") sobrepõe o nome de
+  // exibição global — o endereço de envio (verificado no SES) nunca muda.
+  const fromName = config.from_name || settings.aws_ses_email_from_name || "PremaCar";
 
   if (!accessKeyId || !secretAccessKey || !fromEmail) {
     return { success: false, error: "Credenciais AWS SES incompletas" };
@@ -691,10 +725,17 @@ async function sendWhatsApp(
 
       const components: any[] = [];
       if (template.parameters_count > 0) {
-        const mapping = (template.parameters_mapping as Record<string, string>) || {};
+        // parameters_mapping é salvo como array [{index, field}], não um
+        // objeto {"1": "field"} — mapping["1"] num array acessava o
+        // elemento de ÍNDICE 1 (segundo item), não o item com index===1,
+        // então templates com mais de 1 variável ou com a 1ª variável
+        // mapeada pra algo diferente de "nome" mandavam o valor errado
+        // (só "funcionava" em templates de 1 variável = nome, por
+        // coincidência do fallback pro próprio nome do contato).
+        const mapping = (template.parameters_mapping as Array<{ index: number; field: string }>) || [];
         const params: any[] = [];
         for (let i = 1; i <= template.parameters_count; i++) {
-          const paramKey = mapping[`${i}`] || mapping[String(i)] || "";
+          const paramKey = mapping.find((m) => m.index === i)?.field || "";
           let value = contactName;
           if (paramKey === "empresa" || paramKey === "company") value = contact.oficina || "sua empresa";
           else if (paramKey === "telefone" || paramKey === "phone") value = contact.phone_number;
