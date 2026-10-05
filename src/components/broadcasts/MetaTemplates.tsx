@@ -60,6 +60,7 @@ interface TemplateFormData {
   header_text: string;
   footer_text: string;
   parameters_mapping: Array<{ index: number; field: string }>;
+  quick_reply_button: string;
 }
 
 const defaultFormData: TemplateFormData = {
@@ -71,6 +72,7 @@ const defaultFormData: TemplateFormData = {
   header_text: '',
   footer_text: '',
   parameters_mapping: [],
+  quick_reply_button: '',
 };
 
 const fieldOptions = [
@@ -113,6 +115,7 @@ export const MetaTemplatesManager: React.FC = () => {
       header_text: template.header_text || '',
       footer_text: template.footer_text || '',
       parameters_mapping: template.parameters_mapping || [],
+      quick_reply_button: template.quick_reply_button || '',
     });
     setIsDialogOpen(true);
   };
@@ -157,6 +160,7 @@ export const MetaTemplatesManager: React.FC = () => {
       header_text: formData.header_text.trim() || null,
       footer_text: formData.footer_text.trim() || null,
       parameters_mapping: formData.parameters_mapping,
+      quick_reply_button: formData.quick_reply_button.trim() || null,
     };
 
     if (editingTemplate) {
@@ -358,6 +362,12 @@ export const MetaTemplatesManager: React.FC = () => {
                       <p className="text-sm text-foreground">{template.footer_text}</p>
                     </div>
                   )}
+                  {template.quick_reply_button && (
+                    <div className="bg-secondary/30 rounded-lg p-3">
+                      <span className="text-xs text-muted-foreground mb-1 block">Botão de resposta rápida</span>
+                      <p className="text-sm text-foreground">{template.quick_reply_button}</p>
+                    </div>
+                  )}
                   {template.parameters_mapping && template.parameters_mapping.length > 0 && (
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <span className="text-xs text-muted-foreground mb-2 block">Mapeamento de Variáveis</span>
@@ -485,6 +495,19 @@ export const MetaTemplatesManager: React.FC = () => {
                 value={formData.footer_text}
                 onChange={(e) => setFormData(prev => ({ ...prev, footer_text: e.target.value }))}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quick_reply_button">Botão de resposta rápida (opcional)</Label>
+              <Input
+                id="quick_reply_button"
+                placeholder="Ex: Não tenho interesse"
+                value={formData.quick_reply_button}
+                onChange={(e) => setFormData(prev => ({ ...prev, quick_reply_button: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Só o texto exato "Não tenho interesse" tem resposta automática e opt-out configurados hoje. Outro texto aqui vira um botão de verdade no WhatsApp, mas o clique entra como mensagem normal (sem resposta automática nem opt-out).
+              </p>
             </div>
 
             {/* Parameters Mapping */}

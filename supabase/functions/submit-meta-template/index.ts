@@ -93,6 +93,13 @@ serve(async (req) => {
       components.push({ type: "FOOTER", text: template.footer_text });
     }
 
+    if (template.quick_reply_button) {
+      components.push({
+        type: "BUTTONS",
+        buttons: [{ type: "QUICK_REPLY", text: template.quick_reply_button }],
+      });
+    }
+
     // Template que já tem meta_template_id (enviado antes, aprovado ou
     // rejeitado) precisa usar o endpoint de EDIÇÃO (POST /{template-id},
     // só components/category) — a Meta recusa criar de novo com o mesmo

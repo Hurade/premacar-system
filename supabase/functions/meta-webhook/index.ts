@@ -743,6 +743,50 @@ async function processMetaWebhookAsync(
         }
 
         // ═══════════════════════════════════════════
+        // 4c. BOTÃO DE OPT-OUT ("Não tenho interesse") DE TEMPLATE DE CAMPANHA
+        // ═══════════════════════════════════════════
+        // Clique nesse quick-reply chega como mensagem tipo 'button' — texto
+        // igual ao configurado no template. Responde direto (sem IA), bota
+        // o telefone na blacklist (campaign_blacklist já é checada por
+        // qualquer campanha, atual e futura) e não processa mais nada desta
+        // mensagem.
+        if (messageType === 'button' && message.button?.text === 'Não tenho interesse') {
+          console.log('[Meta Async] 🙅 Opt-out via botão de template:', contact.id);
+
+          const optOutText = `Tudo certo, ${contact.call_name || contact.name || ''}. Você não vai mais receber mensagens desta campanha. Se um dia quiser voltar, é só chamar aqui.`.replace('  ', ' ');
+
+          try {
+            await fetch(`https://graph.facebook.com/v21.0/${metaSettings.meta_phone_number_id}/messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${metaSettings.meta_access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: phoneNumber,
+                type: 'text',
+                text: { body: optOutText },
+              }),
+            });
+          } catch (optOutSendError) {
+            console.error('[Meta Async] ❌ Erro ao enviar confirmação de opt-out:', optOutSendError);
+          }
+
+          if (contact.user_id) {
+            await supabase
+              .from('campaign_blacklist')
+              .upsert(
+                { user_id: contact.user_id, phone: contact.phone_number, reason: 'Opt-out via botão "Não tenho interesse" em template de campanha' },
+                { onConflict: 'user_id,phone' }
+              );
+          }
+
+          continue;
+        }
+
+        // ═══════════════════════════════════════════
         // 5. ATUALIZAR CONVERSA
         // ═══════════════════════════════════════════
         await supabase

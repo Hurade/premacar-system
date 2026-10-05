@@ -19,6 +19,7 @@ export interface MetaTemplate {
   rejected_reason: string | null;
   meta_template_id: string | null;
   submission_error: string | null;
+  quick_reply_button: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +35,7 @@ export interface MetaTemplateInsert {
   footer_text?: string | null;
   parameters_count?: number;
   parameters_mapping?: Array<{ index: number; field: string }>;
+  quick_reply_button?: string | null;
 }
 
 // Fetch all meta templates
@@ -99,6 +101,7 @@ export function useCreateMetaTemplate() {
           footer_text: template.footer_text || null,
           parameters_count: parametersCount,
           parameters_mapping: template.parameters_mapping || [],
+          quick_reply_button: template.quick_reply_button || null,
         })
         .select()
         .single();

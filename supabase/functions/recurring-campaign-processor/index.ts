@@ -262,7 +262,7 @@ serve(async (req) => {
         // Get contact details
         const { data: contact } = await supabase
           .from("contacts")
-          .select("id, name, call_name, phone_number, email, oficina, is_blocked")
+          .select("id, name, call_name, phone_number, email, oficina, is_blocked, tags")
           .eq("id", cc.contact_id)
           .single();
 
@@ -278,6 +278,26 @@ serve(async (req) => {
             .from("campaign_contacts")
             .update({ status: "cancelled" })
             .eq("id", cc.id);
+          continue;
+        }
+
+        // Tag "Free" (aplicada manualmente quando o contato cria conta no
+        // plano Free) para a cadência — não tem webhook do produto Free
+        // avisando o CRM de cadastro, essa tag é o jeito combinado de
+        // registrar isso e interromper os envios.
+        if (Array.isArray(contact.tags) && contact.tags.includes("Free")) {
+          console.log(`[recurring-processor] Contato com tag "Free", parando cadência (sucesso): ${contact.id}`);
+          await supabase
+            .from("campaign_contacts")
+            .update({
+              status: "success",
+              success_at: new Date().toISOString(),
+              completed_at: new Date().toISOString(),
+              metadata: { ...(cc.metadata || {}), stopped_reason: "tag_free" },
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq("id", cc.id);
+          sentCount++;
           continue;
         }
 
