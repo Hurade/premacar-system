@@ -597,9 +597,12 @@ async function sendEmail(
   const region = settings.aws_region || "us-east-1";
   const accessKeyId = settings.aws_access_key_id;
   const secretAccessKey = settings.aws_secret_access_key;
-  const fromEmail = settings.aws_ses_email_from;
+  // from_email por dia/campanha sobrepõe o remetente global — só funciona
+  // se o endereço (ou o domínio inteiro) já estiver verificado no SES,
+  // senão a AWS recusa o envio.
+  const fromEmail = config.from_email || settings.aws_ses_email_from;
   // from_name por dia/campanha (ex: "Marco - Prema") sobrepõe o nome de
-  // exibição global — o endereço de envio (verificado no SES) nunca muda.
+  // exibição global.
   const fromName = config.from_name || settings.aws_ses_email_from_name || "PremaCar";
 
   if (!accessKeyId || !secretAccessKey || !fromEmail) {
