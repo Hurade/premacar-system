@@ -105,6 +105,29 @@ const transferToHumanTool = {
   }
 };
 
+// Só para agentes de campanha (trigger_type='campaign') — o cliente disse
+// que não quer mais receber mensagens, ou que o número não é mais dele /
+// é de outra pessoa. Sem essa ferramenta, a IA só prometia parar no texto
+// e nada parava de verdade (nem blacklist, nem a campanha era cancelada).
+const stopCampaignContactTool = {
+  type: "function",
+  function: {
+    name: "stop_campaign_contact",
+    description: "Parar esta campanha para o contato. Chamar assim que identificar qualquer um dos dois casos, mesmo sem precisar confirmar: cliente pediu pra parar/disse que não tem interesse, OU o número não é mais dele / é de outra pessoa.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          enum: ["not_interested", "wrong_number"],
+          description: "not_interested: cliente pediu pra parar ou disse que não tem interesse (é o lead, só não quer mais contato). wrong_number: número mudou de dono ou é de outra pessoa (não é o lead procurado)."
+        }
+      },
+      required: ["reason"]
+    }
+  }
+};
+
 // ═══════════════════════════════════════════
 // AGENT SELECTION: campanha > fila > padrão
 //
@@ -772,6 +795,65 @@ _A conversa já está em modo humano no sistema._`;
 }
 
 
+async function stopCampaignContact(
+  supabase: any,
+  conversation: any,
+  args: { reason: "not_interested" | "wrong_number" }
+): Promise<{ success: boolean; error?: string }> {
+  console.log('[Nina] Stop campaign contact requested:', args);
+
+  try {
+    if (!conversation.campaign_id || !conversation.contact_id) {
+      return { success: false, error: 'no_campaign' };
+    }
+
+    let contact = conversation.contact ?? null;
+    if (!contact) {
+      const { data: freshContact } = await supabase
+        .from('contacts')
+        .select('phone_number, tags')
+        .eq('id', conversation.contact_id)
+        .maybeSingle();
+      contact = freshContact;
+    }
+
+    // Blacklist global do telefone: nos dois casos (não quer mais contato,
+    // ou o número nem é do lead procurado) nenhuma campanha futura deve
+    // tentar esse número de novo.
+    const { data: campaign } = await supabase
+      .from('recurring_campaigns')
+      .select('user_id')
+      .eq('id', conversation.campaign_id)
+      .maybeSingle();
+
+    if (campaign?.user_id && contact?.phone_number) {
+      await supabase
+        .from('campaign_blacklist')
+        .upsert(
+          { user_id: campaign.user_id, phone: contact.phone_number },
+          { onConflict: 'user_id,phone', ignoreDuplicates: true }
+        );
+    }
+
+    const tag = args.reason === 'wrong_number' ? 'Numero Invalido' : 'Nao Interessado';
+    const currentTags: string[] = contact?.tags || [];
+    if (!currentTags.includes(tag)) {
+      await supabase.from('contacts').update({ tags: [...currentTags, tag] }).eq('id', conversation.contact_id);
+    }
+
+    await supabase
+      .from('campaign_contacts')
+      .update({ status: 'cancelled' })
+      .eq('campaign_id', conversation.campaign_id)
+      .eq('contact_id', conversation.contact_id);
+
+    return { success: true };
+  } catch (err) {
+    console.error('[Nina] Error in stop_campaign_contact:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
 async function updateContactInfo(
   supabase: any,
   contactId: string,
@@ -1326,6 +1408,9 @@ async function processQueueItem(
     tools.push(routeToSectorTool);
   } else {
     tools.push(transferToHumanTool);
+    if (agentConfig?.trigger_type === 'campaign') {
+      tools.push(stopCampaignContactTool);
+    }
   }
 
   let aiResult;
@@ -1375,6 +1460,18 @@ async function processQueueItem(
         toolResults.push({ toolCall, result: handoffResult });
       } catch (parseError) {
         console.error('[Nina] Error parsing transfer_to_human:', parseError);
+      }
+    }
+
+    if (toolCall.function?.name === 'stop_campaign_contact') {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        const stopResult = await stopCampaignContact(supabase, conversation, args);
+        // Silent action, igual update_contact_info — o texto de resposta já
+        // vem do próprio prompt (ex: "entendido, não vai mais receber").
+        toolResults.push({ toolCall, result: stopResult });
+      } catch (parseError) {
+        console.error('[Nina] Error parsing stop_campaign_contact:', parseError);
       }
     }
 
