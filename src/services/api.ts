@@ -1648,7 +1648,7 @@ export const api = {
           .from('messages')
           .select('*')
           .eq('conversation_id', conv.id)
-          .order('sent_at', { ascending: true })
+          .order('sent_at', { ascending: false })
           .limit(100);
 
         if (msgError) {
@@ -1657,7 +1657,7 @@ export const api = {
 
         return transformDBToUIConversation(
           conv as unknown as DBConversation,
-          (messages || []) as unknown as DBMessage[]
+          ((messages || []) as unknown as DBMessage[]).slice().reverse()
         );
       })
     );
