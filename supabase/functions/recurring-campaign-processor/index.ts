@@ -301,6 +301,32 @@ serve(async (req) => {
           continue;
         }
 
+        // Tags "Nao Interessado"/"Numero Invalido" (aplicadas pela IA via
+        // stop_campaign_contact, ou manualmente pelo time): diferente da
+        // "Free", aqui o contato também entra na blacklist global — ele
+        // pediu pra parar ou o número nem é dele, nenhuma campanha futura
+        // deve tentar de novo.
+        if (Array.isArray(contact.tags) && (contact.tags.includes("Nao Interessado") || contact.tags.includes("Numero Invalido"))) {
+          console.log(`[recurring-processor] Contato com tag de opt-out, cancelando e bloqueando: ${contact.id}`);
+          if (contact.phone_number && campaign.user_id) {
+            await supabase
+              .from("campaign_blacklist")
+              .upsert(
+                { user_id: campaign.user_id, phone: contact.phone_number },
+                { onConflict: "user_id,phone", ignoreDuplicates: true }
+              );
+          }
+          await supabase
+            .from("campaign_contacts")
+            .update({
+              status: "cancelled",
+              metadata: { ...(cc.metadata || {}), stopped_reason: contact.tags.includes("Numero Invalido") ? "tag_numero_invalido" : "tag_nao_interessado" },
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq("id", cc.id);
+          continue;
+        }
+
         // Blacklist global do usuário (portado do campaign-processor/Disparos)
         if (dayConfig.type === "whatsapp" && contact.phone_number && campaign.user_id) {
           const { data: blocked } = await supabase
