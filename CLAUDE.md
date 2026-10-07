@@ -1008,15 +1008,21 @@ npm run typecheck
 npm run lint
 ```
 
-> ⚠️ **Backend gerenciado via Lovable:** este projeto usa a integração
-> Lovable ↔ Supabase, não o Supabase CLI manual. Migrations e Edge
-> Functions são sincronizadas automaticamente quando o código é
-> commitado/pushado para o `main` (o Lovable detecta o push no GitHub
-> e aplica no projeto Supabase conectado). Não rode `supabase login`,
-> `supabase link` ou `supabase functions deploy` esperando que
-> funcionem localmente — a conta Supabase usada pelo Lovable não é a
-> conta pessoal do desenvolvedor, então esses comandos falham com 403.
-> Para aplicar uma mudança em `supabase/`, basta commitar e dar push.
+> ⚠️ **Backend não é mais gerenciado via Lovable.** O projeto migrou para
+> um projeto Supabase Cloud na conta própria do desenvolvedor
+> (`qzvswhfjuxfebpvlbysd` / "prema-atendimento"). O Supabase CLI já está
+> logado e linkado a esse projeto nesta máquina (`supabase projects list`
+> mostra `"linked": true` para ele) — `supabase login`, `supabase link`,
+> `supabase db push` e `supabase functions deploy` funcionam normalmente,
+> sem 403.
+>
+> **Importante:** push para o `main` só dispara o deploy do **frontend**
+> na Vercel (ver `.github/workflows/ci.yml` — só roda `npm run build`
+> como check de CI, não aplica nada no Supabase). Migrations em
+> `supabase/migrations/` e mudanças em `supabase/functions/` **não** são
+> aplicadas automaticamente por push nenhum — precisam ser aplicadas
+> manualmente via `supabase db push` / `supabase functions deploy <nome>`,
+> ou diretamente via Supabase Management API.
 
 ### **Debugging:**
 
@@ -1063,7 +1069,6 @@ console.warn('⚠️ [WARN]', mensagem)
 
 - VSCode: https://code.visualstudio.com
 - Claude Code: https://claude.ai/code
-- Lovable: https://lovable.dev/docs (gerencia o projeto Supabase — ver nota em "Comandos Úteis")
 - Vercel CLI: https://vercel.com/docs/cli
 
 ---
