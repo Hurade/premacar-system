@@ -45,10 +45,11 @@ serve(async (req) => {
 
     // Get integration settings for email configs.
     // Prefer the row that has SES enabled; fall back to any row so errors are descriptive.
+    const SETTINGS_SELECT = "id, aws_access_key_id, aws_secret_access_key, aws_region, aws_ses_email_from, aws_ses_email_from_name, aws_ses_enabled, whatsapp_global_daily_limit, whatsapp_global_sent_today, whatsapp_global_sent_date";
     let integrationSettings: any = null;
     const { data: sesRow } = await supabase
       .from("integration_settings")
-      .select("aws_access_key_id, aws_secret_access_key, aws_region, aws_ses_email_from, aws_ses_email_from_name, aws_ses_enabled")
+      .select(SETTINGS_SELECT)
       .eq("aws_ses_enabled", true)
       .limit(1)
       .maybeSingle();
@@ -57,11 +58,25 @@ serve(async (req) => {
     } else {
       const { data: anyRow } = await supabase
         .from("integration_settings")
-        .select("aws_access_key_id, aws_secret_access_key, aws_region, aws_ses_email_from, aws_ses_email_from_name, aws_ses_enabled")
+        .select(SETTINGS_SELECT)
         .limit(1)
         .maybeSingle();
       integrationSettings = anyRow;
     }
+
+    // Teto GLOBAL de WhatsApp por dia, somando TODAS as campanhas juntas —
+    // diferente de recurring_campaigns.daily_limit (que é só por campanha).
+    // Duas campanhas ativas ao mesmo tempo, cada uma dentro do próprio
+    // limite, ainda podiam somar mais envios do que o número aguenta com
+    // segurança. Reset é "preguiçoso": só zera quando percebe que o dia
+    // mudou, sem precisar de mais um cron dedicado.
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+    const globalSettingsId: string | null = integrationSettings?.id ?? null;
+    const globalWhatsappDailyLimit: number = integrationSettings?.whatsapp_global_daily_limit ?? 100;
+    let globalWhatsappSentToday: number =
+      integrationSettings?.whatsapp_global_sent_date === todayStr
+        ? (integrationSettings?.whatsapp_global_sent_today ?? 0)
+        : 0;
 
     const results: any[] = [];
 
@@ -417,12 +432,35 @@ serve(async (req) => {
           continue;
         }
 
+        // Teto GLOBAL (todas as campanhas somadas) — sempre ativo,
+        // independente de anti_ban_enabled da campanha, porque protege o
+        // número de WhatsApp como um todo, não só esta campanha.
+        if (dayConfig.type === "whatsapp" && globalWhatsappSentToday >= globalWhatsappDailyLimit) {
+          console.log(`[recurring-processor] Limite GLOBAL diário de WhatsApp (${globalWhatsappDailyLimit}) atingido, contato ${cc.contact_id} fica pra próxima`);
+          continue;
+        }
+
         // Paginação anti-ban: no máximo 1 envio de WhatsApp por execução
         // do cron quando a campanha tem anti_ban_enabled — mesmo modelo
         // do campaign-processor (1 lead pendente por tick).
         if (dayConfig.type === "whatsapp" && campaign.anti_ban_enabled && whatsappSentThisTick) {
           console.log(`[recurring-processor] Anti-ban: já enviou 1 WhatsApp nesta execução para "${campaign.name}", contato ${cc.contact_id} fica pra próxima`);
           continue;
+        }
+
+        // Intervalo mínimo entre envios (interval_min/interval_max, em
+        // segundos) — sem isso, com o cron de 1 em 1 minuto, os envios
+        // ficavam sempre bem próximos uns dos outros; agora espalha de
+        // verdade ao longo do horário comercial.
+        if (dayConfig.type === "whatsapp" && campaign.anti_ban_enabled && campaign.last_sent_at) {
+          const secondsSinceLastSent = (now2.getTime() - new Date(campaign.last_sent_at).getTime()) / 1000;
+          const intervalMin = campaign.interval_min || 60;
+          const intervalMax = Math.max(intervalMin, campaign.interval_max || 180);
+          const requiredGap = intervalMin + Math.random() * (intervalMax - intervalMin);
+          if (secondsSinceLastSent < requiredGap) {
+            console.log(`[recurring-processor] Intervalo anti-ban: faltam ~${(requiredGap - secondsSinceLastSent).toFixed(0)}s pro próximo envio de "${campaign.name}"`);
+            continue;
+          }
         }
 
         if (dayConfig.type === "email" && emailsSentThisTick >= EMAIL_PER_TICK_CAP) {
@@ -471,6 +509,15 @@ serve(async (req) => {
 
             sendResult = await sendWhatsApp(contact, effectiveDayConfig, whatsappCreds, supabase);
 
+            if (sendResult.success) {
+              globalWhatsappSentToday++;
+              if (globalSettingsId) {
+                await supabase
+                  .from("integration_settings")
+                  .update({ whatsapp_global_sent_today: globalWhatsappSentToday, whatsapp_global_sent_date: todayStr } as any)
+                  .eq("id", globalSettingsId);
+              }
+            }
             if (campaign.anti_ban_enabled && sendResult.success) {
               whatsappSentThisTick = true;
               sentTodayDelta++;

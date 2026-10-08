@@ -1904,6 +1904,9 @@ export type Database = {
           updated_at: string | null
           user_id: string
           whatsapp_enabled: boolean | null
+          whatsapp_global_daily_limit: number
+          whatsapp_global_sent_date: string | null
+          whatsapp_global_sent_today: number
         }
         Insert: {
           aws_access_key_id?: string | null
@@ -1938,6 +1941,9 @@ export type Database = {
           updated_at?: string | null
           user_id: string
           whatsapp_enabled?: boolean | null
+          whatsapp_global_daily_limit?: number
+          whatsapp_global_sent_date?: string | null
+          whatsapp_global_sent_today?: number
         }
         Update: {
           aws_access_key_id?: string | null
@@ -1972,6 +1978,9 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           whatsapp_enabled?: boolean | null
+          whatsapp_global_daily_limit?: number
+          whatsapp_global_sent_date?: string | null
+          whatsapp_global_sent_today?: number
         }
         Relationships: []
       }
