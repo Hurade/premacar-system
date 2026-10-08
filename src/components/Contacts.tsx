@@ -361,8 +361,13 @@ const Contacts: React.FC = () => {
     return folders.find(f => f.id === folderId);
   };
 
-  const getTagDefinition = (tagKey: string) => {
-    return tagDefinitions.find(t => t.key === tagKey);
+  // contacts.tags guarda o LABEL de exibição (ex: "Cancelados"), não a key
+  // slugificada ("cancelados") que o TagManager gera ao criar a tag — por
+  // isso compara por label aqui, senão a badge nunca encontra a definição
+  // (bug pré-existente: antes nenhuma tag com label diferente da key em
+  // minúsculo/sem espaço renderizava cor na lista de contatos).
+  const getTagDefinition = (tagLabel: string) => {
+    return tagDefinitions.find(t => t.label === tagLabel);
   };
 
   return (
@@ -419,9 +424,7 @@ const Contacts: React.FC = () => {
                 ? `Pasta: ${getFolderById(selectedFolderId)?.name || 'Desconhecida'}`
                 : 'Todos os contatos'}
               {selectedTagKeys.length > 0 && (
-                <> · Tags: {selectedTagKeys
-                  .map(k => tagDefinitions.find(t => t.key === k)?.label || k)
-                  .join(', ')}</>
+                <> · Tags: {selectedTagKeys.join(', ')}</>
               )}
             </p>
           </div>

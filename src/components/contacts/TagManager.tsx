@@ -174,11 +174,14 @@ const TagManager: React.FC<TagManagerProps> = ({ tags, onTagsChange, selectedTag
 
       <div className="flex flex-wrap gap-1.5">
         {tags.filter(t => t.is_active).map(tag => {
-          const isSelected = selectedTagKeys.includes(tag.key);
+          // contacts.tags guarda o LABEL (ex: "Cancelados"), não a key
+          // slugificada ("cancelados") — filtrar/comparar pela key nunca
+          // bate com o que está salvo de verdade no contato.
+          const isSelected = selectedTagKeys.includes(tag.label);
           return (
             <Badge
               key={tag.id}
-              onClick={() => onToggleTagFilter?.(tag.key)}
+              onClick={() => onToggleTagFilter?.(tag.label)}
               className={`pl-2 pr-1 py-0.5 text-xs font-medium group ${onToggleTagFilter ? 'cursor-pointer' : 'cursor-default'} ${isSelected ? 'ring-2 ring-offset-1 ring-offset-slate-950' : ''}`}
               style={{
                 backgroundColor: `${tag.color}20`,
