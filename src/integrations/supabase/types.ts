@@ -1262,7 +1262,7 @@ export type Database = {
           name: string | null
           notes: string | null
           oficina: string | null
-          phone_number: string
+          phone_number: string | null
           profile_picture_url: string | null
           tags: string[] | null
           updated_at: string
@@ -1286,7 +1286,7 @@ export type Database = {
           name?: string | null
           notes?: string | null
           oficina?: string | null
-          phone_number: string
+          phone_number?: string | null
           profile_picture_url?: string | null
           tags?: string[] | null
           updated_at?: string
@@ -1310,7 +1310,7 @@ export type Database = {
           name?: string | null
           notes?: string | null
           oficina?: string | null
-          phone_number?: string
+          phone_number?: string | null
           profile_picture_url?: string | null
           tags?: string[] | null
           updated_at?: string
@@ -2337,11 +2337,14 @@ export type Database = {
           header_text: string | null
           id: string
           language_code: string
+          meta_template_id: string | null
           name: string
           parameters_count: number
           parameters_mapping: Json | null
+          quick_reply_button: string | null
           rejected_reason: string | null
           status: string
+          submission_error: string | null
           updated_at: string
           user_id: string | null
         }
@@ -2355,11 +2358,14 @@ export type Database = {
           header_text?: string | null
           id?: string
           language_code?: string
+          meta_template_id?: string | null
           name: string
           parameters_count?: number
           parameters_mapping?: Json | null
+          quick_reply_button?: string | null
           rejected_reason?: string | null
           status?: string
+          submission_error?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -2373,11 +2379,14 @@ export type Database = {
           header_text?: string | null
           id?: string
           language_code?: string
+          meta_template_id?: string | null
           name?: string
           parameters_count?: number
           parameters_mapping?: Json | null
+          quick_reply_button?: string | null
           rejected_reason?: string | null
           status?: string
+          submission_error?: string | null
           updated_at?: string
           user_id?: string | null
         }

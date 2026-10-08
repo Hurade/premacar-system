@@ -382,6 +382,41 @@ serve(async (req) => {
           continue;
         }
 
+        // Dia de WhatsApp/ligação sem telefone cadastrado (contato só-e-mail,
+        // agora que telefone é opcional em contacts): mesmo tratamento do
+        // e-mail ausente acima — pula o dia normalmente em vez de falhar.
+        if ((dayConfig.type === "whatsapp" || dayConfig.type === "call") && !contact.phone_number) {
+          console.log(`[recurring-processor] Contato ${contact.id} sem telefone, pulando dia ${cc.current_day} (${dayConfig.type})`);
+          const skippedDayStatuses = {
+            ...dayStatuses,
+            [dayKey]: { sent_at: new Date().toISOString(), success: false, error: "Sem telefone cadastrado — dia pulado", type: dayConfig.type, skipped: true },
+          };
+          const nextDayKeySkipPhone = `day${cc.current_day + 1}`;
+          const hasNextDaySkipPhone = flowConfig[nextDayKeySkipPhone] && flowConfig[nextDayKeySkipPhone].enabled;
+          if (hasNextDaySkipPhone) {
+            await supabase
+              .from("campaign_contacts")
+              .update({
+                current_day: cc.current_day + 1,
+                day_statuses: skippedDayStatuses,
+                updated_at: new Date().toISOString(),
+              } as any)
+              .eq("id", cc.id);
+          } else {
+            await supabase
+              .from("campaign_contacts")
+              .update({
+                status: "success",
+                day_statuses: skippedDayStatuses,
+                success_at: new Date().toISOString(),
+                completed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              } as any)
+              .eq("id", cc.id);
+          }
+          continue;
+        }
+
         // Paginação anti-ban: no máximo 1 envio de WhatsApp por execução
         // do cron quando a campanha tem anti_ban_enabled — mesmo modelo
         // do campaign-processor (1 lead pendente por tick).
