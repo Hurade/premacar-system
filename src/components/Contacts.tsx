@@ -39,6 +39,7 @@ const Contacts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedTagKeys, setSelectedTagKeys] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -130,12 +131,22 @@ const Contacts: React.FC = () => {
     if (selectedFolderId) {
       query = query.eq('folder_id', selectedFolderId);
     }
+    if (selectedTagKeys.length > 0) {
+      // overlaps = contato tem PELO MENOS UMA das tags selecionadas (OR)
+      query = query.overlaps('tags', selectedTagKeys);
+    }
     if (debouncedSearchTerm) {
       const term = `%${debouncedSearchTerm}%`;
       query = query.or(`name.ilike.${term},phone_number.ilike.${term},oficina.ilike.${term},email.ilike.${term}`);
     }
     return query;
-  }, [selectedFolderId, debouncedSearchTerm]);
+  }, [selectedFolderId, selectedTagKeys, debouncedSearchTerm]);
+
+  const handleToggleTagFilter = (tagKey: string) => {
+    setSelectedTagKeys(prev =>
+      prev.includes(tagKey) ? prev.filter(k => k !== tagKey) : [...prev, tagKey]
+    );
+  };
 
   // Busca e contagem no servidor — o Supabase (PostgREST) limita qualquer
   // resposta a no máximo db.max_rows (padrão 1000) por request, então sem
@@ -196,7 +207,7 @@ const Contacts: React.FC = () => {
   // Reset to page 1 when filter/search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, selectedFolderId, pageSize]);
+  }, [debouncedSearchTerm, selectedFolderId, selectedTagKeys, pageSize]);
 
   const handleSelectAll = () => {
     if (selectedIds.size === paginatedContacts.length) {
@@ -385,6 +396,8 @@ const Contacts: React.FC = () => {
           <TagManager
             tags={tagDefinitions}
             onTagsChange={loadTagDefinitions}
+            selectedTagKeys={selectedTagKeys}
+            onToggleTagFilter={handleToggleTagFilter}
           />
         </div>
       </div>
@@ -402,9 +415,14 @@ const Contacts: React.FC = () => {
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-slate-100">Contatos</h2>
             <p className="text-sm text-slate-400 mt-1">
-              {selectedFolderId 
+              {selectedFolderId
                 ? `Pasta: ${getFolderById(selectedFolderId)?.name || 'Desconhecida'}`
                 : 'Todos os contatos'}
+              {selectedTagKeys.length > 0 && (
+                <> · Tags: {selectedTagKeys
+                  .map(k => tagDefinitions.find(t => t.key === k)?.label || k)
+                  .join(', ')}</>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">

@@ -18,6 +18,8 @@ export interface TagDefinition {
 interface TagManagerProps {
   tags: TagDefinition[];
   onTagsChange: () => void;
+  selectedTagKeys?: string[];
+  onToggleTagFilter?: (key: string) => void;
 }
 
 const TAG_COLORS = [
@@ -31,7 +33,7 @@ const TAG_COLORS = [
   '#84cc16', // lime
 ];
 
-const TagManager: React.FC<TagManagerProps> = ({ tags, onTagsChange }) => {
+const TagManager: React.FC<TagManagerProps> = ({ tags, onTagsChange, selectedTagKeys = [], onToggleTagFilter }) => {
   const [newTagLabel, setNewTagLabel] = useState('');
   const [selectedColor, setSelectedColor] = useState(TAG_COLORS[0]);
   const [creating, setCreating] = useState(false);
@@ -115,6 +117,20 @@ const TagManager: React.FC<TagManagerProps> = ({ tags, onTagsChange }) => {
         </Button>
       </div>
 
+      {onToggleTagFilter && (
+        <div className="flex items-center justify-between -mt-2">
+          <span className="text-xs text-slate-500">Clique numa tag pra filtrar</span>
+          {selectedTagKeys.length > 0 && (
+            <button
+              onClick={() => selectedTagKeys.forEach(k => onToggleTagFilter(k))}
+              className="text-xs text-cyan-400 hover:text-cyan-300"
+            >
+              Limpar ({selectedTagKeys.length})
+            </button>
+          )}
+        </div>
+      )}
+
       {showForm && (
         <div className="p-3 bg-slate-800/50 rounded-lg space-y-3">
           <Input
@@ -157,25 +173,30 @@ const TagManager: React.FC<TagManagerProps> = ({ tags, onTagsChange }) => {
       )}
 
       <div className="flex flex-wrap gap-1.5">
-        {tags.filter(t => t.is_active).map(tag => (
-          <Badge
-            key={tag.id}
-            className="pl-2 pr-1 py-0.5 text-xs font-medium cursor-default group"
-            style={{ 
-              backgroundColor: `${tag.color}20`,
-              borderColor: `${tag.color}40`,
-              color: tag.color 
-            }}
-          >
-            {tag.label}
-            <button
-              onClick={() => handleDeleteTag(tag.id)}
-              className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+        {tags.filter(t => t.is_active).map(tag => {
+          const isSelected = selectedTagKeys.includes(tag.key);
+          return (
+            <Badge
+              key={tag.id}
+              onClick={() => onToggleTagFilter?.(tag.key)}
+              className={`pl-2 pr-1 py-0.5 text-xs font-medium group ${onToggleTagFilter ? 'cursor-pointer' : 'cursor-default'} ${isSelected ? 'ring-2 ring-offset-1 ring-offset-slate-950' : ''}`}
+              style={{
+                backgroundColor: `${tag.color}20`,
+                borderColor: `${tag.color}40`,
+                color: tag.color,
+                ...(isSelected ? { ['--tw-ring-color' as any]: tag.color } : {}),
+              }}
             >
-              <X className="w-3 h-3" />
-            </button>
-          </Badge>
-        ))}
+              {tag.label}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteTag(tag.id); }}
+                className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          );
+        })}
         {tags.filter(t => t.is_active).length === 0 && (
           <span className="text-xs text-slate-500">Nenhuma tag criada</span>
         )}
