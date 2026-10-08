@@ -218,6 +218,26 @@ serve(async (req) => {
           continue;
         }
 
+        // last_customer_message_at só diz há quanto tempo o CONTATO mandou
+        // algo — não diz quem falou por último na conversa. Se o contato
+        // respondeu por último (mesmo um "de nada, fico à disposição" que
+        // encerra educadamente), a conversa já terminou do lado dele e não
+        // é um caso de "ele parou de responder": é a gente quem não
+        // respondeu depois. Só faz sentido cutucar quando NÓS fomos quem
+        // falou por último e ele ficou em silêncio.
+        const { data: lastMessage } = await supabase
+          .from("messages")
+          .select("from_type")
+          .eq("conversation_id", conv.id)
+          .order("sent_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastMessage?.from_type === "user") {
+          results.push({ conversationId: conv.id, sent: false, reason: "contact_sent_last_message" });
+          continue;
+        }
+
         console.log(`[${SOURCE}] Sending via ${apiSource} to ${contactData.phone_number} (conv=${conv.id})`);
 
         // ── Roteamento por api_source ────────────────────────────────────────
