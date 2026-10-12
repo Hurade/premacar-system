@@ -6,7 +6,10 @@ verify_jwt = false
 [functions.admin-update-user]
 verify_jwt = false
 
-[functions.meta-webhook]
+# meta-webhook-v2: recriada no lugar de meta-webhook (deploy da função
+# original começou a falhar com erro de plataforma da Supabase — ver
+# commit). Mesmo código, nome novo porque o slug antigo ficou travado.
+[functions.meta-webhook-v2]
 verify_jwt = false
 
 # whatsapp-webhook: recebe POST direto da Evolution API (sem JWT do Supabase).
@@ -20,9 +23,6 @@ verify_jwt = false
 # mandar Authorization header nesse caso) — mesmo problema do
 # whatsapp-webhook, só descoberto ao testar áudio/imagem no projeto novo.
 [functions.media-proxy]
-verify_jwt = false
-
-[functions.test-meta-webhook]
 verify_jwt = false
 
 [functions.db-backup-sync]
@@ -45,6 +45,12 @@ verify_jwt = false
 # JWT de usuário) — mesmo padrão do follow-me-processor/recurring-campaign-
 # processor.
 [functions.check-meta-template-status]
+verify_jwt = false
+
+# ses-webhook: recebe POST da AWS SNS (confirmação de inscrição +
+# notificações de delivery/bounce/complaint), sem JWT do Supabase — mesmo
+# padrão do meta-webhook/whatsapp-webhook.
+[functions.ses-webhook]
 verify_jwt = false
 
 # make-voice-call: verify_jwt removido (Fase 3.2) — a função estava pública

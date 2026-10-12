@@ -94,7 +94,7 @@ interface FormStepProps {
 }
 
 function FormStep({ provider, isEditing, data, onChange, queues, systems }: FormStepProps) {
-  const metaWebhookUrl = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/meta-webhook` : '';
+  const metaWebhookUrl = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/meta-webhook-v2` : '';
 
   const set = (key: string, value: any) => onChange({ ...data, [key]: value });
 

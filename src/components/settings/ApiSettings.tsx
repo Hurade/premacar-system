@@ -848,13 +848,13 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
               <p className="text-xs text-blue-400 font-medium mb-2">URL do Webhook para Meta:</p>
               <div className="flex gap-2">
                 <code className="flex-1 text-xs text-blue-300 bg-slate-950 px-2 py-1 rounded font-mono break-all">
-                  {import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook
+                  {import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook-v2
                 </code>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook`);
+                    navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook-v2`);
                     toast.success('URL do webhook Meta copiada!');
                   }}
                   className="px-2"
