@@ -879,6 +879,102 @@ export type Database = {
           },
         ]
       }
+      campaign_message_events: {
+        Row: {
+          bounced_at: string | null
+          campaign_contact_id: string
+          campaign_id: string
+          channel: string
+          complained_at: string | null
+          contact_id: string | null
+          created_at: string
+          day_key: string
+          delivered_at: string | null
+          error: string | null
+          failed_at: string | null
+          id: string
+          read_at: string | null
+          sent_at: string
+          ses_message_id: string | null
+          updated_at: string
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          bounced_at?: string | null
+          campaign_contact_id: string
+          campaign_id: string
+          channel: string
+          complained_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          day_key: string
+          delivered_at?: string | null
+          error?: string | null
+          failed_at?: string | null
+          id?: string
+          read_at?: string | null
+          sent_at?: string
+          ses_message_id?: string | null
+          updated_at?: string
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          bounced_at?: string | null
+          campaign_contact_id?: string
+          campaign_id?: string
+          channel?: string
+          complained_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          day_key?: string
+          delivered_at?: string | null
+          error?: string | null
+          failed_at?: string | null
+          id?: string
+          read_at?: string | null
+          sent_at?: string
+          ses_message_id?: string | null
+          updated_at?: string
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_message_events_campaign_contact_id_fkey"
+            columns: ["campaign_contact_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_message_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_message_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_message_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_message_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_send_rules: {
         Row: {
           ab_auto_winner: boolean
@@ -3885,6 +3981,35 @@ export type Database = {
       }
     }
     Views: {
+      campaign_delivery_breakdown: {
+        Row: {
+          bounced_count: number | null
+          campaign_id: string | null
+          channel: string | null
+          complained_count: number | null
+          day_key: string | null
+          delivered_count: number | null
+          failed_count: number | null
+          read_count: number | null
+          sent_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_message_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_message_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts_with_stats: {
         Row: {
           blocked_at: string | null

@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { RecurringCampaign } from '@/hooks/useRecurringCampaigns';
 import { CampaignDetailMetrics } from '@/components/campaigns/CampaignDetailMetrics';
 import { CampaignFunnel } from '@/components/campaigns/CampaignFunnel';
+import { CampaignDeliveryBreakdown } from '@/components/campaigns/CampaignDeliveryBreakdown';
 import { DayDistribution } from '@/components/campaigns/DayDistribution';
 import { CampaignContactsList } from '@/components/campaigns/CampaignContactsList';
 import RecurringCampaignVariations from '@/components/campaigns/RecurringCampaignVariations';
@@ -162,6 +163,9 @@ const CampaignDetailsPage: React.FC = () => {
 
       {/* Funnel */}
       <CampaignFunnel campaignId={campaign.id} />
+
+      {/* Detalhamento dos envios (enviados/entregues/lidos/falhas por dia e canal) */}
+      <CampaignDeliveryBreakdown campaignId={campaign.id} />
 
       {/* Day Distribution */}
       <DayDistribution campaign={campaign} />
