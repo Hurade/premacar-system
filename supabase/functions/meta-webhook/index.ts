@@ -338,6 +338,28 @@ async function processMetaWebhookAsync(
               console.log(`[Meta Async] ✅ ${counterField} incrementado`);
             }
           }
+
+          // Mesmo status, agora pra campanhas recorrentes (recurring_campaigns) —
+          // campaign_message_events é a tabela nova, independente de
+          // campaign_leads (sistema antigo de Disparos). Update sem match
+          // nenhum é inofensivo (0 linhas afetadas).
+          const cmeUpdateData: any = {};
+          if (statusType === 'delivered') cmeUpdateData.delivered_at = updateData.delivered_at;
+          else if (statusType === 'read') cmeUpdateData.read_at = updateData.read_at;
+          else if (statusType === 'failed') {
+            cmeUpdateData.failed_at = new Date().toISOString();
+            cmeUpdateData.error = status.errors?.[0]?.title || 'Message failed';
+          }
+          if (Object.keys(cmeUpdateData).length > 0) {
+            cmeUpdateData.updated_at = new Date().toISOString();
+            const { error: cmeError } = await supabase
+              .from('campaign_message_events')
+              .update(cmeUpdateData)
+              .eq('whatsapp_message_id', messageId);
+            if (cmeError) {
+              console.error('[Meta Async] Erro ao atualizar campaign_message_events:', cmeError);
+            }
+          }
         }
       }
 

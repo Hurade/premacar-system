@@ -254,13 +254,21 @@ serve(async (req) => {
               .maybeSingle();
 
             if (lead) {
-              await supabase.rpc('increment_campaign_counter', { 
-                p_campaign_id: lead.campaign_id, 
-                p_counter: 'total_delivered' 
+              await supabase.rpc('increment_campaign_counter', {
+                p_campaign_id: lead.campaign_id,
+                p_counter: 'total_delivered'
               });
             }
+
+            // Mesmo status, agora pra campanhas recorrentes —
+            // campaign_message_events é independente de campaign_leads
+            // (sistema antigo de Disparos). Update sem match é inofensivo.
+            await supabase
+              .from('campaign_message_events')
+              .update({ delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq('whatsapp_message_id', messageId);
           }
-          
+
           if (status === 'READ' || status === 'read') {
             await supabase
               .from('campaign_leads')
@@ -278,11 +286,16 @@ serve(async (req) => {
               .maybeSingle();
 
             if (lead) {
-              await supabase.rpc('increment_campaign_counter', { 
-                p_campaign_id: lead.campaign_id, 
-                p_counter: 'total_read' 
+              await supabase.rpc('increment_campaign_counter', {
+                p_campaign_id: lead.campaign_id,
+                p_counter: 'total_read'
               });
             }
+
+            await supabase
+              .from('campaign_message_events')
+              .update({ read_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq('whatsapp_message_id', messageId);
           }
         }
         

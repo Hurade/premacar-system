@@ -564,6 +564,26 @@ serve(async (req) => {
           },
         };
 
+        // Um registro por envio (whatsapp/email) pra depois casar com o
+        // webhook de entrega/leitura (Meta/Evolution) ou SES — guarda o
+        // message_id retornado no envio, que antes só ia pro console.log e
+        // se perdia pra sempre, impossibilitando ligar de volta a
+        // confirmação de entrega a este contato/campanha/dia.
+        if (dayConfig.type === "whatsapp" || dayConfig.type === "email") {
+          await supabase.from("campaign_message_events").insert({
+            campaign_id: campaign.id,
+            campaign_contact_id: cc.id,
+            contact_id: cc.contact_id,
+            day_key: dayKey,
+            channel: dayConfig.type,
+            whatsapp_message_id: dayConfig.type === "whatsapp" ? sendResult.messageId || null : null,
+            ses_message_id: dayConfig.type === "email" ? sendResult.messageId || null : null,
+            sent_at: new Date().toISOString(),
+            failed_at: sendResult.success ? null : new Date().toISOString(),
+            error: sendResult.success ? null : sendResult.error,
+          });
+        }
+
         if (sendResult.success) {
           sentCount++;
           console.log(`[recurring-processor] ✅ Sent ${dayConfig.type} to ${contactName} (Day ${cc.current_day})`);
@@ -708,7 +728,7 @@ async function sendEmail(
   contact: any,
   dayConfig: any,
   settings: any
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   console.log(`[recurring-processor] Email: aws_ses_enabled=${settings?.aws_ses_enabled}, has_key=${!!settings?.aws_access_key_id}, has_from=${!!settings?.aws_ses_email_from}, contact_email=${contact.email || '(vazio)'}`);
   if (!settings?.aws_ses_enabled) {
     return { success: false, error: "AWS SES desabilitado — ative em Configurações → Integrações → AWS SES" };
@@ -832,8 +852,9 @@ async function sendEmail(
       return { success: false, error: `SES Error ${response.status}: ${errorText.substring(0, 200)}` };
     }
 
-    console.log("[recurring-processor] Email sent to:", contact.email);
-    return { success: true };
+    const sesData = await response.json().catch(() => ({} as any));
+    console.log("[recurring-processor] Email sent to:", contact.email, "MessageId:", sesData.MessageId);
+    return { success: true, messageId: sesData.MessageId };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -847,7 +868,7 @@ async function sendWhatsApp(
   dayConfig: any,
   creds: SendCredentials,
   supabase: any
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const config = dayConfig.config || {};
   const contactName = contact.name || contact.call_name || "Cliente";
   const message = (config.message || "")
@@ -948,8 +969,9 @@ async function sendWhatsApp(
 
     const data = await response.json();
     if (response.ok) {
-      console.log(`[recurring-processor] Meta API success, message ID:`, data.messages?.[0]?.id);
-      return { success: true };
+      const metaMessageId = data.messages?.[0]?.id;
+      console.log(`[recurring-processor] Meta API success, message ID:`, metaMessageId);
+      return { success: true, messageId: metaMessageId };
     }
 
     const errMsg = data.error?.message || JSON.stringify(data.error) || "Meta API error";
@@ -987,8 +1009,9 @@ async function sendWhatsApp(
       return { success: false, error: `Evolution API: mensagem não enfileirada — ${errDetail}` };
     }
 
-    console.log(`[recurring-processor] Evolution success, key.id:`, respData.key?.id || respData.messageId);
-    return { success: true };
+    const evolutionMessageId = respData.key?.id || respData.messageId;
+    console.log(`[recurring-processor] Evolution success, key.id:`, evolutionMessageId);
+    return { success: true, messageId: evolutionMessageId };
   }
 
   return { success: false, error: "api_type desconhecido nas credenciais WhatsApp" };
