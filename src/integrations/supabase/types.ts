@@ -1904,6 +1904,9 @@ export type Database = {
           call_hours_start: string | null
           call_max_duration: number | null
           call_script_prompt: string | null
+          cost_per_call_minute: number
+          cost_per_email: number
+          cost_per_whatsapp_message: number
           created_at: string | null
           elevenlabs_api_key_integration: string | null
           elevenlabs_enabled: boolean | null
@@ -1941,6 +1944,9 @@ export type Database = {
           call_hours_start?: string | null
           call_max_duration?: number | null
           call_script_prompt?: string | null
+          cost_per_call_minute?: number
+          cost_per_email?: number
+          cost_per_whatsapp_message?: number
           created_at?: string | null
           elevenlabs_api_key_integration?: string | null
           elevenlabs_enabled?: boolean | null
@@ -1978,6 +1984,9 @@ export type Database = {
           call_hours_start?: string | null
           call_max_duration?: number | null
           call_script_prompt?: string | null
+          cost_per_call_minute?: number
+          cost_per_email?: number
+          cost_per_whatsapp_message?: number
           created_at?: string | null
           elevenlabs_api_key_integration?: string | null
           elevenlabs_enabled?: boolean | null
