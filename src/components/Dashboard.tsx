@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight, Radio, UserCheck } from 'lucide-react';
+import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight, Radio, UserCheck, Send } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { StatMetric } from '../types';
 import { api } from '../services/api';
+import { supabase } from '../integrations/supabase/client';
 import { OnboardingBanner } from './OnboardingBanner';
 import { useOutletContext } from 'react-router-dom';
 import { useOperationalMetrics, NO_QUEUE_KEY } from '@/hooks/useOperationalMetrics';
@@ -73,6 +74,41 @@ const Dashboard: React.FC = () => {
     });
   }, []);
 
+  // Envios de campanha (recurring-campaign-processor) não aparecem em
+  // nenhuma métrica acima — "Atendimentos"/"Conversões"/"Novos Leads" só
+  // contam conversa orgânica e deals/appointments. Com campanhas rodando
+  // (ex: centenas de e-mails/WhatsApp por dia), o painel parecia "parado"
+  // mesmo com envio real acontecendo. Atualiza a cada 60s, como o resto
+  // do painel operacional (sempre ao vivo, independe do filtro de período).
+  const [campaignActivity, setCampaignActivity] = useState({ ok: 0, fail: 0, loading: true });
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCampaignActivity = async () => {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const [okResult, failResult] = await Promise.all([
+        supabase
+          .from('system_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('source', 'recurring-campaign-processor')
+          .eq('metadata->>success', 'true')
+          .gte('created_at', todayStart.toISOString()),
+        supabase
+          .from('system_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('source', 'recurring-campaign-processor')
+          .eq('metadata->>success', 'false')
+          .gte('created_at', todayStart.toISOString()),
+      ]);
+      if (!cancelled) {
+        setCampaignActivity({ ok: okResult.count || 0, fail: failResult.count || 0, loading: false });
+      }
+    };
+    fetchCampaignActivity();
+    const interval = setInterval(fetchCampaignActivity, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   const getIcon = (label: string) => {
     if (label.includes('Conversões')) return <DollarSign className="h-5 w-5 text-emerald-400" />;
     if (label.includes('Atendimentos')) return <MessageSquare className="h-5 w-5 text-cyan-400" />;
@@ -141,7 +177,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Painel Operacional (sempre ao vivo, independe do filtro de período) */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Atendimentos abertos por status */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
           <div className="flex items-center gap-2 mb-4">
@@ -212,6 +248,27 @@ const Dashboard: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Envios de campanha hoje */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Send className="w-4 h-4 text-amber-400" />
+            <h3 className="text-sm font-semibold text-slate-100">Campanhas Hoje</h3>
+            <span className="ml-auto text-xs text-slate-500">
+              {campaignActivity.loading ? '…' : campaignActivity.ok + campaignActivity.fail}
+            </span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs px-2 py-0.5 rounded-full border text-emerald-400 bg-emerald-500/10 border-emerald-500/20">Enviados</span>
+              <span className="text-sm font-semibold text-slate-200">{campaignActivity.loading ? '…' : campaignActivity.ok}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs px-2 py-0.5 rounded-full border text-red-400 bg-red-500/10 border-red-500/20">Falhas</span>
+              <span className="text-sm font-semibold text-slate-200">{campaignActivity.loading ? '…' : campaignActivity.fail}</span>
+            </div>
+          </div>
         </div>
       </div>
 
