@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -110,6 +110,13 @@ export type Database = {
             columns: ["trigger_campaign_id"]
             isOneToOne: false
             referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_configs_trigger_campaign_id_fkey"
+            columns: ["trigger_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
             referencedColumns: ["id"]
           },
           {
@@ -760,6 +767,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_contacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
             referencedColumns: ["id"]
           },
           {
@@ -1462,6 +1476,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
             referencedColumns: ["id"]
           },
           {
@@ -3029,6 +3050,13 @@ export type Database = {
             referencedRelation: "recurring_campaigns"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "recurring_campaign_send_rules_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "recurring_campaigns_live"
+            referencedColumns: ["id"]
+          },
         ]
       }
       recurring_campaign_variations: {
@@ -3089,6 +3117,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "recurring_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_campaign_variations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
             referencedColumns: ["id"]
           },
           {
@@ -3731,6 +3766,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "voice_calls_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_campaigns_live"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "voice_calls_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
@@ -3861,6 +3903,55 @@ export type Database = {
           whatsapp_id: string | null
         }
         Relationships: []
+      }
+      recurring_campaigns_live: {
+        Row: {
+          actual_cost: number | null
+          anti_ban_enabled: boolean | null
+          business_days: number[] | null
+          business_hours_enabled: boolean | null
+          business_hours_end: string | null
+          business_hours_start: string | null
+          connection_id: string | null
+          created_at: string | null
+          created_by: string | null
+          daily_limit: number | null
+          description: string | null
+          ended_at: string | null
+          estimated_cost: number | null
+          failed_count: number | null
+          flow_config: Json | null
+          id: string | null
+          in_progress_count: number | null
+          interval_max: number | null
+          interval_min: number | null
+          interval_type: string | null
+          last_sent_at: string | null
+          name: string | null
+          objective: string | null
+          pause_after_count: number | null
+          pause_duration_minutes: number | null
+          paused_until: string | null
+          scheduled_start: string | null
+          send_failed_count: number | null
+          send_success_count: number | null
+          sent_today: number | null
+          started_at: string | null
+          status: string | null
+          success_count: number | null
+          total_contacts: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {

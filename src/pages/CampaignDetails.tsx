@@ -30,8 +30,10 @@ const CampaignDetailsPage: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
+      // recurring_campaigns_live recalcula os contadores direto de
+      // campaign_contacts/system_logs — ver migration 20261012010000.
       const { data, error } = await supabase
-        .from('recurring_campaigns')
+        .from('recurring_campaigns_live')
         .select('*')
         .eq('id', id)
         .maybeSingle();
@@ -169,10 +171,10 @@ const CampaignDetailsPage: React.FC = () => {
 
       {/* Envio & A/B — só relevante quando a campanha tem algum dia de WhatsApp */}
       {Object.values((campaign as any).flow_config || {}).some((d: any) => d?.type === 'whatsapp') && (
-        <>
+        <div id="send-rules" className="space-y-6 scroll-mt-6">
           <RecurringCampaignSendRules campaignId={campaign.id} />
           <RecurringCampaignVariations campaignId={campaign.id} campaignName={campaign.name} />
-        </>
+        </div>
       )}
     </div>
   );

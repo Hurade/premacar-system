@@ -29,7 +29,12 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete, onRefresh }: 
   const total = campaign.total_contacts || 1;
   const completed = campaign.success_count + campaign.failed_count;
   const progress = Math.min((completed / total) * 100, 100);
-  const successRate = total > 0 ? ((campaign.success_count / total) * 100).toFixed(1) : '0';
+  // Taxa de sucesso dos ENVIOS (system_logs), não dos contatos que
+  // terminaram a campanha inteira — essa segunda métrica fica em 0% por
+  // semanas em qualquer campanha de vários dias ainda em andamento, mesmo
+  // com tudo funcionando. "—" até o primeiro envio real acontecer.
+  const totalSends = campaign.send_success_count + campaign.send_failed_count;
+  const successRate = totalSends > 0 ? ((campaign.send_success_count / totalSends) * 100).toFixed(1) : null;
 
   const flowDays = campaign.flow_config && typeof campaign.flow_config === 'object'
     ? Object.keys(campaign.flow_config).length
@@ -85,7 +90,13 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete, onRefresh }: 
               {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="Configurações de envio"
+            onClick={() => navigate(`/campanhas/${campaign.id}#send-rules`)}
+          >
             <Settings className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/campanhas/${campaign.id}`)}>
@@ -122,10 +133,10 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete, onRefresh }: 
         <Progress value={progress} className="h-2" />
       </div>
 
-      {/* Stats */}
+      {/* Stats — contagem é por CONTATO (quem terminou a campanha inteira) */}
       <div className="flex items-center gap-4 text-xs">
         <span className="text-primary">
-          ✅ Sucesso: {campaign.success_count} ({successRate}%)
+          ✅ Sucesso: {campaign.success_count}
         </span>
         <span className="text-destructive">
           ❌ Falha: {campaign.failed_count}
@@ -134,6 +145,11 @@ export function CampaignCard({ campaign, onToggleStatus, onDelete, onRefresh }: 
           🔄 Em progresso: {campaign.in_progress_count}
         </span>
       </div>
+      {totalSends > 0 && (
+        <p className="text-[11px] text-muted-foreground mt-1.5">
+          📤 {totalSends} envios até agora — {successRate}% entregues com sucesso
+        </p>
+      )}
     </div>
   );
 }

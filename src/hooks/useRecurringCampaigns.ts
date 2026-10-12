@@ -12,6 +12,8 @@ export interface RecurringCampaign {
   in_progress_count: number;
   success_count: number;
   failed_count: number;
+  send_success_count: number;
+  send_failed_count: number;
   estimated_cost: number;
   actual_cost: number;
   created_by: string | null;
@@ -35,8 +37,12 @@ export function useRecurringCampaigns({ filter = 'all', search = '' }: UseRecurr
     try {
       setLoading(true);
 
+      // recurring_campaigns_live recalcula total/em-andamento/sucesso/falha
+      // direto de campaign_contacts (por contato) e a taxa de envio direto
+      // de system_logs (por envio) — a tabela crua tem contadores em cache
+      // que ficam defasados (ver migration 20261012010000).
       let query = supabase
-        .from('recurring_campaigns')
+        .from('recurring_campaigns_live')
         .select('*')
         .order('created_at', { ascending: false });
 
