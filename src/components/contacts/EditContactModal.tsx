@@ -20,7 +20,7 @@ interface EditContactModalProps {
   contact: {
     id: string;
     name: string | null;
-    phone_number: string;
+    phone_number: string | null;
     oficina: string | null;
     email: string | null;
     tags: string[] | null;
@@ -75,9 +75,10 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
     e.preventDefault();
     if (!contact) return;
     
+    // Telefone é opcional (contato pode ser só-e-mail) — se preenchido,
+    // precisa ter pelo menos 10 dígitos; se vazio, vira NULL.
     const cleanPhone = formatPhone(phone);
-    
-    if (!cleanPhone || cleanPhone.length < 10) {
+    if (cleanPhone && cleanPhone.length < 10) {
       toast.error('Telefone inválido. Digite pelo menos 10 dígitos.');
       return;
     }
@@ -87,10 +88,15 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
       return;
     }
 
+    if (!cleanPhone && !email.trim()) {
+      toast.error('Informe pelo menos telefone ou e-mail.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Check if phone changed and already exists
-      if (cleanPhone !== contact.phone_number) {
+      if (cleanPhone && cleanPhone !== contact.phone_number) {
         const { data: existing } = await supabase
           .from('contacts')
           .select('id')
@@ -111,7 +117,7 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
         .from('contacts')
         .update({
           name: name.trim() || null,
-          phone_number: cleanPhone,
+          phone_number: cleanPhone || null,
           oficina: oficina.trim() || null,
           email: email.trim() || null,
           tags: selectedTags.length > 0 ? selectedTags : null,
@@ -178,14 +184,13 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-phone">Telefone *</Label>
+            <Label htmlFor="edit-phone">Telefone</Label>
             <Input
               id="edit-phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Ex: 5511999999999"
               className="bg-slate-950 border-slate-800"
-              required
             />
             <p className="text-xs text-slate-500">Formato: código do país + DDD + número</p>
           </div>

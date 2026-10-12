@@ -62,9 +62,10 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Telefone é opcional (contato pode ser só-e-mail) — se preenchido,
+    // precisa ter pelo menos 10 dígitos; se vazio, vira NULL.
     const cleanPhone = formatPhone(phone);
-    
-    if (!cleanPhone || cleanPhone.length < 10) {
+    if (cleanPhone && cleanPhone.length < 10) {
       toast.error('Telefone inválido. Digite pelo menos 10 dígitos.');
       return;
     }
@@ -74,25 +75,33 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
       return;
     }
 
+    if (!cleanPhone && !email.trim()) {
+      toast.error('Informe pelo menos telefone ou e-mail.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Verificar se já existe contato com esse telefone
-      const { data: existing } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('phone_number', cleanPhone)
-        .single();
+      if (cleanPhone) {
+        const { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('phone_number', cleanPhone)
+          .maybeSingle();
 
-      if (existing) {
-        toast.error('Já existe um contato com esse telefone.');
-        return;
+        if (existing) {
+          toast.error('Já existe um contato com esse telefone.');
+          setLoading(false);
+          return;
+        }
       }
 
       const { error } = await supabase
         .from('contacts')
         .insert({
           name: name.trim() || null,
-          phone_number: cleanPhone,
+          phone_number: cleanPhone || null,
           oficina: oficina.trim() || null,
           email: email.trim() || null,
           tags: selectedTags.length > 0 ? selectedTags : null,
@@ -158,14 +167,13 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
 
           {/* Telefone */}
           <div className="space-y-2">
-            <Label htmlFor="phone">Telefone *</Label>
+            <Label htmlFor="phone">Telefone</Label>
             <Input
               id="phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Ex: 5511999999999"
               className="bg-slate-950 border-slate-800"
-              required
             />
             <p className="text-xs text-slate-500">Formato: código do país + DDD + número</p>
           </div>
