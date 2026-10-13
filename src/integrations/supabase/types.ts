@@ -3095,6 +3095,33 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_replies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          text: string
+          trigger: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          text: string
+          trigger: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          text?: string
+          trigger?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recurring_campaign_send_rules: {
         Row: {
           ab_auto_winner: boolean

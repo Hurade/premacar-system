@@ -50,6 +50,7 @@ import { PipelineDrawer } from './chat/PipelineDrawer';
 import { HistorySessionBlock } from './chat/HistorySessionBlock';
 import { VoiceCallsPanel } from './chat/VoiceCallsPanel';
 import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
+import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 type FilterType = 'all' | 'unread' | 'favorite';
@@ -137,9 +138,10 @@ const ChatInterface: React.FC = () => {
   const [signatureEnabled, setSignatureEnabled] = useState(true);
   const [isInternalMode, setIsInternalMode] = useState(false);
   const [showCopilot, setShowCopilot] = useState(false);
-  const [quickReplies, setQuickReplies] = useState<{ trigger: string; text: string }[]>(() => {
-    try { return JSON.parse(localStorage.getItem('prema_quick_replies') || '[]'); } catch { return []; }
-  });
+  // Antes vivia só em localStorage ('prema_quick_replies') — sumia com
+  // limpeza de cache/troca de navegador e nunca era visto pelo resto da
+  // equipe. Agora persiste de verdade, compartilhado (ver useQuickReplies).
+  const { replies: quickReplies, addReply: addQuickReply, deleteReply: deleteQuickReply } = useQuickReplies();
   const [showQuickRepliesPanel, setShowQuickRepliesPanel] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [sharedContactStatus, setSharedContactStatus] = useState<Record<string, 'exists' | 'added'>>({});
@@ -2295,9 +2297,9 @@ const ChatInterface: React.FC = () => {
                       <Zap className="w-3 h-3" />
                       Respostas rápidas
                     </div>
-                    {filteredQuickReplies.map((qr, i) => (
+                    {filteredQuickReplies.map((qr) => (
                       <button
-                        key={i}
+                        key={qr.id}
                         onClick={() => { setInputText(expandQuickReply(qr.text)); setShowQuickRepliesPanel(false); textareaRef.current?.focus(); }}
                         className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-slate-800 transition-colors text-left"
                       >
@@ -2784,9 +2786,7 @@ const ChatInterface: React.FC = () => {
                         if (!trigger) return;
                         const text = window.prompt('Texto da resposta:');
                         if (!text) return;
-                        const updated = [...quickReplies, { trigger: trigger.replace(/\s/g, '_').toLowerCase(), text }];
-                        setQuickReplies(updated);
-                        localStorage.setItem('prema_quick_replies', JSON.stringify(updated));
+                        addQuickReply(trigger.replace(/\s/g, '_').toLowerCase(), text).catch(() => toast.error('Erro ao salvar resposta rápida'));
                       }}
                       className="text-cyan-500 hover:text-cyan-400 transition-colors"
                       title="Adicionar resposta rápida"
@@ -2798,18 +2798,14 @@ const ChatInterface: React.FC = () => {
                     <p className="text-xs text-slate-500 italic">Nenhuma resposta rápida. Digite / no chat para usar.</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {quickReplies.map((qr, i) => (
-                        <div key={i} className="flex items-start gap-2 bg-slate-800/50 rounded-lg px-3 py-2">
+                      {quickReplies.map((qr) => (
+                        <div key={qr.id} className="flex items-start gap-2 bg-slate-800/50 rounded-lg px-3 py-2">
                           <span className="text-xs bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono shrink-0">/{qr.trigger}</span>
                           <span className="text-xs text-slate-400 flex-1 truncate">{qr.text}</span>
                           <button
                             type="button"
                             title="Remover resposta rápida"
-                            onClick={() => {
-                              const updated = quickReplies.filter((_, idx) => idx !== i);
-                              setQuickReplies(updated);
-                              localStorage.setItem('prema_quick_replies', JSON.stringify(updated));
-                            }}
+                            onClick={() => deleteQuickReply(qr.id).catch(() => toast.error('Erro ao remover resposta rápida'))}
                             className="text-slate-600 hover:text-red-400 transition-colors shrink-0"
                           >
                             <X className="w-3 h-3" />
