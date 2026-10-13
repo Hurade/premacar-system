@@ -43,8 +43,14 @@ PremaCar é uma **plataforma SaaS de automação de pós-venda** para oficinas m
 
 ### **Modelo de Negócio:**
 
-- SaaS por assinatura: R$ 650/mês
-- Trial gratuito: 14 dias
+> ⚠️ Corrigido em 13/10/2026 — a versão anterior deste bloco (R$650/mês,
+> "trial gratuito de 14 dias") estava desatualizada e **incorreta**: o
+> plano Free é permanente, não um trial por tempo limitado. O mesmo erro
+> estava escrito no prompt do agente Comercial (agent_configs) e já foi
+> corrigido lá também.
+
+- Plano Free: permanente e gratuito (dashboard básico, funil de atribuição, NPS automático por WhatsApp, gestão de detratores) — NÃO é trial.
+- Planos pagos: Mensurar R$299/mês · Fidelizar R$497/mês (+ integração com ERP, fluxos do motor, multi-loja) · Recuperar R$997/mês (+ campanhas automáticas de recuperação de inativos, suporte prioritário).
 - Setup em 12 minutos
 
 ---
