@@ -141,7 +141,9 @@ const ChatInterface: React.FC = () => {
   // Antes vivia só em localStorage ('prema_quick_replies') — sumia com
   // limpeza de cache/troca de navegador e nunca era visto pelo resto da
   // equipe. Agora persiste de verdade, compartilhado (ver useQuickReplies).
-  const { replies: quickReplies, addReply: addQuickReply, deleteReply: deleteQuickReply } = useQuickReplies();
+  // Gestão (criar/editar/apagar) fica só em Configurações — aqui só usa
+  // pra autocompletar no input quando o atendente digita "/".
+  const { replies: quickReplies } = useQuickReplies();
   const [showQuickRepliesPanel, setShowQuickRepliesPanel] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [sharedContactStatus, setSharedContactStatus] = useState<Record<string, 'exists' | 'added'>>({});
@@ -2773,47 +2775,6 @@ const ChatInterface: React.FC = () => {
                       <p className="text-xs text-slate-500 italic">Nenhuma tag adicionada</p>
                     )}
                   </div>
-                </div>
-
-                {/* Quick Replies Management */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                    <span className="flex items-center gap-2"><Zap className="w-4 h-4" />Respostas Rápidas</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const trigger = window.prompt('Atalho (ex: oi, preco, demo):');
-                        if (!trigger) return;
-                        const text = window.prompt('Texto da resposta:');
-                        if (!text) return;
-                        addQuickReply(trigger.replace(/\s/g, '_').toLowerCase(), text).catch(() => toast.error('Erro ao salvar resposta rápida'));
-                      }}
-                      className="text-cyan-500 hover:text-cyan-400 transition-colors"
-                      title="Adicionar resposta rápida"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </h4>
-                  {quickReplies.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic">Nenhuma resposta rápida. Digite / no chat para usar.</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {quickReplies.map((qr) => (
-                        <div key={qr.id} className="flex items-start gap-2 bg-slate-800/50 rounded-lg px-3 py-2">
-                          <span className="text-xs bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono shrink-0">/{qr.trigger}</span>
-                          <span className="text-xs text-slate-400 flex-1 truncate">{qr.text}</span>
-                          <button
-                            type="button"
-                            title="Remover resposta rápida"
-                            onClick={() => deleteQuickReply(qr.id).catch(() => toast.error('Erro ao remover resposta rápida'))}
-                            className="text-slate-600 hover:text-red-400 transition-colors shrink-0"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Notes Area */}
