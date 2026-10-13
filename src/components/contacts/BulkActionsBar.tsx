@@ -63,7 +63,10 @@ const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
             </div>
           ) : (
             tags.filter(t => t.is_active).map(tag => (
-              <SelectItem key={tag.id} value={tag.key}>
+              // contacts.tags guarda o LABEL (ex: "Nao Interessado"), não a
+              // key slugificada ("nao_interessado") — mesmo engano já
+              // corrigido no filtro de tags (TagManager/Contacts.tsx).
+              <SelectItem key={tag.id} value={tag.label}>
                 <div className="flex items-center gap-2">
                   <span 
                     className="w-2 h-2 rounded-full" 

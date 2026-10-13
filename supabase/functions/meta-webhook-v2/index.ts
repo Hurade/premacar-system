@@ -765,15 +765,21 @@ async function processMetaWebhookAsync(
         }
 
         // ═══════════════════════════════════════════
-        // 4c. BOTÃO DE OPT-OUT ("Não tenho interesse") DE TEMPLATE DE CAMPANHA
+        // 4c. OPT-OUT ("Não tenho interesse") — BOTÃO DE TEMPLATE OU TEXTO LIVRE
         // ═══════════════════════════════════════════
-        // Clique nesse quick-reply chega como mensagem tipo 'button' — texto
-        // igual ao configurado no template. Responde direto (sem IA), bota
-        // o telefone na blacklist (campaign_blacklist já é checada por
-        // qualquer campanha, atual e futura) e não processa mais nada desta
-        // mensagem.
-        if (messageType === 'button' && message.button?.text === 'Não tenho interesse') {
-          console.log('[Meta Async] 🙅 Opt-out via botão de template:', contact.id);
+        // Clique no quick-reply chega como mensagem tipo 'button'. Mas o
+        // mesmo texto também chega digitado livremente (ex: cliente lê
+        // "Não tenho interesse" no botão e simplesmente digita a mesma
+        // frase em vez de clicar) — sem pegar os dois casos aqui, esse
+        // segundo ficava sem tag/blacklist, dependendo só da IA chamar a
+        // tool stop_campaign_contact (que não é 100% confiável: já visto
+        // antes a IA "esquecer" de chamar uma tool). Match exato (não
+        // substring) pra não pegar frases mais longas tipo "no momento não
+        // tenho interesse, mas me conta mais" por engano.
+        const isOptOutButton = messageType === 'button' && message.button?.text === 'Não tenho interesse';
+        const isOptOutFreeText = messageContent?.trim().toLowerCase().replace(/[.!]+$/, '') === 'não tenho interesse';
+        if (isOptOutButton || isOptOutFreeText) {
+          console.log(`[Meta Async] 🙅 Opt-out via ${isOptOutButton ? 'botão' : 'texto livre'}:`, contact.id);
 
           const optOutText = `Tudo certo, ${contact.call_name || contact.name || ''}. Você não vai mais receber mensagens desta campanha. Se um dia quiser voltar, é só chamar aqui.`.replace('  ', ' ');
 
@@ -800,9 +806,29 @@ async function processMetaWebhookAsync(
             await supabase
               .from('campaign_blacklist')
               .upsert(
-                { user_id: contact.user_id, phone: contact.phone_number, reason: 'Opt-out via botão "Não tenho interesse" em template de campanha' },
+                { user_id: contact.user_id, phone: contact.phone_number, reason: `Opt-out via ${isOptOutButton ? 'botão' : 'texto'} "Não tenho interesse"` },
                 { onConflict: 'user_id,phone' }
               );
+          }
+
+          // Tag visível no contato (antes só a blacklist acontecia — nada
+          // indicava visualmente, na tela de Chat, que o contato pediu
+          // pra parar) + cancela a campanha atual, mesmo efeito da tool
+          // stop_campaign_contact (nina-orchestrator) usada no texto livre
+          // não-exato processado pela IA.
+          const currentContactTags: string[] = contact.tags || [];
+          if (!currentContactTags.includes('Nao Interessado')) {
+            await supabase
+              .from('contacts')
+              .update({ tags: [...currentContactTags, 'Nao Interessado'] })
+              .eq('id', contact.id);
+          }
+          if (conversation.campaign_id) {
+            await supabase
+              .from('campaign_contacts')
+              .update({ status: 'cancelled' })
+              .eq('campaign_id', conversation.campaign_id)
+              .eq('contact_id', contact.id);
           }
 
           continue;
