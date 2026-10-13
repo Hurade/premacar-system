@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Zap, Plus, Trash2, Pencil, Check, X, Copy, Loader2 } from 'lucide-react';
+import { Zap, Plus, Trash2, Pencil, Check, X, Copy, Loader2, Globe2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { useQuickReplies } from '@/hooks/useQuickReplies';
+import { useQuickReplies, QuickReplyScope } from '@/hooks/useQuickReplies';
 
 const VARIABLES = [
   { var: '{{nome}}', label: 'Nome do contato', example: 'João' },
@@ -13,9 +13,11 @@ const QuickRepliesSettings: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [newTrigger, setNewTrigger] = useState('');
   const [newText, setNewText] = useState('');
+  const [newScope, setNewScope] = useState<QuickReplyScope>('global');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTrigger, setEditTrigger] = useState('');
   const [editText, setEditText] = useState('');
+  const [editScope, setEditScope] = useState<QuickReplyScope>('global');
   const [saving, setSaving] = useState(false);
 
   const handleAdd = async () => {
@@ -25,9 +27,10 @@ const QuickRepliesSettings: React.FC = () => {
     if (replies.some(r => r.trigger === trigger)) { toast.error('Este atalho já existe'); return; }
     setSaving(true);
     try {
-      await addReply(trigger, text);
+      await addReply(trigger, text, newScope);
       setNewTrigger('');
       setNewText('');
+      setNewScope('global');
       setAdding(false);
       toast.success('Resposta rápida adicionada');
     } catch {
@@ -52,6 +55,7 @@ const QuickRepliesSettings: React.FC = () => {
     setEditingId(id);
     setEditTrigger(reply.trigger);
     setEditText(reply.text);
+    setEditScope(reply.scope);
   };
 
   const handleSaveEdit = async () => {
@@ -63,7 +67,7 @@ const QuickRepliesSettings: React.FC = () => {
     if (conflict) { toast.error('Este atalho já existe'); return; }
     setSaving(true);
     try {
-      await updateReply(editingId, trigger, text);
+      await updateReply(editingId, trigger, text, editScope);
       setEditingId(null);
       toast.success('Resposta atualizada');
     } catch {
@@ -72,6 +76,31 @@ const QuickRepliesSettings: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const ScopeToggle = ({ value, onChange }: { value: QuickReplyScope; onChange: (v: QuickReplyScope) => void }) => (
+    <div className="flex gap-1.5">
+      <button
+        type="button"
+        onClick={() => onChange('global')}
+        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${
+          value === 'global' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'border-slate-700 text-slate-500 hover:text-slate-300'
+        }`}
+        title="Visível e editável por toda a equipe"
+      >
+        <Globe2 className="w-3 h-3" /> Global
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('individual')}
+        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${
+          value === 'individual' ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'border-slate-700 text-slate-500 hover:text-slate-300'
+        }`}
+        title="Visível e editável só por você"
+      >
+        <Lock className="w-3 h-3" /> Individual
+      </button>
+    </div>
+  );
 
   const insertVar = (v: string, target: 'new' | 'edit') => {
     if (target === 'new') setNewText(prev => prev + v);
@@ -164,26 +193,36 @@ const QuickRepliesSettings: React.FC = () => {
                         placeholder="Texto da resposta com {{nome}} e {{saudacao}}"
                       />
                     </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-100 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
-                      >
-                        <X className="w-3 h-3" /> Cancelar
-                      </button>
-                      <button
-                        onClick={handleSaveEdit}
-                        disabled={saving}
-                        className="flex items-center gap-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <Check className="w-3 h-3" /> Salvar
-                      </button>
+                    <div className="flex items-center justify-between">
+                      <ScopeToggle value={editScope} onChange={setEditScope} />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-100 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                        >
+                          <X className="w-3 h-3" /> Cancelar
+                        </button>
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <Check className="w-3 h-3" /> Salvar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-start gap-3">
                     <span className="shrink-0 font-mono text-sm bg-slate-800 text-cyan-400 px-2 py-1 rounded-lg">
                       /{reply.trigger}
+                    </span>
+                    <span className="shrink-0 mt-1" title={reply.scope === 'individual' ? 'Individual' : 'Global'}>
+                      {reply.scope === 'individual' ? (
+                        <Lock className="w-3.5 h-3.5 text-amber-500" />
+                      ) : (
+                        <Globe2 className="w-3.5 h-3.5 text-cyan-500" />
+                      )}
                     </span>
                     <p className="flex-1 text-sm text-slate-300 whitespace-pre-wrap break-words">{reply.text}</p>
                     <div className="flex gap-1 shrink-0">
@@ -244,9 +283,11 @@ const QuickRepliesSettings: React.FC = () => {
                 placeholder="Texto da resposta. Use {{nome}} e {{saudacao}} para variáveis automáticas."
               />
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex items-center justify-between">
+              <ScopeToggle value={newScope} onChange={setNewScope} />
+              <div className="flex gap-2 justify-end">
               <button
-                onClick={() => { setAdding(false); setNewTrigger(''); setNewText(''); }}
+                onClick={() => { setAdding(false); setNewTrigger(''); setNewText(''); setNewScope('global'); }}
                 className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-100 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
               >
                 <X className="w-3 h-3" /> Cancelar
@@ -258,6 +299,7 @@ const QuickRepliesSettings: React.FC = () => {
               >
                 <Check className="w-3 h-3" /> Adicionar
               </button>
+              </div>
             </div>
           </div>
         )}

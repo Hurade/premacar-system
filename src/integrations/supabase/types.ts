@@ -3100,6 +3100,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          scope: string
           text: string
           trigger: string
           updated_at: string
@@ -3108,6 +3109,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          scope?: string
           text: string
           trigger: string
           updated_at?: string
@@ -3116,6 +3118,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          scope?: string
           text?: string
           trigger?: string
           updated_at?: string
