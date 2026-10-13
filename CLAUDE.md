@@ -49,9 +49,10 @@ PremaCar é uma **plataforma SaaS de automação de pós-venda** para oficinas m
 > estava escrito no prompt do agente Comercial (agent_configs) e já foi
 > corrigido lá também.
 
-- Plano Free: permanente e gratuito (dashboard básico, funil de atribuição, NPS automático por WhatsApp, gestão de detratores) — NÃO é trial.
-- Planos pagos: Mensurar R$299/mês · Fidelizar R$497/mês (+ integração com ERP, fluxos do motor, multi-loja) · Recuperar R$997/mês (+ campanhas automáticas de recuperação de inativos, suporte prioritário).
+- Plano Free: permanente e gratuito (dashboard básico, funil de atribuição, dashboard ROI, NPS automático por WhatsApp, gestão de detratores, White Label) — NÃO é trial.
+- Planos pagos (valor mensal · valor no anual, 20% off, compromisso de 12 meses): Mensurar R$99 · R$79,20/mês · Fidelizar R$199 · R$159,20/mês (+ integração com ERP, fluxos do motor, multi-loja) · Recuperar R$299 · R$239,20/mês (+ campanhas automáticas de recuperação de inativos, suporte prioritário).
 - Setup em 12 minutos
+- Valores atualizados em 13/10/2026 — conferir a tela de planos real antes de citar preço em qualquer contexto novo, já mudou mais de uma vez.
 
 ---
 
