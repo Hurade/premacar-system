@@ -96,6 +96,26 @@ function sanitizeCacheKey(mediaId: string): string {
   return mediaId.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+// URL assinada pra mídia que já está no cache (null se não estiver, ou em
+// qualquer erro). Permite ao media-proxy redirecionar o navegador direto pro
+// Storage em vez de baixar o arquivo e reenviar os bytes pela function —
+// que contava o mesmo arquivo duas vezes no egress.
+export async function getCachedMediaSignedUrl(
+  supabase: any,
+  mediaId: string,
+  expiresInSeconds: number
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(MEDIA_CACHE_BUCKET)
+      .createSignedUrl(sanitizeCacheKey(mediaId), expiresInSeconds);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
+}
+
 // Baixa mídia com cache best-effort no Storage (bucket privado, só service_role).
 // A Evolution API só garante servir a mesma mensagem de forma confiável
 // UMA vez (getBase64FromMediaMessage falha em chamadas repetidas pro

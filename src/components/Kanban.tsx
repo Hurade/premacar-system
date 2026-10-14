@@ -122,6 +122,70 @@ const Kanban: React.FC = () => {
     }, 1500);
   };
 
+  // Espelho de `deals` pros callbacks de realtime (registrados uma vez só,
+  // no mount) decidirem se dá pra atualizar o estado local ou se precisa
+  // de um fetchPipeline() completo.
+  const dealsRef = useRef<Deal[]>([]);
+  useEffect(() => { dealsRef.current = deals; }, [deals]);
+
+  // UPDATE de deal já carregado: aplica os campos do próprio payload em vez
+  // de rebaixar o pipeline inteiro (~18 mil deals). Troca de responsável
+  // precisa do join com team_members (nome/avatar) → refetch completo.
+  const handleDealUpdate = (row: any) => {
+    const current = dealsRef.current.find(d => d.id === row?.id);
+    if (!current || (row.owner_id ?? undefined) !== current.ownerId || row.contact_id !== current.contactId) {
+      scheduleRefetchPipeline();
+      return;
+    }
+    setDeals(prev => prev.map(d => d.id !== row.id ? d : {
+      ...d,
+      title: row.title,
+      company: row.company || d.contactName || 'Sem empresa',
+      value: Number(row.value) || 0,
+      stage: row.stage,
+      stageId: row.stage_id,
+      tags: row.tags || [],
+      dueDate: row.due_date,
+      priority: (row.priority || 'medium') as 'low' | 'medium' | 'high',
+      wonAt: row.won_at,
+      lostAt: row.lost_at,
+      lostReason: row.lost_reason,
+    }));
+  };
+
+  // Cada mensagem nova atualiza conversations.last_message_at — antes isso
+  // disparava um fetchPipeline() completo a cada mensagem com o Pipeline
+  // aberto (maior fonte de egress do Supabase). Agora só atualiza os deals
+  // daquele contato; refetch só quando nenhum deal carregado é do contato
+  // (pode ser um lead novo que passa a aparecer no funil).
+  const handleConversationUpdate = (row: any) => {
+    if (!row?.contact_id) return;
+    if (!dealsRef.current.some(d => d.contactId === row.contact_id)) {
+      scheduleRefetchPipeline();
+      return;
+    }
+    setDeals(prev => prev.map(d => d.contactId !== row.contact_id ? d : {
+      ...d,
+      conversationId: row.id,
+      hasActiveConversation: true,
+      lastConversationAt: row.last_message_at || d.lastConversationAt || null,
+    }));
+  };
+
+  // client_memory não vem mais na listagem do pipeline — busca só do deal
+  // aberto no drawer.
+  useEffect(() => {
+    const dealId = selectedDeal?.id;
+    const contactId = selectedDeal?.contactId;
+    if (!dealId || !contactId || selectedDeal?.clientMemory) return;
+    let cancelled = false;
+    api.fetchContactMemory(contactId).then(memory => {
+      if (cancelled || !memory) return;
+      setSelectedDeal(prev => prev && prev.id === dealId ? { ...prev, clientMemory: memory } : prev);
+    });
+    return () => { cancelled = true; };
+  }, [selectedDeal?.id]);
+
   useEffect(() => {
     const loadStages = async () => {
       try {
@@ -166,7 +230,10 @@ const Kanban: React.FC = () => {
           schema: 'public',
           table: 'deals'
         },
-        () => scheduleRefetchPipeline()
+        (payload) => {
+          if (payload.eventType === 'UPDATE') handleDealUpdate(payload.new);
+          else scheduleRefetchPipeline();
+        }
       )
       .subscribe();
 
@@ -197,7 +264,7 @@ const Kanban: React.FC = () => {
           table: 'conversations',
           filter: 'status=in.(nina,human)'
         },
-        () => scheduleRefetchPipeline()
+        (payload) => handleConversationUpdate(payload.new)
       )
       .subscribe();
 

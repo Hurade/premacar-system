@@ -33,10 +33,27 @@ serve(async (req) => {
 
     if (candErr) throw candErr;
 
+    // Atendentes com Siga-me ativo, buscados 1x por execução. Antes a
+    // última mensagem de TODA conversa humana era buscada a cada minuto
+    // (~8 mil queries/dia) antes de saber se o atendente tinha Siga-me.
+    const assignedIds = [...new Set((candidates || []).map(c => c.assigned_user_id))];
+    const membersById = new Map<string, { id: string; name: string; notification_phone: string | null; follow_me_enabled: boolean | null; follow_me_delay_minutes: number | null }>();
+    if (assignedIds.length > 0) {
+      const { data: members, error: membersErr } = await supabase
+        .from('team_members')
+        .select('id, name, notification_phone, follow_me_enabled, follow_me_delay_minutes')
+        .in('id', assignedIds);
+      if (membersErr) throw membersErr;
+      for (const m of members || []) membersById.set(m.id, m);
+    }
+
     let notified = 0;
     let checked = 0;
 
     for (const conv of candidates || []) {
+      const teamMember = membersById.get(conv.assigned_user_id);
+      if (!teamMember || !teamMember.follow_me_enabled || !teamMember.notification_phone) continue;
+
       checked++;
       try {
         const { data: lastMsg } = await supabase
@@ -52,14 +69,6 @@ serve(async (req) => {
 
         // Já avisamos sobre essa mesma mensagem antes — não repete
         if (conv.follow_me_notified_message_id === lastMsg.id) continue;
-
-        const { data: teamMember } = await supabase
-          .from('team_members')
-          .select('id, name, notification_phone, follow_me_enabled, follow_me_delay_minutes')
-          .eq('id', conv.assigned_user_id)
-          .maybeSingle();
-
-        if (!teamMember || !teamMember.follow_me_enabled || !teamMember.notification_phone) continue;
 
         const delayMs = (teamMember.follow_me_delay_minutes ?? 5) * 60 * 1000;
         const waitedMs = Date.now() - new Date(lastMsg.sent_at).getTime();

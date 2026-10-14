@@ -50,6 +50,11 @@ const updateDocumentTitle = (unreadCount: number) => {
   }
 };
 
+// Fallback quando o realtime cai: cada fetchConversations() traz até 100
+// conversas × 100 mensagens. A cada 4s isso sozinho consumia o egress do
+// plano em poucas horas com uma aba aberta.
+const POLLING_FALLBACK_MS = 30_000;
+
 export function useConversations() {
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,19 +141,24 @@ export function useConversations() {
         if (!include) return false;
       }
 
-      const { data: messages, error: msgError } = await supabase
+      // Mesmo limite de fetchConversations (últimas 100) — antes buscava o
+      // histórico inteiro da conversa a cada evento de realtime.
+      const { data: messagesDesc, error: msgError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('sent_at', { ascending: true });
+        .order('sent_at', { ascending: false })
+        .limit(100);
 
       if (msgError) {
         console.error('[Realtime] Error fetching messages:', msgError);
       }
 
+      const messages = ((messagesDesc || []) as DBMessage[]).slice().reverse();
+
       const uiConversation = transformDBToUIConversation(
         convData as unknown as DBConversation,
-        (messages || []) as DBMessage[]
+        messages
       );
 
       // Add new conversation to state (at top, sorted by recency)
@@ -402,11 +412,11 @@ export function useConversations() {
           setRealtimeConnected(false);
           // Start polling fallback
           if (!pollingIntervalRef.current) {
-            console.log('[Realtime] 🔄 Starting polling fallback (every 4s)...');
+            console.log('[Realtime] 🔄 Starting polling fallback (every 30s)...');
             pollingIntervalRef.current = setInterval(() => {
               console.log('[Realtime] 📡 Polling for updates...');
               fetchConversations();
-            }, 4000);
+            }, POLLING_FALLBACK_MS);
           }
           // Also attempt immediate fetch
           setTimeout(() => fetchConversations(), 2000);
@@ -419,7 +429,7 @@ export function useConversations() {
             pollingIntervalRef.current = setInterval(() => {
               console.log('[Realtime] 📡 Polling for updates...');
               fetchConversations();
-            }, 4000);
+            }, POLLING_FALLBACK_MS);
           }
           setTimeout(() => fetchConversations(), 3000);
         }

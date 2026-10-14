@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getOrDownloadMedia } from "../_shared/media.ts";
+import { getCachedMediaSignedUrl, getOrDownloadMedia } from "../_shared/media.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +26,22 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Mídia já em cache: redireciona pro Storage (URL assinada) — sem as 3
+    // queries de credenciais abaixo e sem trafegar o arquivo pela function.
+    // O redirect fica em cache no navegador por menos tempo que a validade
+    // da URL assinada, pra nunca apontar pra uma assinatura expirada.
+    const signedUrl = await getCachedMediaSignedUrl(supabase, mediaId, 60 * 60 * 24);
+    if (signedUrl) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': signedUrl,
+          'Cache-Control': 'private, max-age=43200',
+        }
+      });
+    }
 
     // Credenciais da CONEXÃO que recebeu essa mídia (mensagem → conversa →
     // conexão) — com múltiplas conexões Evolution (ex: Atendimento,

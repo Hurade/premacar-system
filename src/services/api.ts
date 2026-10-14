@@ -937,12 +937,18 @@ export const api = {
     // fazendo alguns deals somem (nunca aparecem em nenhuma página) ou
     // dupliquem entre execuções. id como desempate garante ordenação
     // determinística.
+    //
+    // Colunas explícitas e SEM contacts.client_memory: com ~18 mil deals,
+    // `deals.*` + client_memory somavam ~18 MB por carregamento do Pipeline
+    // (egress do Supabase). client_memory só é usado no drawer de um deal
+    // aberto — buscado sob demanda via fetchContactMemory().
     const PAGE_SIZE = 1000;
     const dealsPageQuery = (from: number) => supabase
       .from('deals')
       .select(`
-        *,
-        contact:contacts(name, call_name, phone_number, email, client_memory),
+        id, contact_id, title, company, value, stage, stage_id, priority, tags,
+        due_date, owner_id, won_at, lost_at, lost_reason, created_at,
+        contact:contacts(name, call_name, phone_number, email),
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false })
@@ -1030,7 +1036,6 @@ export const api = {
         wonAt: d.won_at,
         lostAt: d.lost_at,
         lostReason: d.lost_reason,
-        clientMemory: d.contact?.client_memory || null,
         conversationId: conv?.id || null,
         hasActiveConversation: conv?.isActive === true,
         lastConversationAt: conv?.lastMessageAt || null,
@@ -1071,7 +1076,7 @@ export const api = {
     // trigger sync_deal_stage_on_conversation_lifecycle.
     const { data: activeConvsOrphan, error: orphanError } = await supabase
       .from('conversations')
-      .select('id, contact_id, status, window_status, last_message_at, contact:contacts(id, name, call_name, phone_number, email, client_memory)')
+      .select('id, contact_id, status, window_status, last_message_at, contact:contacts(id, name, call_name, phone_number, email)')
       .eq('status', 'nina')
       .eq('is_active', true);
 
@@ -1111,7 +1116,6 @@ export const api = {
           wonAt: undefined,
           lostAt: undefined,
           lostReason: undefined,
-          clientMemory: contact?.client_memory || null,
           conversationId: conv.id,
           hasActiveConversation: true,
           lastConversationAt: conv.last_message_at || null,
@@ -1120,6 +1124,23 @@ export const api = {
     }
 
     return finalDeals;
+  },
+
+  /**
+   * client_memory de um único contato — usado pelo drawer do Pipeline ao
+   * abrir um deal (não vem mais na listagem, ver fetchPipeline).
+   */
+  fetchContactMemory: async (contactId: string): Promise<Deal['clientMemory'] | null> => {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('client_memory')
+      .eq('id', contactId)
+      .maybeSingle();
+    if (error) {
+      console.error('[API] Error fetching contact memory:', error);
+      return null;
+    }
+    return (data?.client_memory as unknown as Deal['clientMemory']) || null;
   },
 
   // Pipeline Stages CRUD
