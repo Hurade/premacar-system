@@ -1,5 +1,6 @@
 import { Check, AlertCircle, Loader2, ChevronRight, TrendingUp, Shield, Star, Zap, Phone, Mail } from 'lucide-react'
-import { PLANOS_PADRAO, formatarMoeda, calcularTotal, descFidelidadePct, type PlanoTipo, type Proposta, DOR_LABELS } from '@/types/propostas'
+import { PLANOS_PADRAO, formatarMoeda, type PlanoTipo, type Proposta, DOR_LABELS } from '@/types/propostas'
+import { VERTICAL_CONTENT } from '@/components/apresentacoes/decks/oficina-direta/content'
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -38,12 +39,26 @@ export function PropostaDocument({ proposta, accepted = false, isPending = false
   const planoTipo = proposta.plano?.tipo as PlanoTipo | undefined
   const planoInfo = planoTipo ? PLANOS_PADRAO[planoTipo] : null
   const unidades = proposta.unidades ?? 1
-  const fidelidade = proposta.fidelidade_meses ?? 0
   const extras = proposta.extras ?? []
-  const pctFid = descFidelidadePct(fidelidade, planoTipo)
+  const totalExtras = extras.reduce((a, e) => a + e.valor, 0)
+  const temDesconto = proposta.desconto_percentual > 0
+
+  // Três formas de pagamento mostradas juntas (cliente escolhe), não uma
+  // pergunta no ato de criar a proposta: preço de tabela, com o desconto
+  // extra que o vendedor aplicou (se houver) e anual no cartão — que soma
+  // mais 20%, compondo sobre o desconto extra já aplicado. Os extras
+  // (addons) nunca entram no desconto, em nenhuma das três colunas.
   const valorBase = proposta.valor_mensal * unidades
-  const aposF = valorBase * (1 - pctFid / 100)
-  const valorTotal = calcularTotal(proposta.valor_mensal, unidades, fidelidade, proposta.desconto_percentual, planoTipo, extras)
+  const comDesconto = valorBase * (1 - proposta.desconto_percentual / 100)
+  const comAnual = comDesconto * 0.8
+  const totalTabela = valorBase + totalExtras
+  const totalComDesconto = comDesconto + totalExtras
+  const totalAnual = comAnual + totalExtras
+  // Total "oficial" da proposta (destacado na capa) é o valor mensal com o
+  // desconto extra já aplicado — o anual é uma opção melhor, mostrada à parte.
+  const valorTotal = totalComDesconto
+
+  const vertical = VERTICAL_CONTENT[proposta.atuacao_principal ?? 'outro']
   const validade = proposta.validade_ate
     ? new Date(proposta.validade_ate).toLocaleDateString('pt-BR')
     : null
@@ -99,13 +114,10 @@ export function PropostaDocument({ proposta, accepted = false, isPending = false
               <span>{formatarMoeda(valorTotal)}/mês</span>
             )}
           </div>
-          {(pctFid > 0 || proposta.desconto_percentual > 0) && (
-            <p className="mt-2 text-sm" style={{ color: '#9B5ABE' }}>
-              {pctFid > 0 && `Anual no cartão: -${pctFid}%`}
-              {pctFid > 0 && proposta.desconto_percentual > 0 && ' · '}
-              {proposta.desconto_percentual > 0 && `Desconto adicional: -${proposta.desconto_percentual}%`}
-            </p>
-          )}
+          <p className="mt-2 text-sm" style={{ color: '#9B5ABE' }}>
+            {temDesconto && `Desconto adicional: -${proposta.desconto_percentual}% · `}
+            Pagando anual no cartão: {formatarMoeda(totalAnual)}/mês (-20%)
+          </p>
         </div>
       </div>
 
@@ -171,16 +183,11 @@ export function PropostaDocument({ proposta, accepted = false, isPending = false
           </section>
         )}
 
-        {/* Motor de Pós-Venda */}
+        {/* Motor de Pós-Venda — personalizado pelo tipo de serviço do lead */}
         <section>
           <SectionTitle>Como Funciona — Motor de Pós-Venda (Ciclo de 90 Dias)</SectionTitle>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            {[
-              { day: 'Dia 0', title: 'O.S. Fechada no Sistema', desc: 'O sistema absorve os dados automaticamente, sem intervenção humana.' },
-              { day: 'Dia 3', title: 'NPS Automático', desc: 'Pesquisa de satisfação enviada. Clientes satisfeitos são direcionados para o Google.' },
-              { day: 'Dia 80', title: 'Cashback & Bônus', desc: 'Lembrete automático com saldo disponível para o próximo serviço.' },
-              { day: 'Dia 90', title: 'Rodízio e Retorno', desc: 'O cliente retorna. O ciclo se reinicia sozinho.' },
-            ].map(s => (
+            {vertical.cycleStages.map(s => (
               <div key={s.day} className="p-3 rounded-xl border" style={{ backgroundColor: '#3A1750', borderColor: '#5D267A' }}>
                 <span className="text-xs font-bold" style={{ color: '#9B5ABE' }}>{s.day}</span>
                 <p className="font-semibold text-slate-100 text-sm mt-1 mb-1">{s.title}</p>
@@ -189,7 +196,7 @@ export function PropostaDocument({ proposta, accepted = false, isPending = false
             ))}
           </div>
           <p className="text-xs mt-3" style={{ color: '#C8C4CE' }}>
-            E se o cliente não voltar? O módulo de Recuperação de Inativos entra em ação automaticamente, com condições especiais escalonadas para trazê-lo de volta à base.
+            {vertical.recoveryQuestion} O módulo de Recuperação de Inativos entra em ação automaticamente, com condições especiais escalonadas para trazê-lo de volta à base.
           </p>
         </section>
 
@@ -206,81 +213,97 @@ export function PropostaDocument({ proposta, accepted = false, isPending = false
           </section>
         )}
 
-        {/* Investimento */}
+        {/* Investimento — tabela, desconto extra (se houver) e anual no
+            cartão sempre lado a lado, pro cliente comparar as formas de
+            pagamento sem precisar perguntar. Extras (addons) nunca entram
+            no desconto, em nenhuma das colunas. */}
         <section>
           <SectionTitle>Investimento</SectionTitle>
-          <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #5D267A' }}>
-            {/* Breakdown */}
-            <div className="p-5 space-y-3" style={{ backgroundColor: '#3A1750' }}>
-              {/* Plano base */}
-              <div className="flex items-center justify-between text-sm">
-                <span style={{ color: '#C8C4CE' }}>
-                  {planoInfo?.nome ?? 'Plano'}
-                  {unidades > 1 && <span className="ml-1" style={{ color: '#9B5ABE' }}>× {unidades} unidades</span>}
-                </span>
-                <span className="font-medium text-slate-100">{formatarMoeda(valorBase)}/mês</span>
-              </div>
-
-              {/* Desconto anual no cartão */}
-              {pctFid > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: '#4ade80' }}>
-                    Anual no cartão (-{pctFid}%)
-                  </span>
-                  <span style={{ color: '#4ade80' }}>-{formatarMoeda(valorBase * pctFid / 100)}/mês</span>
+          <div className={`grid grid-cols-1 ${temDesconto ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
+            {[
+              {
+                label: 'Preço de Tabela',
+                badge: null,
+                precoUnidade: proposta.valor_mensal,
+                total: totalTabela,
+                nota: 'Valor padrão, sem desconto — referência para comparação.',
+                destaque: false,
+              },
+              ...(temDesconto ? [{
+                label: `Desconto de ${proposta.desconto_percentual}%`,
+                badge: null,
+                precoUnidade: proposta.valor_mensal * (1 - proposta.desconto_percentual / 100),
+                total: totalComDesconto,
+                nota: `Economia de ${formatarMoeda(totalTabela - totalComDesconto)}/mês sobre a tabela.`,
+                destaque: false,
+              }] : []),
+              {
+                label: 'Anual no Cartão (-20%)',
+                badge: 'Recomendado',
+                precoUnidade: proposta.valor_mensal * (1 - proposta.desconto_percentual / 100) * 0.8,
+                total: totalAnual,
+                nota: `Economia de ${formatarMoeda(totalTabela - totalAnual)}/mês · compromisso de 12 meses no cartão.`,
+                destaque: true,
+              },
+            ].map(card => (
+              <div
+                key={card.label}
+                className="rounded-2xl overflow-hidden flex flex-col"
+                style={{ border: card.destaque ? '1px solid #9B5ABE' : '1px solid #5D267A' }}
+              >
+                <div
+                  className="p-5 space-y-2 flex-1"
+                  style={{ backgroundColor: card.destaque ? '#3A1750' : 'rgba(58, 23, 80, 0.5)' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#9B5ABE' }}>{card.label}</span>
+                    {card.badge && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-slate-900" style={{ backgroundColor: '#FFB800' }}>{card.badge}</span>
+                    )}
+                  </div>
+                  <p className="text-2xl font-extrabold text-slate-100">
+                    {formatarMoeda(card.precoUnidade)}
+                    <span className="text-xs font-normal" style={{ color: '#C8C4CE' }}>/mês{unidades > 1 ? ' por loja' : ''}</span>
+                  </p>
+                  {unidades > 1 && (
+                    <p className="text-xs" style={{ color: '#C8C4CE' }}>
+                      {planoInfo?.nome ?? 'Plano'} × {unidades} lojas: {formatarMoeda(card.precoUnidade * unidades)}
+                      {totalExtras > 0 && <> + extras: {formatarMoeda(totalExtras)}</>}
+                    </p>
+                  )}
+                  <div className="pt-2 flex items-center justify-between" style={{ borderTop: '1px solid rgba(123,58,158,0.4)' }}>
+                    <span className="text-xs font-medium text-slate-100">Total mensal</span>
+                    <span className="text-lg font-bold text-slate-100">{formatarMoeda(card.total)}</span>
+                  </div>
+                  <p className="text-[11px]" style={{ color: '#C8C4CE' }}>{card.nota}</p>
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
 
-              {/* Contatos de campanha incluídos */}
+          {(planoInfo && planoInfo.contatosCampanhaIncluidos > 0) || extras.length > 0 ? (
+            <div className="mt-3 p-3 rounded-xl text-xs" style={{ backgroundColor: 'rgba(58, 23, 80, 0.5)', color: '#C8C4CE' }}>
               {planoInfo && planoInfo.contatosCampanhaIncluidos > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: '#C8C4CE' }}>Contatos de campanha incluídos</span>
-                  <span className="text-slate-100">{planoInfo.contatosCampanhaIncluidos}/mês</span>
-                </div>
+                <p>Incluso{unidades > 1 ? ' por loja' : ''}: {planoInfo.contatosCampanhaIncluidos} contatos de campanha/mês{unidades > 1 ? ` (${planoInfo.contatosCampanhaIncluidos * unidades} na rede)` : ''}.</p>
               )}
-
-              {/* Desconto manual */}
-              {proposta.desconto_percentual > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: '#4ade80' }}>Desconto adicional (-{proposta.desconto_percentual}%)</span>
-                  <span style={{ color: '#4ade80' }}>-{formatarMoeda(aposF * proposta.desconto_percentual / 100)}/mês</span>
-                </div>
-              )}
-
-              {/* Extras */}
-              {extras.length > 0 && (
-                <>
-                  <div className="border-t my-1" style={{ borderColor: '#5D267A' }} />
-                  {extras.map((e, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span style={{ color: '#C8C4CE' }}>{e.nome || 'Item adicional'}</span>
-                      <span className="text-slate-100">{formatarMoeda(e.valor)}/mês</span>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {/* Total */}
-              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid #7B3A9E' }}>
-                <span className="font-semibold text-slate-100">Total mensal</span>
-                <span className="text-3xl font-extrabold text-slate-100">{formatarMoeda(valorTotal)}</span>
-              </div>
+              {extras.map((e, i) => e.nome && (
+                <p key={i}>{e.nome}: {formatarMoeda(e.valor)}/mês{unidades > 1 ? ' para a rede, sem desconto' : ', sem desconto'}.</p>
+              ))}
             </div>
+          ) : null}
 
-            {/* Rodapé do card */}
-            <div className="px-5 py-3 space-y-2 text-center" style={{ background: 'linear-gradient(135deg, #5D267A, #7B3A9E)' }}>
-              {proposta.condicao_especial && (
-                <p className="text-sm font-medium" style={{ color: '#EDE8F4' }}>🎁 {proposta.condicao_especial}</p>
-              )}
-              {validade && (
-                <p className="text-xs" style={{ color: 'rgba(237,232,244,0.7)' }}>
-                  Proposta válida até <strong className="text-slate-100">{validade}</strong>
-                </p>
-              )}
-              <p className="text-[11px]" style={{ color: 'rgba(237,232,244,0.6)' }}>
-                Contatos adicionais de campanha: R$ 2/contato, mínimo de 100 · Cobrança via Asaas — cartão, Pix ou boleto
+          <div className="mt-3 p-3 rounded-xl text-center space-y-1" style={{ background: 'linear-gradient(135deg, #5D267A, #7B3A9E)' }}>
+            {proposta.condicao_especial && (
+              <p className="text-sm font-medium" style={{ color: '#EDE8F4' }}>🎁 {proposta.condicao_especial}</p>
+            )}
+            {validade && (
+              <p className="text-xs" style={{ color: 'rgba(237,232,244,0.7)' }}>
+                Proposta válida até <strong className="text-slate-100">{validade}</strong>
               </p>
-            </div>
+            )}
+            <p className="text-[11px]" style={{ color: 'rgba(237,232,244,0.6)' }}>
+              Contatos adicionais de campanha: R$ 2/contato, mínimo de 100 · Cobrança via Asaas — cartão, Pix ou boleto
+            </p>
           </div>
         </section>
 

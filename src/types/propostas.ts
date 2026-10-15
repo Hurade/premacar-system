@@ -19,6 +19,12 @@ export type StatusProposta =
   | 'expirada'
 export type PlanoTipo = 'mensurar' | 'fidelizar' | 'recuperar'
 
+// Mesmo campo/valores de Apresentações (types/apresentacoes.ts) — reaproveitado
+// aqui pra personalizar a proposta (ex: ciclo de pós-venda do Motor) pelo tipo
+// de serviço do lead, igual já acontece no deck de Apresentações.
+import type { AtuacaoPrincipal } from '@/types/apresentacoes'
+export type { AtuacaoPrincipal }
+
 export interface Lead {
   id: string
   empresa: string
@@ -48,6 +54,9 @@ export interface DiagnosticoRespostas {
   quer_recuperar: boolean
   tem_equipe_followup: boolean
   objetivo_principal: 'satisfacao' | 'fidelizar' | 'recuperar'
+  /** Tem mais de uma loja ou quer conectar o ERP — é hoje o que diferencia o
+   * Fidelizar do Mensurar (integração com ERP, fluxos do motor, multi-loja). */
+  tem_multiloja_ou_erp: boolean
 }
 
 export interface Plano {
@@ -79,6 +88,7 @@ export interface Proposta {
   assinatura_vendedor: AssinaturaVendedor | null
   unidades: number
   fidelidade_meses: number
+  atuacao_principal: AtuacaoPrincipal | null
   extras: ExtraItem[] | null
   vendedor_id: string | null
   enviada_at: string | null
@@ -245,6 +255,7 @@ export function recomendarPlano(d: DiagnosticoRespostas): PlanoTipo {
   if (d.whatsapp_tipo === 'manual') score.fidelizar += 1
   if (d.whatsapp_tipo === 'nenhum') score.recuperar += 1
   if (!d.tem_equipe_followup) score.recuperar += 1
+  if (d.tem_multiloja_ou_erp) score.fidelizar += 2
 
   if (score.recuperar >= score.fidelizar && score.recuperar >= score.mensurar) return 'recuperar'
   if (score.fidelizar >= score.mensurar) return 'fidelizar'

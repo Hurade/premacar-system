@@ -131,6 +131,7 @@ export function useCreateProposta() {
       empresa: string
       plano_id: string | null
       diagnostico: DiagnosticoRespostas | null
+      atuacao_principal?: import('@/types/propostas').AtuacaoPrincipal | null
       valor_mensal: number
       desconto_percentual: number
       condicao_especial: string | null
@@ -139,6 +140,7 @@ export function useCreateProposta() {
       unidades?: number
       fidelidade_meses?: number
       extras?: import('@/types/propostas').ExtraItem[] | null
+      assinatura_vendedor?: import('@/types/propostas').AssinaturaVendedor | null
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const slug = generateSlug(params.empresa)
@@ -152,6 +154,7 @@ export function useCreateProposta() {
           lead_id: params.lead_id,
           plano_id: params.plano_id,
           diagnostico: params.diagnostico,
+          atuacao_principal: params.atuacao_principal ?? null,
           valor_mensal: params.valor_mensal,
           desconto_percentual: params.desconto_percentual,
           condicao_especial: params.condicao_especial,
@@ -160,6 +163,7 @@ export function useCreateProposta() {
           unidades: params.unidades ?? 1,
           fidelidade_meses: params.fidelidade_meses ?? 0,
           extras: params.extras ?? [],
+          assinatura_vendedor: params.assinatura_vendedor ?? null,
           slug,
           status: 'rascunho',
           validade_ate: validade.toISOString().split('T')[0],

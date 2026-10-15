@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProposta, useUpdatePropostaStatus, useDeleteProposta, useUpdateProposta } from '@/hooks/usePropostas'
+import { useAssinaturaPadrao, useSaveAssinaturaPadrao } from '@/hooks/useAssinaturaPadrao'
 import { StatusBadge } from '@/components/propostas/StatusBadge'
 import { FollowUpModal } from '@/components/propostas/FollowUpModal'
 import { EnviarPropostaModal } from '@/components/propostas/EnviarPropostaModal'
@@ -55,6 +56,8 @@ export default function PropostaDetalhe() {
   const updateStatus = useUpdatePropostaStatus()
   const updateProposta = useUpdateProposta()
   const deleteProposta = useDeleteProposta()
+  const saveAssinaturaPadrao = useSaveAssinaturaPadrao()
+  const { data: assinaturaPadrao } = useAssinaturaPadrao()
 
   const [showFollowUp, setShowFollowUp] = useState(false)
   const [showEnviar, setShowEnviar] = useState(false)
@@ -385,7 +388,7 @@ export default function PropostaDetalhe() {
                 <button
                   type="button"
                   onClick={() => {
-                    setAssinatura(proposta.assinatura_vendedor ?? { nome: '', cargo: '', telefone: '', email: '' })
+                    setAssinatura(proposta.assinatura_vendedor ?? assinaturaPadrao ?? { nome: '', cargo: '', telefone: '', email: '' })
                     setEditingAssinatura(true)
                   }}
                   className="text-muted-foreground hover:text-primary"
@@ -415,6 +418,14 @@ export default function PropostaDetalhe() {
                     <Button size="sm" onClick={handleSaveAssinatura} disabled={updateProposta.isPending} className="flex-1 bg-primary/80 hover:bg-primary text-white text-xs">Salvar</Button>
                     <Button size="sm" variant="outline" onClick={() => setEditingAssinatura(false)} className="text-xs">Cancelar</Button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => saveAssinaturaPadrao.mutate(assinatura)}
+                    disabled={saveAssinaturaPadrao.isPending || !assinatura.nome}
+                    className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50"
+                  >
+                    {saveAssinaturaPadrao.isPending ? 'Salvando...' : 'Usar sempre esta assinatura (salvar como padrão)'}
+                  </button>
                 </div>
               ) : proposta.assinatura_vendedor ? (
                 <div className="space-y-1">

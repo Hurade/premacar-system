@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,13 +12,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useCRMContacts, useLeadFromContact, useCreateLead, type CRMContact } from '@/hooks/useLeads'
+import { useCRMContacts, useLeadFromContact, useCreateLead, useUpdateLead, type CRMContact } from '@/hooks/useLeads'
 import { useCreateProposta, usePlanos } from '@/hooks/usePropostas'
-import type { Lead, DiagnosticoRespostas, PlanoTipo, TipoNegocio, OrigemLead, DorPrincipal, ExtraItem } from '@/types/propostas'
+import { useAssinaturaPadrao, useSaveAssinaturaPadrao } from '@/hooks/useAssinaturaPadrao'
+import type { Lead, DiagnosticoRespostas, PlanoTipo, TipoNegocio, OrigemLead, DorPrincipal, ExtraItem, AssinaturaVendedor } from '@/types/propostas'
 import {
   PLANOS_PADRAO, TIPO_NEGOCIO_LABELS, ORIGEM_LABELS, DOR_LABELS,
-  recomendarPlano, formatarMoeda, descFidelidadePct, calcularTotal,
+  recomendarPlano, formatarMoeda, calcularTotal,
 } from '@/types/propostas'
+import type { AtuacaoPrincipal } from '@/types/apresentacoes'
+import { ATUACAO_LABELS } from '@/types/apresentacoes'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
@@ -54,6 +57,7 @@ const diagDefaults: DiagnosticoRespostas = {
   quer_recuperar: true,
   tem_equipe_followup: false,
   objetivo_principal: 'fidelizar',
+  tem_multiloja_ou_erp: false,
 }
 
 // ─── Step 1: Select Lead ─────────────────────────────────────────────────────
@@ -65,10 +69,17 @@ function Step1Lead({
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [loadingContactId, setLoadingContactId] = useState<string | null>(null)
+  // Lead resolvido do CRM, aguardando confirmação/edição de nome antes de
+  // seguir — o nome que vem do contato (ex: "oficina" ou "call_name") às
+  // vezes não é o ideal pra aparecer numa proposta formal.
+  const [pendingLead, setPendingLead] = useState<Lead | null>(null)
+  const [pendingEmpresa, setPendingEmpresa] = useState('')
+  const [pendingResponsavel, setPendingResponsavel] = useState('')
 
   const { data: contacts = [], isLoading: contactsLoading } = useCRMContacts(search)
   const leadFromContact = useLeadFromContact()
   const createLead = useCreateLead()
+  const updateLead = useUpdateLead()
 
   const form = useForm<LeadForm>({
     resolver: zodResolver(leadSchema),
@@ -80,15 +91,21 @@ function Step1Lead({
     setLoadingContactId(contact.id)
     try {
       const lead = await leadFromContact.mutateAsync(contact)
-      // Auto-select if pre-selected from Leads page
-      if (preselectedId && lead.id === preselectedId) {
-        onSelectLead(lead)
-        return
-      }
-      onSelectLead(lead)
+      setPendingLead(lead)
+      setPendingEmpresa(lead.empresa)
+      setPendingResponsavel(lead.responsavel)
     } finally {
       setLoadingContactId(null)
     }
+  }
+
+  async function handleConfirmPendingLead() {
+    if (!pendingLead) return
+    const lead = (pendingEmpresa !== pendingLead.empresa || pendingResponsavel !== pendingLead.responsavel)
+      ? await updateLead.mutateAsync({ id: pendingLead.id, empresa: pendingEmpresa, responsavel: pendingResponsavel })
+      : pendingLead
+    setPendingLead(null)
+    onSelectLead(lead)
   }
 
   async function handleCreate(values: LeadForm) {
@@ -110,6 +127,39 @@ function Step1Lead({
     })
     onSelectLead(lead)
     setShowNew(false)
+  }
+
+  if (pendingLead) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <button onClick={() => setPendingLead(null)} className="p-1.5 rounded-lg hover:bg-muted/50">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <h3 className="font-semibold text-foreground">Confirme os dados antes de continuar</h3>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-2">
+          Vieram do CRM — ajuste se não for assim que devem aparecer na proposta.
+        </p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Empresa</Label>
+            <Input value={pendingEmpresa} onChange={e => setPendingEmpresa(e.target.value)} className="bg-muted/20 border-border/40" />
+          </div>
+          <div className="space-y-1">
+            <Label>Responsável</Label>
+            <Input value={pendingResponsavel} onChange={e => setPendingResponsavel(e.target.value)} className="bg-muted/20 border-border/40" />
+          </div>
+        </div>
+        <Button
+          onClick={handleConfirmPendingLead}
+          disabled={updateLead.isPending || !pendingEmpresa.trim() || !pendingResponsavel.trim()}
+          className="w-full bg-primary hover:bg-primary/90 text-white"
+        >
+          {updateLead.isPending ? 'Salvando...' : 'Confirmar e continuar'}
+        </Button>
+      </div>
+    )
   }
 
   if (showNew) {
@@ -256,9 +306,11 @@ function YesNoButton({ value, current, onChange, label }: { value: boolean; curr
   )
 }
 
-function Step2Diagnostico({ diagnostico, onChange }: {
+function Step2Diagnostico({ diagnostico, onChange, atuacaoPrincipal, onAtuacaoPrincipal }: {
   diagnostico: DiagnosticoRespostas
   onChange: (d: DiagnosticoRespostas) => void
+  atuacaoPrincipal: AtuacaoPrincipal | null
+  onAtuacaoPrincipal: (v: AtuacaoPrincipal) => void
 }) {
   const set = <K extends keyof DiagnosticoRespostas>(key: K, val: DiagnosticoRespostas[K]) =>
     onChange({ ...diagnostico, [key]: val })
@@ -337,6 +389,15 @@ function Step2Diagnostico({ diagnostico, onChange }: {
       ),
     },
     {
+      label: 'Têm mais de uma loja, ou querem conectar o ERP da oficina?',
+      node: (
+        <div className="flex gap-2">
+          <YesNoButton value={true} current={diagnostico.tem_multiloja_ou_erp} onChange={v => set('tem_multiloja_ou_erp', v)} label="Sim" />
+          <YesNoButton value={false} current={diagnostico.tem_multiloja_ou_erp} onChange={v => set('tem_multiloja_ou_erp', v)} label="Não" />
+        </div>
+      ),
+    },
+    {
       label: 'Qual é o objetivo principal agora?',
       node: (
         <div className="grid grid-cols-3 gap-2">
@@ -365,6 +426,16 @@ function Step2Diagnostico({ diagnostico, onChange }: {
 
   return (
     <div className="space-y-5">
+      <div className="space-y-2 pb-3 border-b border-border/40">
+        <Label>Tipo de serviço principal da oficina</Label>
+        <p className="text-xs text-muted-foreground -mt-1">Personaliza os exemplos e o ciclo de pós-venda mostrados na proposta.</p>
+        <Select value={atuacaoPrincipal ?? ''} onValueChange={v => onAtuacaoPrincipal(v as AtuacaoPrincipal)}>
+          <SelectTrigger className="bg-muted/20 border-border/40"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+          <SelectContent>
+            {Object.entries(ATUACAO_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
       {questions.map((q, i) => (
         <div key={i} className="space-y-2">
           <p className="text-sm font-medium text-foreground">
@@ -377,13 +448,21 @@ function Step2Diagnostico({ diagnostico, onChange }: {
   )
 }
 
-const EXTRAS_SUGERIDOS = ['Rastreamento', 'Telefone Digital', 'Setup', 'Treinamento', 'Outro']
+// Catálogo real de adicionais da Prema (CLAUDE.md / material comercial) —
+// valor pré-preenchido quando conhecido, continua editável pelo vendedor.
+const EXTRAS_SUGERIDOS: { nome: string; valorSugerido?: number }[] = [
+  { nome: 'Gestão e Traqueamento de Leads', valorSugerido: 199 },
+  { nome: 'Contatos de Campanha Adicionais (100, R$2/contato)', valorSugerido: 200 },
+  { nome: 'Setup Personalizado' },
+  { nome: 'Treinamento da Equipe' },
+  { nome: 'Outro' },
+]
 
 // ─── Step 3: Plano ────────────────────────────────────────────────────────────
 function Step3Plano({
   planoSelecionado, desconto, condicaoEspecial, validadeDias,
-  fidelidade, unidades, extras,
-  onPlano, onDesconto, onCondicao, onValidade, onFidelidade, onUnidades, onExtras,
+  unidades, extras,
+  onPlano, onDesconto, onCondicao, onValidade, onUnidades, onExtras,
   recomendado,
 }: {
   planoSelecionado: PlanoTipo
@@ -391,14 +470,12 @@ function Step3Plano({
   desconto: number
   condicaoEspecial: string
   validadeDias: number
-  fidelidade: number
   unidades: number
   extras: ExtraItem[]
   onPlano: (p: PlanoTipo) => void
   onDesconto: (d: number) => void
   onCondicao: (c: string) => void
   onValidade: (v: number) => void
-  onFidelidade: (f: number) => void
   onUnidades: (u: number) => void
   onExtras: (e: ExtraItem[]) => void
 }) {
@@ -407,6 +484,12 @@ function Step3Plano({
   }
   function updateExtra(i: number, field: keyof ExtraItem, value: string | number) {
     onExtras(extras.map((e, idx) => idx === i ? { ...e, [field]: value } : e))
+  }
+  function selectExtraPreset(i: number, nome: string) {
+    const preset = EXTRAS_SUGERIDOS.find(s => s.nome === nome)
+    onExtras(extras.map((e, idx) => idx === i
+      ? { nome: nome === 'Outro' ? '' : nome, valor: preset?.valorSugerido && !e.valor ? preset.valorSugerido : e.valor }
+      : e))
   }
   function removeExtra(i: number) {
     onExtras(extras.filter((_, idx) => idx !== i))
@@ -465,36 +548,9 @@ function Step3Plano({
         })}
       </div>
 
-      {/* Recorrência — anual no cartão dá 20% de desconto, nos três planos */}
-      <div className="space-y-2 pt-2 border-t border-border/40">
-        <Label>Forma de pagamento</Label>
-        <p className="text-xs text-muted-foreground">20% de desconto na recorrência anual no cartão (cobrança via Asaas)</p>
-        <div className="grid grid-cols-2 gap-2">
-          {([0, 12] as const).map(m => {
-            const pct = descFidelidadePct(m, planoSelecionado)
-            return (
-              <button
-                key={m}
-                type="button"
-                onClick={() => onFidelidade(m)}
-                className={cn(
-                  'p-2.5 rounded-xl border text-center transition-all text-sm font-medium',
-                  fidelidade === m
-                    ? 'border-primary bg-primary/15 text-primary'
-                    : 'border-border/40 text-muted-foreground hover:border-primary/30',
-                )}
-              >
-                {m === 0 ? 'Mensal' : 'Anual no cartão (12x)'}
-                {pct > 0 && (
-                  <span className="block text-[10px] font-semibold text-green-400">-{pct}%</span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Unidades + Desconto + Validade */}
+      {/* Unidades + Desconto + Validade — "anual no cartão -20%" já aparece
+          sempre junto do preço de tabela na proposta final (não precisa
+          escolher a forma de pagamento aqui, o cliente vê as duas opções). */}
       <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/40">
         <div className="space-y-1.5">
           <Label>Unidades / Lojas</Label>
@@ -549,20 +605,20 @@ function Step3Plano({
           </button>
         </div>
         {extras.length === 0 && (
-          <p className="text-xs text-muted-foreground">Nenhum custo adicional. Ex: Rastreamento, Telefone Digital...</p>
+          <p className="text-xs text-muted-foreground">Nenhum custo adicional. Ex: Gestão e Traqueamento de Leads...</p>
         )}
         <div className="space-y-2">
           {extras.map((extra, i) => (
             <div key={i} className="flex items-center gap-2">
               <Select
-                value={EXTRAS_SUGERIDOS.includes(extra.nome) ? extra.nome : (extra.nome ? 'Outro' : '')}
-                onValueChange={v => updateExtra(i, 'nome', v === 'Outro' ? '' : v)}
+                value={EXTRAS_SUGERIDOS.some(s => s.nome === extra.nome) ? extra.nome : (extra.nome ? 'Outro' : '')}
+                onValueChange={v => selectExtraPreset(i, v)}
               >
                 <SelectTrigger className="bg-muted/20 border-border/40 flex-1 h-8 text-xs">
                   <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {EXTRAS_SUGERIDOS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {EXTRAS_SUGERIDOS.map(s => <SelectItem key={s.nome} value={s.nome}>{s.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Input
@@ -591,28 +647,33 @@ function Step3Plano({
 }
 
 // ─── Step 4: Preview ──────────────────────────────────────────────────────────
-function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNotas, fidelidade, unidades, extras }: {
+function Step4Preview({
+  lead, plano, desconto, condicao, validade, notas, onNotas, unidades, extras,
+  assinatura, onAssinaturaChange, onSaveAssinatura, savingAssinatura,
+}: {
   lead: Lead
   plano: PlanoTipo
   desconto: number
   condicao: string
   validade: number
   notas: string
-  fidelidade: number
   unidades: number
   extras: ExtraItem[]
   onNotas: (n: string) => void
+  assinatura: AssinaturaVendedor
+  onAssinaturaChange: (a: AssinaturaVendedor) => void
+  onSaveAssinatura: () => void
+  savingAssinatura: boolean
 }) {
   const info = PLANOS_PADRAO[plano]
   const validadeDate = new Date()
   validadeDate.setDate(validadeDate.getDate() + validade)
 
   const valorBase = info.preco * unidades
-  const pctFid = descFidelidadePct(fidelidade, plano)
-  const aposF = valorBase * (1 - pctFid / 100)
-  const aposD = aposF * (1 - desconto / 100)
+  const aposD = valorBase * (1 - desconto / 100)
   const totalExtras = extras.reduce((a, e) => a + e.valor, 0)
   const total = aposD + totalExtras
+  const totalAnual = aposD * 0.8 + totalExtras
 
   return (
     <div className="space-y-4">
@@ -639,16 +700,10 @@ function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNota
             <span className="font-medium text-foreground">{formatarMoeda(valorBase)}/mês</span>
           </div>
 
-          {pctFid > 0 && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-green-400">Anual no cartão (-{pctFid}%)</span>
-              <span className="text-green-400">-{formatarMoeda(valorBase * pctFid / 100)}/mês</span>
-            </div>
-          )}
           {desconto > 0 && (
             <div className="flex justify-between items-center text-sm">
               <span className="text-green-400">Desconto adicional (-{desconto}%)</span>
-              <span className="text-green-400">-{formatarMoeda(aposF * desconto / 100)}/mês</span>
+              <span className="text-green-400">-{formatarMoeda(valorBase * desconto / 100)}/mês</span>
             </div>
           )}
           {extras.map((e, i) => e.nome && (
@@ -661,6 +716,10 @@ function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNota
           <div className="flex justify-between items-center pt-2 border-t border-border/50">
             <span className="font-semibold text-foreground">Total mensal</span>
             <span className="text-xl font-bold text-primary">{formatarMoeda(total)}/mês</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-muted-foreground">Anual no cartão (-20%, aparece na proposta como opção)</span>
+            <span className="text-green-400 font-medium">{formatarMoeda(totalAnual)}/mês</span>
           </div>
         </div>
 
@@ -675,6 +734,28 @@ function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNota
               <p className="text-sm font-medium text-green-400">{condicao}</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Assinatura do consultor — salva como padrão e reaproveitada em toda
+          proposta nova, sem precisar redigitar. */}
+      <div className="bg-muted/20 border border-border/40 rounded-2xl p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <Label>Assinatura do consultor</Label>
+          <button
+            type="button"
+            onClick={onSaveAssinatura}
+            disabled={savingAssinatura || !assinatura.nome}
+            className="text-xs text-primary hover:text-primary/80 disabled:opacity-50"
+          >
+            {savingAssinatura ? 'Salvando...' : 'Salvar como padrão'}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Input placeholder="Nome" value={assinatura.nome} onChange={e => onAssinaturaChange({ ...assinatura, nome: e.target.value })} className="bg-muted/20 border-border/40 h-8 text-xs" />
+          <Input placeholder="Cargo" value={assinatura.cargo} onChange={e => onAssinaturaChange({ ...assinatura, cargo: e.target.value })} className="bg-muted/20 border-border/40 h-8 text-xs" />
+          <Input placeholder="Telefone" value={assinatura.telefone} onChange={e => onAssinaturaChange({ ...assinatura, telefone: e.target.value })} className="bg-muted/20 border-border/40 h-8 text-xs" />
+          <Input placeholder="E-mail" value={assinatura.email} onChange={e => onAssinaturaChange({ ...assinatura, email: e.target.value })} className="bg-muted/20 border-border/40 h-8 text-xs" />
         </div>
       </div>
 
@@ -697,18 +778,31 @@ export default function NovaPropostaWizard() {
   const navigate = useNavigate()
   const createProposta = useCreateProposta()
   const { data: planos = [] } = usePlanos()
+  const { data: assinaturaPadrao } = useAssinaturaPadrao()
+  const saveAssinaturaPadrao = useSaveAssinaturaPadrao()
 
   const [step, setStep] = useState(1)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [diagnostico, setDiagnostico] = useState<DiagnosticoRespostas>(diagDefaults)
+  const [atuacaoPrincipal, setAtuacaoPrincipal] = useState<AtuacaoPrincipal | null>(null)
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoTipo>('fidelizar')
   const [desconto, setDesconto] = useState(0)
   const [condicaoEspecial, setCondicaoEspecial] = useState('')
   const [validadeDias, setValidadeDias] = useState(15)
   const [notas, setNotas] = useState('')
-  const [fidelidade, setFidelidade] = useState(0)
   const [unidades, setUnidades] = useState(1)
   const [extras, setExtras] = useState<ExtraItem[]>([])
+  const [assinatura, setAssinatura] = useState<AssinaturaVendedor>({ nome: '', cargo: '', telefone: '', email: '' })
+  const [assinaturaCarregada, setAssinaturaCarregada] = useState(false)
+
+  // Pré-preenche com a assinatura salva como padrão assim que ela carregar —
+  // só na primeira vez, pra não sobrescrever o que o vendedor já digitou.
+  useEffect(() => {
+    if (assinaturaPadrao && !assinaturaCarregada) {
+      setAssinatura(assinaturaPadrao)
+      setAssinaturaCarregada(true)
+    }
+  }, [assinaturaPadrao, assinaturaCarregada])
 
   const recomendado = recomendarPlano(diagnostico)
 
@@ -736,14 +830,15 @@ export default function NovaPropostaWizard() {
       empresa: selectedLead.empresa,
       plano_id: planoObj?.id ?? null,
       diagnostico,
+      atuacao_principal: atuacaoPrincipal,
       valor_mensal: preco,
       desconto_percentual: desconto,
       condicao_especial: condicaoEspecial || null,
       validade_dias: validadeDias,
       notas_vendedor: notas || null,
       unidades,
-      fidelidade_meses: fidelidade,
       extras: extras.length > 0 ? extras : null,
+      assinatura_vendedor: assinatura.nome ? assinatura : null,
     })
 
     navigate(`/propostas/${proposta.id}`)
@@ -804,7 +899,12 @@ export default function NovaPropostaWizard() {
             <Step1Lead selectedLead={selectedLead} onSelectLead={setSelectedLead} />
           )}
           {step === 2 && (
-            <Step2Diagnostico diagnostico={diagnostico} onChange={setDiagnostico} />
+            <Step2Diagnostico
+              diagnostico={diagnostico}
+              onChange={setDiagnostico}
+              atuacaoPrincipal={atuacaoPrincipal}
+              onAtuacaoPrincipal={setAtuacaoPrincipal}
+            />
           )}
           {step === 3 && (
             <Step3Plano
@@ -813,14 +913,12 @@ export default function NovaPropostaWizard() {
               desconto={desconto}
               condicaoEspecial={condicaoEspecial}
               validadeDias={validadeDias}
-              fidelidade={fidelidade}
               unidades={unidades}
               extras={extras}
               onPlano={setPlanoSelecionado}
               onDesconto={setDesconto}
               onCondicao={setCondicaoEspecial}
               onValidade={setValidadeDias}
-              onFidelidade={setFidelidade}
               onUnidades={setUnidades}
               onExtras={setExtras}
             />
@@ -833,10 +931,13 @@ export default function NovaPropostaWizard() {
               condicao={condicaoEspecial}
               validade={validadeDias}
               notas={notas}
-              fidelidade={fidelidade}
               unidades={unidades}
               extras={extras}
               onNotas={setNotas}
+              assinatura={assinatura}
+              onAssinaturaChange={setAssinatura}
+              onSaveAssinatura={() => saveAssinaturaPadrao.mutate(assinatura)}
+              savingAssinatura={saveAssinaturaPadrao.isPending}
             />
           )}
         </div>
