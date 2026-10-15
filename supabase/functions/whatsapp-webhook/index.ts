@@ -717,6 +717,48 @@ serve(async (req) => {
         }
       }
 
+      // WhatsApp permite editar uma mensagem já enviada. O Baileys (por trás
+      // da Evolution API) entrega isso como um evento NOVO cujo msg.message é
+      // um protocolMessage (type=14/MESSAGE_EDIT), com o texto corrigido em
+      // editedMessage e o id da mensagem ORIGINAL em protocolMessage.key.id —
+      // não é um "tipo de mensagem não suportado", é uma atualização da
+      // bolha já existente. Sem tratar isso à parte, caía no fallback de
+      // "formato não suportado" e criava uma bolha nova em vez de corrigir a
+      // existente.
+      const protocolMsg = data.message?.protocolMessage;
+      if (protocolMsg && protocolMsg.editedMessage) {
+        const edited = protocolMsg.editedMessage;
+        const editedText = edited.conversation || edited.extendedTextMessage?.text || '';
+        const originalMessageId = protocolMsg.key?.id;
+
+        if (editedText && originalMessageId && conversation) {
+          const { data: originalMsg } = await supabase
+            .from('messages')
+            .select('id, metadata')
+            .eq('conversation_id', conversation.id)
+            .eq('whatsapp_message_id', originalMessageId)
+            .maybeSingle();
+
+          if (originalMsg) {
+            await supabase
+              .from('messages')
+              .update({
+                content: editedText,
+                metadata: { ...(originalMsg.metadata || {}), edited: true }
+              })
+              .eq('id', originalMsg.id);
+            console.log('[Webhook] ✏️ Mensagem editada, atualizada:', originalMsg.id);
+          } else {
+            console.log('[Webhook] ✏️ Edição recebida mas mensagem original não encontrada:', originalMessageId);
+          }
+        }
+
+        return new Response(JSON.stringify({ status: 'edited' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       // 3. Determine message content and type
       let messageContent = '';
       let messageType = 'text';

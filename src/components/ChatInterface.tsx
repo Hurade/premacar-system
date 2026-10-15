@@ -1057,8 +1057,15 @@ const ChatInterface: React.FC = () => {
     );
   };
 
+  // Placeholders tipo "[imagem recebida]"/"[vídeo recebido]" (ver webhooks
+  // whatsapp-webhook/meta-webhook-v2) não são legenda real — só a mídia sem
+  // texto junto. Qualquer outro conteúdo em msg.content É a legenda que o
+  // contato mandou junto da mídia e precisa aparecer, não só a mídia sozinha.
+  const isPlaceholderCaption = (content: string) => /^\[.*\]$/.test(content.trim());
+
   const renderMessageContent = (msg: UIMessage) => {
     if (msg.type === MessageType.IMAGE) {
+      const hasCaption = !!msg.content && !isPlaceholderCaption(msg.content);
       return (
         <div className="mb-1 group/img relative">
           <img
@@ -1081,6 +1088,9 @@ const ChatInterface: React.FC = () => {
             >
               <Download className="w-3.5 h-3.5" />
             </a>
+          )}
+          {hasCaption && (
+            <p className="mt-1.5 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
           )}
         </div>
       );
@@ -1187,8 +1197,14 @@ const ChatInterface: React.FC = () => {
     }
 
     if (msg.type === MessageType.VIDEO) {
+      const hasCaption = !!msg.content && !isPlaceholderCaption(msg.content);
       return msg.mediaUrl ? (
-        <video controls src={msg.mediaUrl} className="rounded-lg max-w-full max-h-72 border border-slate-700/50" />
+        <div className="mb-1">
+          <video controls src={msg.mediaUrl} className="rounded-lg max-w-full max-h-72 border border-slate-700/50" />
+          {hasCaption && (
+            <p className="mt-1.5 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+          )}
+        </div>
       ) : (
         <p className="leading-relaxed whitespace-pre-wrap italic text-slate-400">Vídeo indisponível</p>
       );
