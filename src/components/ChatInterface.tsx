@@ -1090,7 +1090,7 @@ const ChatInterface: React.FC = () => {
             </a>
           )}
           {hasCaption && (
-            <p className="mt-1.5 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+            <p className="mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
           )}
         </div>
       );
@@ -1202,7 +1202,7 @@ const ChatInterface: React.FC = () => {
         <div className="mb-1">
           <video controls src={msg.mediaUrl} className="rounded-lg max-w-full max-h-72 border border-slate-700/50" />
           {hasCaption && (
-            <p className="mt-1.5 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+            <p className="mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
           )}
         </div>
       ) : (
@@ -1228,7 +1228,7 @@ const ChatInterface: React.FC = () => {
           </span>
         </a>
       ) : (
-        <p className="leading-relaxed whitespace-pre-wrap italic text-slate-400">
+        <p className="leading-relaxed whitespace-pre-wrap italic text-slate-400 break-words">
           {isLikelyFileName ? msg.content : 'Anexo indisponível'}
         </p>
       );
@@ -1273,7 +1273,7 @@ const ChatInterface: React.FC = () => {
       }
     }
 
-    return <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>;
+    return <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>;
   };
 
   if (loading) {
@@ -2133,10 +2133,10 @@ const ChatInterface: React.FC = () => {
                             </div>
                           </div>
                         ) : (
-                        <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                          <div className={`flex flex-col max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
+                        <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0`}>
+                          <div className={`flex flex-col max-w-[75%] min-w-0 ${isOutgoing ? 'items-end' : 'items-start'}`}>
                             <div
-                              className={`px-5 py-3 rounded-2xl shadow-md relative text-sm leading-relaxed ${
+                              className={`px-5 py-3 rounded-2xl shadow-md relative text-sm leading-relaxed min-w-0 ${
                                 isOutgoing
                                   ? msg.fromType === 'nina'
                                     ? 'bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm shadow-violet-900/20'
