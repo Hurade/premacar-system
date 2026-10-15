@@ -146,9 +146,17 @@ export default function PropostaDetalhe() {
               <Copy className="w-3.5 h-3.5" />
               Copiar Link
             </Button>
-            <Button variant="outline" size="sm" onClick={() => window.open(publicLink, '_blank')} className="gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(
+                proposta.status === 'rascunho' ? `/propostas/${proposta.id}/preview` : publicLink,
+                '_blank',
+              )}
+              className="gap-1.5"
+            >
               <ExternalLink className="w-3.5 h-3.5" />
-              Ver Proposta
+              {proposta.status === 'rascunho' ? 'Pré-visualizar' : 'Ver Proposta'}
             </Button>
             <Button
               size="sm"

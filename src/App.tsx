@@ -22,11 +22,13 @@ import PropostasDashboard from './pages/propostas/PropostasDashboard';
 import Leads from './pages/propostas/Leads';
 import NovaPropostaWizard from './pages/propostas/NovaPropostaWizard';
 import PropostaDetalhe from './pages/propostas/PropostaDetalhe';
+import PropostaPreview from './pages/propostas/PropostaPreview';
 import PropostaPublica from './pages/propostas/PropostaPublica';
 import Biblioteca from './pages/propostas/Biblioteca';
 import ApresentacoesDashboard from './pages/apresentacoes/ApresentacoesDashboard';
 import NovaApresentacaoWizard from './pages/apresentacoes/NovaApresentacaoWizard';
 import ApresentacaoDetalhe from './pages/apresentacoes/ApresentacaoDetalhe';
+import ApresentacaoPreview from './pages/apresentacoes/ApresentacaoPreview';
 import ApresentacaoPublica from './pages/apresentacoes/ApresentacaoPublica';
 import DuplicateContacts from './pages/DuplicateContacts';
 import CsatPublic from './pages/CsatPublic';
@@ -193,10 +195,12 @@ const App: React.FC = () => {
                   <Route path="/propostas/nova" element={<NovaPropostaWizard />} />
                   <Route path="/propostas/biblioteca" element={<Biblioteca />} />
                   <Route path="/propostas/:id" element={<PropostaDetalhe />} />
+                  <Route path="/propostas/:id/preview" element={<PropostaPreview />} />
                   {/* Apresentações */}
                   <Route path="/apresentacoes" element={<ApresentacoesDashboard />} />
                   <Route path="/apresentacoes/nova" element={<NovaApresentacaoWizard />} />
                   <Route path="/apresentacoes/:id" element={<ApresentacaoDetalhe />} />
+                  <Route path="/apresentacoes/:id/preview" element={<ApresentacaoPreview />} />
                 </Route>
 
                 {/* Páginas públicas (abertas por clientes fora do app) — design

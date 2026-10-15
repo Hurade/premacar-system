@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { useApresentacaoBySlug, useApresentacaoPublicaStatus } from '@/hooks/useApresentacoes'
-import { ParceirosComerciaisDeck } from '@/components/apresentacoes/decks/parceiros-comerciais'
-import { OficinaDiretaDeck } from '@/components/apresentacoes/decks/oficina-direta'
+import { ApresentacaoDocument } from '@/components/apresentacoes/ApresentacaoDocument'
 
 export default function ApresentacaoPublica() {
   const { slug } = useParams<{ slug: string }>()
@@ -50,30 +49,5 @@ export default function ApresentacaoPublica() {
     )
   }
 
-  const lead = apresentacao.lead
-  const tipo = apresentacao.template?.tipo
-
-  if (tipo === 'oficina_direta') {
-    return (
-      <OficinaDiretaDeck
-        empresa={lead?.empresa}
-        responsavel={lead?.responsavel}
-        tituloPersonalizado={apresentacao.titulo_personalizado}
-        assinaturaVendedor={apresentacao.assinatura_vendedor}
-        atuacaoPrincipal={apresentacao.atuacao_principal}
-        estrategiaInicial={apresentacao.estrategia_inicial}
-        temErp={apresentacao.tem_erp}
-        erpNome={apresentacao.erp_nome}
-      />
-    )
-  }
-
-  return (
-    <ParceirosComerciaisDeck
-      empresa={lead?.empresa}
-      responsavel={lead?.responsavel}
-      tituloPersonalizado={apresentacao.titulo_personalizado}
-      assinaturaVendedor={apresentacao.assinatura_vendedor}
-    />
-  )
+  return <ApresentacaoDocument apresentacao={apresentacao} />
 }
