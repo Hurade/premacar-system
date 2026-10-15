@@ -161,7 +161,7 @@ const SECTIONS = {
       {
         title: '"Está caro pra mim agora"',
         tag: 'Preço',
-        content: 'Entendo perfeitamente. Mas vamos pensar juntos:\n\nSe você tem 1.000 clientes na base e recuperar 5% deles gera em média R$350 por visita, isso são 50 clientes × R$350 = R$17.500 de faturamento adicional.\n\nO investimento no plano é R$997/mês. Em 1 mês você já paga e ainda sobra R$16.503.\n\nA pergunta não é se é caro — a pergunta é: quanto você está deixando de faturar por não ter isso rodando hoje?',
+        content: 'Entendo perfeitamente. Mas vamos pensar juntos:\n\nSe você tem 1.000 clientes na base e recuperar 5% deles gera em média R$350 por visita, isso são 50 clientes × R$350 = R$17.500 de faturamento adicional.\n\nO investimento no plano é uma fração disso — e ainda sobra a maior parte desse faturamento recuperado no seu caixa.\n\nA pergunta não é se é caro — a pergunta é: quanto você está deixando de faturar por não ter isso rodando hoje?',
       },
       {
         title: '"Não é o momento certo"',

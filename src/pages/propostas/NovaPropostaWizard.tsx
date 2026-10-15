@@ -402,8 +402,6 @@ function Step3Plano({
   onUnidades: (u: number) => void
   onExtras: (e: ExtraItem[]) => void
 }) {
-  const planoPrecisa = planoSelecionado === 'fidelizar' || planoSelecionado === 'recuperar'
-
   function addExtra() {
     onExtras([...extras, { nome: '', valor: 0 }])
   }
@@ -467,36 +465,34 @@ function Step3Plano({
         })}
       </div>
 
-      {/* Fidelidade — apenas Fidelizar e Recuperar */}
-      {planoPrecisa && (
-        <div className="space-y-2 pt-2 border-t border-border/40">
-          <Label>Fidelidade de contrato</Label>
-          <p className="text-xs text-muted-foreground">Desconto progressivo para contratos com fidelidade</p>
-          <div className="grid grid-cols-4 gap-2">
-            {([0, 3, 6, 12] as const).map(m => {
-              const pct = descFidelidadePct(m, planoSelecionado)
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => onFidelidade(m)}
-                  className={cn(
-                    'p-2.5 rounded-xl border text-center transition-all text-sm font-medium',
-                    fidelidade === m
-                      ? 'border-primary bg-primary/15 text-primary'
-                      : 'border-border/40 text-muted-foreground hover:border-primary/30',
-                  )}
-                >
-                  {m === 0 ? 'Sem' : `${m} m.`}
-                  {pct > 0 && (
-                    <span className="block text-[10px] font-semibold text-green-400">-{pct}%</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+      {/* Recorrência — anual no cartão dá 20% de desconto, nos três planos */}
+      <div className="space-y-2 pt-2 border-t border-border/40">
+        <Label>Forma de pagamento</Label>
+        <p className="text-xs text-muted-foreground">20% de desconto na recorrência anual no cartão (cobrança via Asaas)</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([0, 12] as const).map(m => {
+            const pct = descFidelidadePct(m, planoSelecionado)
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => onFidelidade(m)}
+                className={cn(
+                  'p-2.5 rounded-xl border text-center transition-all text-sm font-medium',
+                  fidelidade === m
+                    ? 'border-primary bg-primary/15 text-primary'
+                    : 'border-border/40 text-muted-foreground hover:border-primary/30',
+                )}
+              >
+                {m === 0 ? 'Mensal' : 'Anual no cartão (12x)'}
+                {pct > 0 && (
+                  <span className="block text-[10px] font-semibold text-green-400">-{pct}%</span>
+                )}
+              </button>
+            )
+          })}
         </div>
-      )}
+      </div>
 
       {/* Unidades + Desconto + Validade */}
       <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/40">
@@ -645,7 +641,7 @@ function Step4Preview({ lead, plano, desconto, condicao, validade, notas, onNota
 
           {pctFid > 0 && (
             <div className="flex justify-between items-center text-sm">
-              <span className="text-green-400">Desconto fidelidade {fidelidade} meses (-{pctFid}%)</span>
+              <span className="text-green-400">Anual no cartão (-{pctFid}%)</span>
               <span className="text-green-400">-{formatarMoeda(valorBase * pctFid / 100)}/mês</span>
             </div>
           )}

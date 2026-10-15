@@ -143,7 +143,7 @@ export default function PropostaPublica() {
           </div>
           {(pctFid > 0 || proposta.desconto_percentual > 0) && (
             <p className="mt-2 text-sm" style={{ color: '#9B5ABE' }}>
-              {pctFid > 0 && `Desconto fidelidade ${fidelidade} meses: -${pctFid}%`}
+              {pctFid > 0 && `Anual no cartão: -${pctFid}%`}
               {pctFid > 0 && proposta.desconto_percentual > 0 && ' · '}
               {proposta.desconto_percentual > 0 && `Desconto adicional: -${proposta.desconto_percentual}%`}
             </p>
@@ -213,6 +213,28 @@ export default function PropostaPublica() {
           </section>
         )}
 
+        {/* Motor de Pós-Venda */}
+        <section>
+          <SectionTitle>Como Funciona — Motor de Pós-Venda (Ciclo de 90 Dias)</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            {[
+              { day: 'Dia 0', title: 'O.S. Fechada no Sistema', desc: 'O sistema absorve os dados automaticamente, sem intervenção humana.' },
+              { day: 'Dia 3', title: 'NPS Automático', desc: 'Pesquisa de satisfação enviada. Clientes satisfeitos são direcionados para o Google.' },
+              { day: 'Dia 80', title: 'Cashback & Bônus', desc: 'Lembrete automático com saldo disponível para o próximo serviço.' },
+              { day: 'Dia 90', title: 'Rodízio e Retorno', desc: 'O cliente retorna. O ciclo se reinicia sozinho.' },
+            ].map(s => (
+              <div key={s.day} className="p-3 rounded-xl border" style={{ backgroundColor: '#3A1750', borderColor: '#5D267A' }}>
+                <span className="text-xs font-bold" style={{ color: '#9B5ABE' }}>{s.day}</span>
+                <p className="font-semibold text-slate-100 text-sm mt-1 mb-1">{s.title}</p>
+                <p className="text-xs" style={{ color: '#C8C4CE' }}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs mt-3" style={{ color: '#C8C4CE' }}>
+            E se o cliente não voltar? O módulo de Recuperação de Inativos entra em ação automaticamente, com condições especiais escalonadas para trazê-lo de volta à base.
+          </p>
+        </section>
+
         {/* Plano */}
         {planoInfo && (
           <section>
@@ -241,13 +263,21 @@ export default function PropostaPublica() {
                 <span className="font-medium text-slate-100">{formatarMoeda(valorBase)}/mês</span>
               </div>
 
-              {/* Desconto fidelidade */}
+              {/* Desconto anual no cartão */}
               {pctFid > 0 && (
                 <div className="flex items-center justify-between text-sm">
                   <span style={{ color: '#4ade80' }}>
-                    Fidelidade {fidelidade} meses (-{pctFid}%)
+                    Anual no cartão (-{pctFid}%)
                   </span>
                   <span style={{ color: '#4ade80' }}>-{formatarMoeda(valorBase * pctFid / 100)}/mês</span>
+                </div>
+              )}
+
+              {/* Contatos de campanha incluídos */}
+              {planoInfo && planoInfo.contatosCampanhaIncluidos > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span style={{ color: '#C8C4CE' }}>Contatos de campanha incluídos</span>
+                  <span className="text-slate-100">{planoInfo.contatosCampanhaIncluidos}/mês</span>
                 </div>
               )}
 
@@ -289,6 +319,9 @@ export default function PropostaPublica() {
                   Proposta válida até <strong className="text-slate-100">{validade}</strong>
                 </p>
               )}
+              <p className="text-[11px]" style={{ color: 'rgba(237,232,244,0.6)' }}>
+                Contatos adicionais de campanha: R$ 2/contato, mínimo de 100 · Cobrança via Asaas — cartão, Pix ou boleto
+              </p>
             </div>
           </div>
         </section>

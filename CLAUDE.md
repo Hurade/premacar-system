@@ -49,10 +49,13 @@ PremaCar é uma **plataforma SaaS de automação de pós-venda** para oficinas m
 > estava escrito no prompt do agente Comercial (agent_configs) e já foi
 > corrigido lá também.
 
-- Plano Free: permanente e gratuito (dashboard básico, funil de atribuição, dashboard ROI, NPS automático por WhatsApp, gestão de detratores, White Label) — NÃO é trial.
-- Planos pagos (valor mensal · valor no anual, 20% off, compromisso de 12 meses): Mensurar R$99 · R$79,20/mês · Fidelizar R$199 · R$159,20/mês (+ integração com ERP, fluxos do motor, multi-loja) · Recuperar R$299 · R$239,20/mês (+ campanhas automáticas de recuperação de inativos, suporte prioritário).
-- Setup em 12 minutos
-- Valores atualizados em 13/10/2026 — conferir a tela de planos real antes de citar preço em qualquer contexto novo, já mudou mais de uma vez.
+- Plano Free: permanente e gratuito — NÃO é trial. Limites: até 150 clientes na base, 20 mensagens WhatsApp/mês, 1 importação/mês (até 1.000 linhas), número de WhatsApp compartilhado da Prema (Hub Free), templates só os padrões (sem editar), fluxos automáticos só NPS pós-serviço e follow-up (definidos pela Prema), campanhas só simulador (sem envio), equipe só visualiza membros (não convida), sem multi-loja, sem integração com ERP (só planilha), sem Janela de Ouro/classificação por IA, sem atendimento com IA no WhatsApp.
+- Conta paga (aberta pela equipe Prema, acesso completo): sem limite de clientes na base, sem limite de mensagens WhatsApp (custo Meta por conversa), de 1 a 5 importações/mês (até 10.000 linhas, ilimitado no nível mais alto), número de WhatsApp próprio da oficina na API oficial, cria/edita/submete templates próprios, todos os sete fluxos automáticos configuráveis por loja, criação e envio de campanhas com créditos, convida equipe com papéis dono/gerente/atendente, multi-loja, integração com ERP configurada pela Prema, Janela de Ouro e classificação por IA (níveis intermediário e alto), atendimento com IA no WhatsApp (nível mais alto, ativado por organização).
+- Planos pagos (valor mensal · valor no anual, 20% off, compromisso de 12 meses, contatos de campanha incluídos): Mensurar R$99 · R$79,20/mês (nenhum contato incluído) · Fidelizar R$199 · R$159,20/mês (nenhum contato incluído; + integração com ERP, fluxos do motor, multi-loja) · Recuperar R$299 · R$239,20/mês (50 contatos de campanha/mês incluídos; + campanhas automáticas de recuperação de inativos, suporte prioritário).
+- Contatos de campanha adicionais: R$2/contato, compra mínima de 100 (R$200). Opcional em qualquer plano: gestão e traqueamento de leads, R$199/mês (sem desconto).
+- Cobrança: faturamento integrado ao Asaas (cartão de crédito, Pix ou boleto), com cobrança automática — o próprio cliente cadastra o cartão e troca de plano dentro do sistema.
+- Setup em 12 minutos.
+- Valores atualizados em 13/10/2026 — conferir a tela de planos real antes de citar preço em qualquer contexto novo, já mudou mais de uma vez. Fonte desta tabela: material comercial "PremaCar_Base_Comparativo_Planos"/"PremaCar_Base_Plano_Recuperar" e a tela "Planos e limites" do painel administrativo.
 
 ---
 

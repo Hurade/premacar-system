@@ -8,7 +8,6 @@ import { Slide06Nps } from './Slide06Nps'
 import { Slide07Bonus } from './Slide07Bonus'
 import { Slide08Objecoes } from './Slide08Objecoes'
 import { Slide09Prova } from './Slide09Prova'
-import { Slide10Investimento } from './Slide10Investimento'
 import { Slide11Jornada } from './Slide11Jornada'
 import { Slide12Contato } from './Slide12Contato'
 import type { OficinaDiretaDeckProps } from './types'
@@ -20,6 +19,11 @@ export type { OficinaDiretaDeckProps }
  * dourado), fiel aos decks de referência "PremaCar Troca de Óleo" / "PremaCar
  * Pneus". Conteúdo das seções 2-7 e 11 varia por `atuacaoPrincipal` — ver
  * ./content.ts.
+ *
+ * É o deck usado por Apresentações (material institucional, sem compromisso
+ * comercial) — por isso não tem slide de investimento/preço; os valores reais
+ * só aparecem numa Proposta de verdade (módulo separado, com plano/desconto
+ * específicos do negócio).
  */
 export function OficinaDiretaDeck(props: OficinaDiretaDeckProps) {
   return (
@@ -33,7 +37,6 @@ export function OficinaDiretaDeck(props: OficinaDiretaDeckProps) {
       <Slide07Bonus {...props} />
       <Slide08Objecoes {...props} />
       <Slide09Prova {...props} />
-      <Slide10Investimento {...props} />
       <Slide11Jornada {...props} />
       <Slide12Contato {...props} />
     </div>
