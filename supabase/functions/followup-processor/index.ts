@@ -24,6 +24,7 @@ interface EligibleConversation {
   contact_id: string;
   connection_id: string | null;
   api_source: string;
+  status: string;
   window_expires_at: string;
   last_customer_message_at: string;
 }
@@ -172,8 +173,9 @@ serve(async (req) => {
       // Critérios: janela aberta, cliente mandou msg há >= delay_hours, janela expira em > 30min
       const { data: conversations, error: convError } = await supabase
         .from("conversations")
-        .select("id, contact_id, connection_id, api_source, window_expires_at, last_customer_message_at")
+        .select("id, contact_id, connection_id, api_source, status, window_expires_at, last_customer_message_at")
         .eq("window_status", "open")
+        .eq("status", "nina")
         .not("last_customer_message_at", "is", null)
         .lte("last_customer_message_at", delayThreshold)
         .gt("window_expires_at", windowSafetyThreshold);
@@ -225,6 +227,16 @@ serve(async (req) => {
         // é um caso de "ele parou de responder": é a gente quem não
         // respondeu depois. Só faz sentido cutucar quando NÓS fomos quem
         // falou por último e ele ficou em silêncio.
+        //
+        // from_type='human' também pula, não só 'user': o filtro
+        // status='nina' acima já devia excluir conversa assumida por
+        // humano, mas visto na prática que isso não bastou — caso real:
+        // humano respondeu pessoalmente ("Ótimo, amanhã envio o link"),
+        // encerrando a conversa com naturalidade (até combinaram reunião
+        // pro dia seguinte), e o follow-up disparou em cima mesmo assim,
+        // porque só checava from_type==='user'. Se um humano falou por
+        // último, by definição ele já está cuidando — automação não deve
+        // se meter, não importa o status da conversa no momento do check.
         const { data: lastMessage } = await supabase
           .from("messages")
           .select("from_type")
@@ -233,8 +245,8 @@ serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-        if (lastMessage?.from_type === "user") {
-          results.push({ conversationId: conv.id, sent: false, reason: "contact_sent_last_message" });
+        if (lastMessage?.from_type === "user" || lastMessage?.from_type === "human") {
+          results.push({ conversationId: conv.id, sent: false, reason: "contact_or_human_sent_last_message" });
           continue;
         }
 
