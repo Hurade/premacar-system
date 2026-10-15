@@ -32,7 +32,7 @@ export default function PropostaPreview() {
   }
 
   return (
-    <div className="dark">
+    <div className="dark h-full overflow-y-auto">
       <div className="sticky top-0 z-50 flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium" style={{ backgroundColor: '#1a0a24', borderBottom: '1px solid #5D267A' }}>
         <button
           onClick={() => navigate(`/propostas/${id}`)}

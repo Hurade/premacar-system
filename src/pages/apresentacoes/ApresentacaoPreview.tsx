@@ -32,7 +32,7 @@ export default function ApresentacaoPreview() {
   }
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <div className="sticky top-0 z-50 flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium bg-white border-b" style={{ borderColor: '#612c7d33' }}>
         <button
           onClick={() => navigate(`/apresentacoes/${id}`)}

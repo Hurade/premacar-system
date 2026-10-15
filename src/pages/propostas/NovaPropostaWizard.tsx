@@ -724,7 +724,12 @@ export default function NovaPropostaWizard() {
   async function handleCreate() {
     if (!selectedLead) return
     const planoObj = planos.find((p: { tipo: string }) => p.tipo === planoSelecionado)
-    const preco = planoObj?.preco_mensal ?? PLANOS_PADRAO[planoSelecionado].preco
+    // Preço sempre vem de PLANOS_PADRAO — é o valor que o vendedor acabou de
+    // ver e escolher no card do Step 3. planoObj (tabela planos_propostas) só
+    // serve pro FK/catálogo do Pipeline; usar o preco_mensal dele aqui já
+    // mandou proposta com valor desatualizado quando os dois ficaram
+    // dessincronizados (ex: tabela ainda com preço antigo do Recuperar).
+    const preco = PLANOS_PADRAO[planoSelecionado].preco
 
     const proposta = await createProposta.mutateAsync({
       lead_id: selectedLead.id,
