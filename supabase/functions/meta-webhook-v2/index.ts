@@ -802,20 +802,33 @@ async function processMetaWebhookAsync(
             console.error('[Meta Async] ❌ Erro ao enviar confirmação de opt-out:', optOutSendError);
           }
 
-          if (contact.user_id) {
+          // contact.user_id vem null pra maioria da base (import antigo
+          // nunca preencheu essa coluna) — sem o fallback pro owner da
+          // conexão (metaSettings.user_id, já carregado acima), o upsert
+          // de blacklist era pulado em silêncio pra quase todo mundo, e o
+          // contato continuava elegível pros próximos disparos da campanha
+          // mesmo depois de pedir pra parar.
+          const blacklistOwnerId = contact.user_id || metaSettings.user_id || null;
+          if (blacklistOwnerId) {
             await supabase
               .from('campaign_blacklist')
               .upsert(
-                { user_id: contact.user_id, phone: contact.phone_number, reason: `Opt-out via ${isOptOutButton ? 'botão' : 'texto'} "Não tenho interesse"` },
+                { user_id: blacklistOwnerId, phone: contact.phone_number, reason: `Opt-out via ${isOptOutButton ? 'botão' : 'texto'} "Não tenho interesse"` },
                 { onConflict: 'user_id,phone' }
               );
+          } else {
+            console.warn('[Meta Async] ⚠️ Opt-out sem user_id (contato e nina_settings nulos) — blacklist não gravada:', contact.id);
           }
 
           // Tag visível no contato (antes só a blacklist acontecia — nada
           // indicava visualmente, na tela de Chat, que o contato pediu
-          // pra parar) + cancela a campanha atual, mesmo efeito da tool
-          // stop_campaign_contact (nina-orchestrator) usada no texto livre
-          // não-exato processado pela IA.
+          // pra parar) + cancela qualquer campanha ativa do contato, mesmo
+          // efeito da tool stop_campaign_contact (nina-orchestrator) usada
+          // no texto livre não-exato processado pela IA. Cancela por
+          // contact_id (não só a campanha da conversa atual) porque a
+          // conversa pode não estar vinculada a nenhuma campanha
+          // (conversation.campaign_id nulo) mesmo quando o contato tem
+          // campaign_contacts ativo em outra.
           const currentContactTags: string[] = contact.tags || [];
           if (!currentContactTags.includes('Nao Interessado')) {
             await supabase
@@ -823,13 +836,11 @@ async function processMetaWebhookAsync(
               .update({ tags: [...currentContactTags, 'Nao Interessado'] })
               .eq('id', contact.id);
           }
-          if (conversation.campaign_id) {
-            await supabase
-              .from('campaign_contacts')
-              .update({ status: 'cancelled' })
-              .eq('campaign_id', conversation.campaign_id)
-              .eq('contact_id', contact.id);
-          }
+          await supabase
+            .from('campaign_contacts')
+            .update({ status: 'cancelled' })
+            .eq('contact_id', contact.id)
+            .eq('status', 'in_progress');
 
           continue;
         }
