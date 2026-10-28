@@ -40,19 +40,29 @@ serve(async (req) => {
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      const { data: evoSettings, error: evoErr } = await supabase
-        .from('nina_settings')
-        .select('evolution_api_url, evolution_api_key, evolution_instance_name')
+      // nina_settings guarda só uma linha global/legada (instância
+      // "Atendimento", hoje desconectada) — não reflete qual conexão está
+      // de fato ativa. Resolver pela mesma tabela/critério que
+      // sendInternalNotification usa (whatsapp_connections, evolution,
+      // ativa, preferindo a conectada) é o que garante testar a conexão
+      // que realmente está no ar (hoje "Automax"), em vez de sempre
+      // retornar "Connection Closed" por tentar numa instância morta.
+      const { data: evolutionConn } = await supabase
+        .from('whatsapp_connections')
+        .select('evolution_base_url, evolution_api_key, evolution_instance_name')
+        .eq('api_type', 'evolution')
+        .eq('is_active', true)
+        .order('is_connected', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (evoErr) {
-        console.error('❌ Error fetching Evolution settings:', evoErr);
-        return new Response(
-          JSON.stringify({ success: false, error: 'Erro ao buscar configurações: ' + evoErr.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      const evoSettings = evolutionConn
+        ? {
+            evolution_api_url: evolutionConn.evolution_base_url,
+            evolution_api_key: evolutionConn.evolution_api_key,
+            evolution_instance_name: evolutionConn.evolution_instance_name,
+          }
+        : null;
 
       if (!evoSettings?.evolution_api_url || !evoSettings?.evolution_api_key || !evoSettings?.evolution_instance_name) {
         console.error('❌ Evolution API not configured:', {
@@ -61,7 +71,7 @@ serve(async (req) => {
           instance: !!evoSettings?.evolution_instance_name,
         });
         return new Response(
-          JSON.stringify({ success: false, error: 'Evolution API não configurada. Acesse Configurações → APIs e preencha os campos da Evolution API.' }),
+          JSON.stringify({ success: false, error: 'Nenhuma conexão WhatsApp (Evolution) ativa encontrada. Acesse Configurações → Conexões.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
