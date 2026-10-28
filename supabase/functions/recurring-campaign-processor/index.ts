@@ -28,11 +28,17 @@ serve(async (req) => {
 
     console.log("[recurring-processor] Starting...", targetCampaignId ? `Campaign: ${targetCampaignId}` : "All active");
 
-    // Get active recurring campaigns
+    // Busca campanhas ativas E pausadas — o auto-pause por taxa de erro
+    // (abaixo, "status: paused" + paused_until) pretende resumir sozinho
+    // depois de pause_duration_minutes, mas filtrar só "active" aqui fazia
+    // a campanha nunca mais aparecer nesta query, mesmo com paused_until já
+    // no passado — ficava presa "pausada" pra sempre, só saindo com o botão
+    // manual "Retomar". Pausa manual (sem paused_until setado) continua
+    // intocada, sem data pra auto-retomar — ver o if logo abaixo.
     let query = supabase
       .from("recurring_campaigns")
       .select("*")
-      .eq("status", "active");
+      .in("status", ["active", "paused"]);
 
     if (targetCampaignId) {
       query = query.eq("id", targetCampaignId);
@@ -83,6 +89,30 @@ serve(async (req) => {
     for (const campaign of campaigns || []) {
       const flowConfig = campaign.flow_config as Record<string, any>;
       const now2 = new Date();
+
+      // status "paused" só devia existir temporariamente, até paused_until
+      // passar (auto-pause por taxa de erro, ver mais abaixo). Sem
+      // paused_until, foi pausa manual pelo botão "Retomar" — fica como
+      // está, só o humano decide quando voltar.
+      if (campaign.status === "paused") {
+        const stillPaused = campaign.paused_until && new Date(campaign.paused_until) > now2;
+        if (stillPaused) {
+          results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "anti_ban_pause" });
+          continue;
+        }
+        if (!campaign.paused_until) {
+          results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "manually_paused" });
+          continue;
+        }
+        // paused_until já passou — auto-retoma e segue processando esta campanha neste mesmo run.
+        await supabase
+          .from("recurring_campaigns")
+          .update({ status: "active", paused_until: null })
+          .eq("id", campaign.id);
+        campaign.status = "active";
+        campaign.paused_until = null;
+        console.log(`[recurring-processor] Campanha ${campaign.id} auto-retomada (pausa de erro expirou)`);
+      }
 
       // scheduled_start: campanha só começa a processar contatos a partir
       // dessa data/hora, não importa quando foi ativada nem quando os

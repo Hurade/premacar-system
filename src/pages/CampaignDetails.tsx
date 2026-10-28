@@ -52,9 +52,13 @@ const CampaignDetailsPage: React.FC = () => {
   const handleToggleStatus = async () => {
     if (!campaign || !id) return;
     const newStatus = campaign.status === 'active' ? 'paused' : 'active';
+    // Limpa paused_until em toda troca manual — sem isso, uma data antiga de
+    // uma pausa automática por taxa de erro (que já passou) ficava parada
+    // aqui, e o processor podia confundir uma pausa manual nova com aquela
+    // pausa automática antiga já expirada e retomar sozinho sem querer.
     const { error } = await supabase
       .from('recurring_campaigns')
-      .update({ status: newStatus } as any)
+      .update({ status: newStatus, paused_until: null } as any)
       .eq('id', id);
     if (error) {
       toast.error('Erro ao atualizar status');
