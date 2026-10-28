@@ -76,11 +76,12 @@ serve(async (req) => {
     }
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const bounceType = sesEvent.bounce?.bounceType;
     if (eventType === "Delivery") {
       updateData.delivered_at = new Date().toISOString();
     } else if (eventType === "Bounce") {
       updateData.bounced_at = new Date().toISOString();
-      updateData.error = `Bounce (${sesEvent.bounce?.bounceType || "unknown"}): ${sesEvent.bounce?.bouncedRecipients?.[0]?.diagnosticCode || ""}`.slice(0, 500);
+      updateData.error = `Bounce (${bounceType || "unknown"}): ${sesEvent.bounce?.bouncedRecipients?.[0]?.diagnosticCode || ""}`.slice(0, 500);
     } else if (eventType === "Complaint") {
       updateData.complained_at = new Date().toISOString();
     } else {
@@ -94,12 +95,30 @@ serve(async (req) => {
       .from("campaign_message_events")
       .update(updateData)
       .eq("ses_message_id", messageId)
-      .select("id");
+      .select("id, contact_id");
 
     if (error) {
       console.error(`[${SOURCE}] Erro ao atualizar campaign_message_events:`, error);
     } else {
       console.log(`[${SOURCE}] Atualizado ${data?.length || 0} registro(s) para messageId ${messageId}`);
+    }
+
+    // Bounce permanente (endereço provado inexistente) ou reclamação de spam:
+    // marca o contato pra nunca mais tentar e-mail de novo — sem isso,
+    // campanhas futuras continuam batendo no mesmo endereço morto pra sempre,
+    // o que é exatamente o que inflou a taxa de rejeição da campanha "Leads
+    // Antigos" pra 13%. Bounce transitório (caixa cheia, DNS temporário) não
+    // marca — pode voltar a funcionar.
+    const isPermanentIssue = (eventType === "Bounce" && bounceType === "Permanent") || eventType === "Complaint";
+    if (isPermanentIssue && data && data.length > 0) {
+      const contactIds = [...new Set(data.map((row: any) => row.contact_id).filter(Boolean))];
+      for (const contactId of contactIds) {
+        const { data: contact } = await supabase.from("contacts").select("tags").eq("id", contactId).maybeSingle();
+        const currentTags: string[] = contact?.tags || [];
+        if (!currentTags.includes("Email Invalido")) {
+          await supabase.from("contacts").update({ tags: [...currentTags, "Email Invalido"] }).eq("id", contactId);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true, updated: data?.length || 0 }), {

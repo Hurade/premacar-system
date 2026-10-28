@@ -212,6 +212,50 @@ serve(async (req) => {
               continue;
             }
           }
+
+          // Mesma proteção, agora pro e-mail — nada disso existia antes, e foi
+          // assim que uma campanha chegou a 13% de rejeição (bounce) sem
+          // ninguém perceber até a caixa de entrada encher de "Delivery Status
+          // Notification (Failure)". Usa campaign_message_events (não
+          // system_logs) porque o resultado do e-mail só chega depois, via
+          // webhook do SES/SNS — na hora do envio ainda não se sabe se vai
+          // "quicar".
+          const emailWindowSize = sendRules.error_window_sends || 30;
+          let recentEmailsQuery = supabase
+            .from("campaign_message_events")
+            .select("bounced_at")
+            .eq("campaign_id", campaign.id)
+            .eq("channel", "email")
+            .order("sent_at", { ascending: false })
+            .limit(emailWindowSize);
+          if (campaign.last_resumed_at) {
+            recentEmailsQuery = recentEmailsQuery.gte("sent_at", campaign.last_resumed_at);
+          }
+          const { data: recentEmails } = await recentEmailsQuery;
+
+          if (recentEmails && recentEmails.length >= emailWindowSize) {
+            const bounced = recentEmails.filter((e: any) => e.bounced_at !== null).length;
+            const bounceRatePct = (bounced / recentEmails.length) * 100;
+            if (bounceRatePct >= (sendRules.error_rate_threshold || 15)) {
+              const pauseUntil = new Date(Date.now() + (sendRules.pause_duration_minutes || 60) * 60_000).toISOString();
+              await supabase
+                .from("recurring_campaigns")
+                .update({ status: "paused", paused_until: pauseUntil })
+                .eq("id", campaign.id);
+              await saveLog(supabase, {
+                source: "recurring-campaign-processor",
+                level: "warn",
+                message: `Auto-pause taxa de rejeição de e-mail: ${campaign.name} (${bounceRatePct.toFixed(1)}% bounce)`,
+                metadata: { campaign_id: campaign.id, bounce_rate: bounceRatePct, threshold: sendRules.error_rate_threshold },
+              });
+              await notifyAdmins(
+                supabase,
+                `🚨 *Campanha pausada — taxa de rejeição de e-mail alta*\n\n📋 *${campaign.name}*\n📊 Bounce: ${bounceRatePct.toFixed(1)}% (limite: ${sendRules.error_rate_threshold || 15}%)\n⏸️ Pausa automática — tenta retomar sozinha em ${sendRules.pause_duration_minutes || 60} min.\n\n_Risco de reputação no AWS SES — verifique a qualidade da lista antes que ela volte a enviar._`
+              );
+              results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "auto_paused_bounce_rate" });
+              continue;
+            }
+          }
         }
       }
 
@@ -412,11 +456,17 @@ serve(async (req) => {
         // travar o contato pra sempre fora da cadência (antes, um contato
         // com telefone mas sem e-mail ficava "failed" no dia 1 e nunca
         // recebia nem o WhatsApp dos dias seguintes).
-        if (dayConfig.type === "email" && !contact.email) {
-          console.log(`[recurring-processor] Contato ${contact.id} sem email, pulando dia ${cc.current_day} (${dayConfig.type})`);
+        // "Email Invalido" (aplicada pelo ses-webhook num bounce permanente)
+        // reaproveita o mesmo pulo-de-dia graciosamente, sem cancelar o
+        // contato da campanha inteira — ele pode continuar recebendo os dias
+        // de WhatsApp normalmente, só o e-mail é que não adianta tentar de
+        // novo (endereço já provou não existir).
+        const emailInvalido = Array.isArray(contact.tags) && contact.tags.includes("Email Invalido");
+        if (dayConfig.type === "email" && (!contact.email || emailInvalido)) {
+          console.log(`[recurring-processor] Contato ${contact.id} ${emailInvalido ? "com email marcado inválido" : "sem email"}, pulando dia ${cc.current_day} (${dayConfig.type})`);
           const skippedDayStatuses = {
             ...dayStatuses,
-            [dayKey]: { sent_at: new Date().toISOString(), success: false, error: "Sem email cadastrado — dia pulado", type: dayConfig.type, skipped: true },
+            [dayKey]: { sent_at: new Date().toISOString(), success: false, error: emailInvalido ? "Email marcado como inválido (bounce permanente) — dia pulado" : "Sem email cadastrado — dia pulado", type: dayConfig.type, skipped: true },
           };
           const nextDayKeySkip = `day${cc.current_day + 1}`;
           const hasNextDaySkip = flowConfig[nextDayKeySkip] && flowConfig[nextDayKeySkip].enabled;
