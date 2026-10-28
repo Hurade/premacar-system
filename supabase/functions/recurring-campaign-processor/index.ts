@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
 import { resolveSendCredentials, SendCredentials } from "../_shared/connection-resolver.ts";
 import { selectVariation, CampaignVariationLike } from "../_shared/campaign-variations.ts";
+import { notifyAdmins } from "../_shared/internal-notify.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,12 +106,17 @@ serve(async (req) => {
           continue;
         }
         // paused_until já passou — auto-retoma e segue processando esta campanha neste mesmo run.
+        // last_resumed_at marca a partir de quando a checagem de taxa de erro (abaixo) volta a contar
+        // envios — sem isso, a mesma janela de erro antiga (de antes da causa ser corrigida) repausava
+        // a campanha de novo antes de qualquer envio novo conseguir substituí-la.
+        const resumedAt = now2.toISOString();
         await supabase
           .from("recurring_campaigns")
-          .update({ status: "active", paused_until: null })
+          .update({ status: "active", paused_until: null, last_resumed_at: resumedAt })
           .eq("id", campaign.id);
         campaign.status = "active";
         campaign.paused_until = null;
+        campaign.last_resumed_at = resumedAt;
         console.log(`[recurring-processor] Campanha ${campaign.id} auto-retomada (pausa de erro expirou)`);
       }
 
@@ -168,13 +174,17 @@ serve(async (req) => {
 
         if (sendRules?.auto_pause_on_errors) {
           const windowSize = sendRules.error_window_sends || 30;
-          const { data: recentSends } = await supabase
+          let recentSendsQuery = supabase
             .from("system_logs")
             .select("metadata")
             .eq("source", "recurring-campaign-processor")
             .contains("metadata", { campaign_id: campaign.id, type: "whatsapp" })
             .order("created_at", { ascending: false })
             .limit(windowSize);
+          if (campaign.last_resumed_at) {
+            recentSendsQuery = recentSendsQuery.gte("created_at", campaign.last_resumed_at);
+          }
+          const { data: recentSends } = await recentSendsQuery;
 
           if (recentSends && recentSends.length >= windowSize) {
             const errors = recentSends.filter((l: any) => l.metadata?.success === false).length;
@@ -191,6 +201,13 @@ serve(async (req) => {
                 message: `Auto-pause anti-bloqueio: ${campaign.name} (${errorRatePct.toFixed(1)}% erros)`,
                 metadata: { campaign_id: campaign.id, error_rate: errorRatePct, threshold: sendRules.error_rate_threshold },
               });
+              // system_logs fica invisível pra quem não abre o painel — avisa
+              // o gestor direto no WhatsApp, já que uma campanha parada sem
+              // ninguém notar pode ficar dias travada (já aconteceu).
+              await notifyAdmins(
+                supabase,
+                `🚨 *Campanha pausada automaticamente*\n\n📋 *${campaign.name}*\n📊 Taxa de erro: ${errorRatePct.toFixed(1)}% (limite: ${sendRules.error_rate_threshold || 15}%)\n⏸️ Pausa automática — tenta retomar sozinha em ${sendRules.pause_duration_minutes || 60} min.\n\n_Verifique o motivo das falhas antes que ela volte a enviar._`
+              );
               results.push({ campaign_id: campaign.id, name: campaign.name, sent: 0, failed: 0, reason: "auto_paused_error_rate" });
               continue;
             }

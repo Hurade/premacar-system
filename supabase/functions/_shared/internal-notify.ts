@@ -8,6 +8,31 @@ import { resolveSendCredentials } from "./connection-resolver.ts";
 // aviso falhava silenciosamente sempre que a conversa era via Meta. Não
 // passa pelo send_queue porque não é uma mensagem do atendimento, é um
 // aviso pro atendente.
+/** Avisa os gestores (team_members.role='admin', ativos, com telefone de
+ * notificação) sobre eventos de infraestrutura — número desconectado,
+ * falha grave, campanha pausada por erro — que senão só aparecem em
+ * system_logs, invisíveis pra quem não entra no painel. Reaproveita o
+ * mesmo canal (Evolution) já usado pra avisar sobre handoff de lead. */
+export async function notifyAdmins(supabase: any, text: string): Promise<number> {
+  const { data: admins } = await supabase
+    .from('team_members')
+    .select('name, notification_phone')
+    .eq('role', 'admin')
+    .eq('status', 'active')
+    .not('notification_phone', 'is', null);
+
+  let notified = 0;
+  for (const admin of admins || []) {
+    try {
+      const sent = await sendInternalNotification(supabase, admin.notification_phone, text);
+      if (sent) notified++;
+    } catch (err) {
+      console.error(`[InternalNotify] Falha ao avisar gestor ${admin.name}:`, err);
+    }
+  }
+  return notified;
+}
+
 export async function sendInternalNotification(
   supabase: any,
   toPhone: string,

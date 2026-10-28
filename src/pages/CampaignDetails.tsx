@@ -56,9 +56,16 @@ const CampaignDetailsPage: React.FC = () => {
     // uma pausa automática por taxa de erro (que já passou) ficava parada
     // aqui, e o processor podia confundir uma pausa manual nova com aquela
     // pausa automática antiga já expirada e retomar sozinho sem querer.
+    // last_resumed_at (só ao retomar) reinicia a janela de checagem de taxa
+    // de erro do processor, pra não repausar de novo usando envios de antes
+    // da causa do problema ter sido corrigida.
     const { error } = await supabase
       .from('recurring_campaigns')
-      .update({ status: newStatus, paused_until: null } as any)
+      .update({
+        status: newStatus,
+        paused_until: null,
+        ...(newStatus === 'active' ? { last_resumed_at: new Date().toISOString() } : {}),
+      } as any)
       .eq('id', id);
     if (error) {
       toast.error('Erro ao atualizar status');

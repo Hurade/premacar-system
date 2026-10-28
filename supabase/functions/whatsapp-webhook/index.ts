@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
+import { notifyAdmins } from "../_shared/internal-notify.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -196,11 +197,28 @@ serve(async (req) => {
           if (connErr) console.error('[Webhook] Error marking connected:', connErr);
         } else if (state === 'close' || state === 'connecting') {
           // Desconectou ou reconectando — marca desconectado
+          const { data: prevConn } = await supabase
+            .from('whatsapp_connections')
+            .select('name, is_connected')
+            .eq('evolution_instance_name', instanceName)
+            .maybeSingle();
+
           const { error: dcErr } = await supabase
             .from('whatsapp_connections')
             .update({ is_connected: false })
             .eq('evolution_instance_name', instanceName);
           if (dcErr) console.error('[Webhook] Error marking disconnected:', dcErr);
+
+          // Só avisa na transição conectado→desconectado de verdade (state
+          // 'close'), não a cada 'connecting' — a Evolution já tenta
+          // reconectar sozinha, e avisar nessa hora geraria spam a cada
+          // tentativa de reconexão automática.
+          if (prevConn?.is_connected && state === 'close') {
+            await notifyAdmins(
+              supabase,
+              `🔌 *WhatsApp desconectado*\n\n📱 Conexão: *${prevConn.name || instanceName}*\n\nO número caiu — pode estar sem internet, sem bateria ou foi desconectado do WhatsApp Web. Escaneie o QR Code novamente em Configurações → Conexões.`
+            );
+          }
         }
         return new Response(JSON.stringify({ status: 'connection_update_processed', state }), {
           status: 200,
