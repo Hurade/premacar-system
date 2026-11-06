@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus, Megaphone, Layers, Star, ScrollText, History, Cpu, Tag } from 'lucide-react';
+import { Shield, Bot, Loader2, Save, RotateCcw, BookOpen, Lock, Cable, Smartphone, MessageSquare, Zap, Database, ListPlus, Megaphone, Layers, Star, ScrollText, History, Cpu, Tag, Bell } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import SystemRoadmap from './SystemRoadmap';
@@ -11,6 +11,7 @@ import KnowledgeBaseSettings from './settings/KnowledgeBaseSettings';
 import AIProvidersSettings from './settings/AIProvidersSettings';
 import CustomFieldsSettings from './settings/CustomFieldsSettings';
 import TagsSettings from './settings/TagsSettings';
+import NotificationSettings from './settings/NotificationSettings';
 import AnnouncementsSettings from './settings/AnnouncementsSettings';
 import Filas from '@/pages/Filas';
 import Ratings from '@/pages/Ratings';
@@ -133,6 +134,10 @@ const Settings: React.FC = () => {
               <Tag className="w-4 h-4" />
               Tags
             </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="w-4 h-4" />
+              Notificações
+            </TabsTrigger>
             <TabsTrigger value="filas" className="gap-2">
               <Layers className="w-4 h-4" />
               Filas
@@ -226,6 +231,9 @@ const Settings: React.FC = () => {
         </TabsContent>
         <TabsContent value="tags">
           <TagsSettings />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationSettings />
         </TabsContent>
         <TabsContent value="filas" className="-mx-8">
           <Filas />

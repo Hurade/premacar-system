@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface CompanySettings {
   companyName: string;
@@ -16,8 +17,12 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
   const [companyName, setCompanyName] = useState('');
   const [sdrName, setSdrName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { user } = useAuth();
+  // Fonte única de verdade pra isAdmin — já checa user_roles E team_members
+  // (ver useUserRole.tsx). A versão anterior daqui só checava user_roles,
+  // então um admin só por team_members.role (sem linha em user_roles) via
+  // "Somente Leitura" em Configurações mesmo sendo admin de verdade.
+  const { isAdmin } = useUserRole();
 
   const fetchSettings = async () => {
     if (!user) {
@@ -27,16 +32,7 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
 
     try {
       setLoading(true);
-      
-      // Check if user is admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      setIsAdmin(roleData?.role === 'admin');
-      
+
       // Fetch global nina_settings (no user_id filter)
       const { data, error } = await supabase
         .from('nina_settings')
