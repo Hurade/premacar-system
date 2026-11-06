@@ -98,6 +98,10 @@ const transferToHumanTool = {
         preferred_time: {
           type: "string",
           description: "Horário/dia que o cliente mencionou preferir, se for sobre agendamento (ex: 'terça de manhã')"
+        },
+        target_member_name: {
+          type: "string",
+          description: "Só preencher se o cliente pediu explicitamente por uma pessoa específica pelo nome (ex: 'repassa pra Tamiris'). Nesse caso, transferir direto pra essa pessoa sem perguntar mais nada. Deixar vazio em qualquer outro caso."
         }
       },
       required: ["reason"]
@@ -705,7 +709,7 @@ async function routeToSector(
 async function transferToHuman(
   supabase: any,
   conversation: any,
-  args: { reason: string; origem?: string; preferred_time?: string }
+  args: { reason: string; origem?: string; preferred_time?: string; target_member_name?: string }
 ): Promise<{ success: boolean; error?: string; notified?: number }> {
   console.log('[Nina] Transfer to human requested:', args);
 
@@ -726,10 +730,33 @@ async function transferToHuman(
     const displayName = contact?.call_name || contact?.name || null;
     const displayPhone = contact?.phone_number || null;
 
+    // Cliente pediu uma pessoa específica pelo nome (ex: "repassa pra
+    // Tamiris") — resolve contra team_members e, se achar exatamente um
+    // ativo, atribui a conversa direto a ela em vez de só avisar a fila
+    // inteira. Match ambíguo ou sem resultado cai no comportamento normal
+    // (notifica a fila), pra nunca travar a transferência por causa disso.
+    let targetMember: { id: string; name: string; notification_phone: string | null } | null = null;
+    if (args.target_member_name?.trim()) {
+      const { data: matches } = await supabase
+        .from('team_members')
+        .select('id, name, notification_phone')
+        .eq('status', 'active')
+        .ilike('name', `%${args.target_member_name.trim()}%`);
+
+      if (matches?.length === 1) {
+        targetMember = matches[0];
+      } else if (matches && matches.length > 1) {
+        console.warn(`[Nina] target_member_name "${args.target_member_name}" deu match ambíguo (${matches.length}) — caindo no handoff pra fila`);
+      } else {
+        console.warn(`[Nina] target_member_name "${args.target_member_name}" não encontrado em team_members — caindo no handoff pra fila`);
+      }
+    }
+
     const updatePayload: Record<string, unknown> = { status: 'human' };
     if (args.origem) updatePayload.origem_classificada = args.origem;
+    if (targetMember) updatePayload.assigned_user_id = targetMember.id;
     await supabase.from('conversations').update(updatePayload).eq('id', conversation.id);
-    console.log('[Nina] Conversation switched to human mode', { queue_id: conversation.queue_id, origem: args.origem });
+    console.log('[Nina] Conversation switched to human mode', { queue_id: conversation.queue_id, origem: args.origem, assigned_to: targetMember?.name });
 
     // Tag do contato: TRANSFERIDO-<FILA> (fallback genérico se a fila não
     // estiver carregada na conversa por algum motivo)
@@ -744,28 +771,40 @@ async function transferToHuman(
       await supabase.from('contacts').update({ tags: [...currentTags, handoffTag] }).eq('id', conversation.contact_id);
     }
 
-    if (!conversation.queue_id) {
-      console.warn('[Nina] transfer_to_human sem queue_id na conversa — sem destinatário para notificar');
-      return { success: true, error: 'no_queue', notified: 0 };
+    // Pessoa específica resolvida: notifica só ela (se tiver telefone de
+    // notificação). Senão, cai no handoff genérico pra fila inteira.
+    let recipients: Array<{ name: string; notification_phone: string }>;
+    if (targetMember) {
+      recipients = targetMember.notification_phone
+        ? [{ name: targetMember.name, notification_phone: targetMember.notification_phone }]
+        : [];
+      if (recipients.length === 0) {
+        console.warn(`[Nina] ${targetMember.name} não tem telefone de notificação cadastrado`);
+      }
+    } else {
+      if (!conversation.queue_id) {
+        console.warn('[Nina] transfer_to_human sem queue_id na conversa — sem destinatário para notificar');
+        return { success: true, error: 'no_queue', notified: 0 };
+      }
+
+      // Atendentes ativos da fila com telefone de notificação cadastrado
+      const { data: members } = await supabase
+        .from('queue_members')
+        .select('team_member:team_members(name, notification_phone)')
+        .eq('queue_id', conversation.queue_id)
+        .eq('is_active', true);
+
+      recipients = (members || [])
+        .map((m: any) => m.team_member)
+        .filter((tm: any) => tm?.notification_phone);
     }
 
-    // Atendentes ativos da fila com telefone de notificação cadastrado
-    const { data: members } = await supabase
-      .from('queue_members')
-      .select('team_member:team_members(name, notification_phone)')
-      .eq('queue_id', conversation.queue_id)
-      .eq('is_active', true);
-
-    const recipients = (members || [])
-      .map((m: any) => m.team_member)
-      .filter((tm: any) => tm?.notification_phone);
-
     if (recipients.length === 0) {
-      console.warn(`[Nina] Fila "${queueName}" sem atendentes com telefone de notificação cadastrado`);
+      console.warn(`[Nina] Sem destinatário com telefone de notificação cadastrado para "${targetMember?.name || queueName}"`);
       return { success: true, error: 'no_recipients', notified: 0 };
     }
 
-    const notifMessage = `🔔 *Nova conversa transferida — ${queueName}*
+    const notifMessage = `🔔 *Nova conversa transferida${targetMember ? ` — direto pra você` : ` — ${queueName}`}*
 
 👤 *Cliente:* ${displayName || 'Sem nome'}
 📱 *Telefone:* ${displayPhone || 'Não informado'}${contact?.oficina ? `\n🏢 *Oficina:* ${contact.oficina}` : ''}
