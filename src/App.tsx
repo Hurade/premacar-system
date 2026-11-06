@@ -34,6 +34,7 @@ import DuplicateContacts from './pages/DuplicateContacts';
 import CsatPublic from './pages/CsatPublic';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
+import { NotificationSettingsProvider } from './hooks/useNotificationSettings';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { UserRoleProvider } from './hooks/useUserRole';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
@@ -129,6 +130,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <UserRoleProvider>
           <CompanySettingsProvider>
+          <NotificationSettingsProvider>
             <BrowserRouter>
               <PageTitle />
               <Routes>
@@ -215,6 +217,7 @@ const App: React.FC = () => {
               </Routes>
             </BrowserRouter>
             <ThemedToaster />
+          </NotificationSettingsProvider>
           </CompanySettingsProvider>
         </UserRoleProvider>
       </AuthProvider>
