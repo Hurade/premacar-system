@@ -367,7 +367,10 @@ const Contacts: React.FC = () => {
   // (bug pré-existente: antes nenhuma tag com label diferente da key em
   // minúsculo/sem espaço renderizava cor na lista de contatos).
   const getTagDefinition = (tagLabel: string) => {
-    return tagDefinitions.find(t => t.label === tagLabel);
+    // Case-insensitive: a mesma tag existe salva com grafias diferentes em
+    // contatos distintos (ex: "cliente" e "Cliente") — comparação exata
+    // perdia a cor pra uma das variantes.
+    return tagDefinitions.find(t => t.label.toLowerCase() === tagLabel.toLowerCase());
   };
 
   return (

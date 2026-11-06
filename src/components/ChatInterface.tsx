@@ -1061,8 +1061,11 @@ const ChatInterface: React.FC = () => {
           // contacts.tags guarda o LABEL (ex: "Api oficial"), não a key
           // slugificada ("api_oficial") — comparar por t.key nunca batia,
           // e toda tag automática caía no azul genérico de fallback sem
-          // cor/categoria/instrução de IA aplicadas.
-          const tagDef = availableTags.find(t => t.label === tagKey);
+          // cor/categoria/instrução de IA aplicadas. Comparação também
+          // precisa ser case-insensitive: a mesma tag existe salva com
+          // grafias diferentes (ex: "cliente" e "Cliente") em contatos
+          // distintos.
+          const tagDef = availableTags.find(t => t.label.toLowerCase() === tagKey.toLowerCase());
           return (
             <span
               key={tagKey}
@@ -2791,8 +2794,9 @@ const ChatInterface: React.FC = () => {
                     {activeChat.tags && activeChat.tags.length > 0 ? (
                       activeChat.tags.map(tagKey => {
                         // Mesmo motivo do chip na lista de conversas (ver
-                        // comentário acima) — comparar por label, não key.
-                        const tagDef = availableTags.find(t => t.label === tagKey);
+                        // comentário acima) — comparar por label, não key,
+                        // e sem diferenciar maiúsculas/minúsculas.
+                        const tagDef = availableTags.find(t => t.label.toLowerCase() === tagKey.toLowerCase());
                         return (
                           <span 
                             key={tagKey}
