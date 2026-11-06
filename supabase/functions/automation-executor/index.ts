@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { executeSingleAction, AutomationActionDef } from "../_shared/automation-actions.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ interface AutomationRule {
   trigger_config: Record<string, unknown>;
   conditions: Condition[];
   conditions_logic: 'AND' | 'OR';
-  actions: Array<{ type: string; params: Record<string, unknown> }>;
+  actions: AutomationActionDef[];
   priority: number;
   run_once_per_contact: boolean;
 }
@@ -231,7 +232,7 @@ function evaluateConditions(conditions: Condition[], logic: 'AND' | 'OR', contex
 
 async function executeActions(
   supabase: any,
-  actions: Array<{ type: string; params: Record<string, unknown> }>,
+  actions: AutomationActionDef[],
   context: Record<string, any>,
   chainDepth: number,
   supabaseUrl: string,
@@ -240,90 +241,31 @@ async function executeActions(
   const results: Array<{ type: string; success: boolean; error?: string }> = [];
 
   for (const action of actions) {
-    try {
-      switch (action.type) {
-        case 'send_message': {
-          if (!context.conversation_id || !context.contact?.id) {
-            throw new Error('Sem conversa/contato para enviar mensagem');
-          }
-          if (context.contact.is_blocked) {
-            console.log('[automation-executor] Contato bloqueado, pulando envio de mensagem:', context.contact.id);
-            results.push({ type: action.type, success: true });
-            continue;
-          }
-          const { error } = await supabase.from('send_queue').insert({
-            conversation_id: context.conversation_id,
-            contact_id: context.contact.id,
-            message_type: 'text',
-            from_type: 'nina',
-            content: String(action.params.message || ''),
-            priority: 2,
-          });
-          if (error) throw error;
-          break;
-        }
-        case 'apply_tag':
-        case 'remove_tag': {
-          if (!context.contact?.id) throw new Error('Sem contato para aplicar/remover tag');
-          const tag = String(action.params.tag || '');
-          const currentTags: string[] = context.contact.tags || [];
-          const nextTags =
-            action.type === 'apply_tag'
-              ? currentTags.includes(tag) ? currentTags : [...currentTags, tag]
-              : currentTags.filter((t) => t !== tag);
-          const { error } = await supabase.from('contacts').update({ tags: nextTags }).eq('id', context.contact.id);
-          if (error) throw error;
-          context.contact.tags = nextTags;
-
-          // Encadeamento controlado: uma automação de tag pode disparar outra,
-          // até MAX_CHAIN_DEPTH níveis, evitando loop infinito.
-          if (action.type === 'apply_tag') {
-            fetch(`${supabaseUrl}/functions/v1/automation-executor`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
-                event_type: 'tag_applied',
-                contact_id: context.contact.id,
-                conversation_id: context.conversation_id,
-                tags: [tag],
-                chain_depth: chainDepth + 1,
-              }),
-            }).catch((err) => console.error('[AutomationExecutor] Erro ao encadear tag_applied:', err));
-          }
-          break;
-        }
-        case 'move_stage': {
-          if (!context.deal?.id) throw new Error('Sem deal para mover de estágio');
-          const stageId = String(action.params.stage_id || '');
-          const { data: stage } = await supabase.from('pipeline_stages').select('title').eq('id', stageId).maybeSingle();
-          const { error } = await supabase
-            .from('deals')
-            .update({ stage_id: stageId, stage: stage?.title || null, updated_at: new Date().toISOString() })
-            .eq('id', context.deal.id);
-          if (error) throw error;
-          break;
-        }
-        case 'create_task': {
-          if (!context.deal?.id) throw new Error('Sem deal para criar tarefa');
-          const { error } = await supabase.from('deal_activities').insert({
-            deal_id: context.deal.id,
-            type: 'task',
-            title: String(action.params.title || 'Tarefa automática'),
-            description: action.params.description ? String(action.params.description) : null,
-            scheduled_at: action.params.scheduled_at || null,
-          });
-          if (error) throw error;
-          break;
-        }
-        default:
-          throw new Error(`Tipo de ação desconhecido: ${action.type}`);
+    if (action.delay_hours && action.delay_hours > 0) {
+      // Ação com delay: não executa agora — enfileira pro
+      // automation-delayed-processor rodar no horário certo.
+      try {
+        const runAt = new Date(Date.now() + action.delay_hours * 3_600_000).toISOString();
+        const { error } = await supabase.from('automation_delayed_actions').insert({
+          contact_id: context.contact?.id || null,
+          conversation_id: context.conversation_id || null,
+          deal_id: context.deal?.id || null,
+          action: { type: action.type, params: action.params },
+          run_at: runAt,
+          chain_depth: chainDepth,
+        });
+        if (error) throw error;
+        results.push({ type: action.type, success: true });
+      } catch (scheduleError) {
+        const message = scheduleError instanceof Error ? scheduleError.message : 'Erro desconhecido';
+        console.error(`[AutomationExecutor] Erro ao agendar ação ${action.type}:`, message);
+        results.push({ type: action.type, success: false, error: message });
       }
-      results.push({ type: action.type, success: true });
-    } catch (actionError) {
-      const message = actionError instanceof Error ? actionError.message : 'Erro desconhecido';
-      console.error(`[AutomationExecutor] Erro na ação ${action.type}:`, message);
-      results.push({ type: action.type, success: false, error: message });
+      continue;
     }
+
+    const result = await executeSingleAction(supabase, action, context, chainDepth, supabaseUrl, supabaseServiceKey);
+    results.push(result);
   }
 
   return results;

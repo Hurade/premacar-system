@@ -4,6 +4,7 @@ import { saveLog } from "../_shared/logger.ts";
 import { resolveSendCredentials, SendCredentials } from "../_shared/connection-resolver.ts";
 import { selectVariation, CampaignVariationLike } from "../_shared/campaign-variations.ts";
 import { notifyAdmins } from "../_shared/internal-notify.ts";
+import { sendWhatsAppMessage } from "../_shared/whatsapp-send.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -282,11 +283,16 @@ serve(async (req) => {
 
       if (!contacts || contacts.length === 0) {
         console.log(`[recurring-processor] No in_progress contacts for campaign ${campaign.name}`);
-        // Mark campaign completed if no contacts left
-        await supabase
-          .from("recurring_campaigns")
-          .update({ status: "completed", ended_at: new Date().toISOString() })
-          .eq("id", campaign.id);
+        // Campanhas always_on (ex.: nutrição por tag, alimentadas aos poucos
+        // via automation-executor) não devem completar só por ficarem
+        // momentaneamente sem contato in_progress — elas seguem recebendo
+        // contatos novos indefinidamente.
+        if (!campaign.always_on) {
+          await supabase
+            .from("recurring_campaigns")
+            .update({ status: "completed", ended_at: new Date().toISOString() })
+            .eq("id", campaign.id);
+        }
         continue;
       }
 
@@ -960,6 +966,8 @@ async function sendEmail(
 // ===== WhatsApp via SendCredentials (Meta ou Evolution) =====
 // Usa o mesmo resolveSendCredentials do campaign-processor (Disparos),
 // garantindo que meta_api_enabled seja verificado antes de tentar a Meta API.
+// Lógica de envio em si vive em _shared/whatsapp-send.ts (reaproveitada
+// também pelo automation-delayed-processor).
 async function sendWhatsApp(
   contact: any,
   dayConfig: any,
@@ -967,151 +975,9 @@ async function sendWhatsApp(
   supabase: any
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const config = dayConfig.config || {};
-  const contactName = contact.name || contact.call_name || "Cliente";
-  const message = (config.message || "")
-    .replace(/\{\{nome\}\}/g, contactName)
-    .replace(/\{\{empresa\}\}/g, contact.oficina || "");
-
-  if (!contact.phone_number) {
-    return { success: false, error: "Contato sem número de telefone" };
-  }
-
-  const cleanPhone = contact.phone_number.replace(/\D/g, "");
-  const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-
   // Normaliza: a UI salva meta_template_id, versões antigas usavam template_id
   const templateId = config.meta_template_id || config.template_id || null;
-
-  console.log(`[recurring-processor] sendWhatsApp: api_type=${creds.api_type}, phone=${formattedPhone}, templateId=${templateId || "none"}`);
-
-  // ── Meta API ──────────────────────────────────────────────────────────────
-  if (creds.api_type === "meta") {
-    if (!creds.meta_access_token || !creds.meta_phone_number_id) {
-      return { success: false, error: "Credenciais Meta incompletas (meta_access_token ou meta_phone_number_id ausente)" };
-    }
-
-    const url = `https://graph.facebook.com/v21.0/${creds.meta_phone_number_id}/messages`;
-    let payload: any;
-
-    if (templateId) {
-      const { data: template } = await supabase
-        .from("meta_templates")
-        .select("name, language_code, parameters_count, parameters_mapping, status")
-        .eq("id", templateId)
-        .single();
-
-      if (!template) {
-        return { success: false, error: `Template ${templateId} não encontrado na tabela meta_templates. Verifique o cadastro em Configurações → Templates.` };
-      }
-      if (template.status !== "approved") {
-        return { success: false, error: `Template "${template.name}" não aprovado pela Meta (status: ${template.status}). Aguarde aprovação ou escolha outro template.` };
-      }
-
-      console.log(`[recurring-processor] Meta template "${template.name}" (${template.language_code}) → ${formattedPhone}`);
-
-      const components: any[] = [];
-      if (template.parameters_count > 0) {
-        // parameters_mapping é salvo como array [{index, field}], não um
-        // objeto {"1": "field"} — mapping["1"] num array acessava o
-        // elemento de ÍNDICE 1 (segundo item), não o item com index===1,
-        // então templates com mais de 1 variável ou com a 1ª variável
-        // mapeada pra algo diferente de "nome" mandavam o valor errado
-        // (só "funcionava" em templates de 1 variável = nome, por
-        // coincidência do fallback pro próprio nome do contato).
-        const mapping = (template.parameters_mapping as Array<{ index: number; field: string }>) || [];
-        const params: any[] = [];
-        for (let i = 1; i <= template.parameters_count; i++) {
-          const paramKey = mapping.find((m) => m.index === i)?.field || "";
-          let value = contactName;
-          if (paramKey === "empresa" || paramKey === "company") value = contact.oficina || "sua empresa";
-          else if (paramKey === "telefone" || paramKey === "phone") value = contact.phone_number;
-          params.push({ type: "text", text: value });
-        }
-        components.push({ type: "body", parameters: params });
-      }
-
-      payload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: formattedPhone,
-        type: "template",
-        template: {
-          name: template.name,
-          language: { code: template.language_code },
-          ...(components.length > 0 ? { components } : {}),
-        },
-      };
-    } else if (message) {
-      payload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: formattedPhone,
-        type: "text",
-        text: { body: message },
-      };
-    } else {
-      return { success: false, error: "Nenhum template ou mensagem configurado para este dia da campanha" };
-    }
-
-    console.log(`[recurring-processor] Meta payload:`, JSON.stringify(payload).substring(0, 500));
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${creds.meta_access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    if (response.ok) {
-      const metaMessageId = data.messages?.[0]?.id;
-      console.log(`[recurring-processor] Meta API success, message ID:`, metaMessageId);
-      return { success: true, messageId: metaMessageId };
-    }
-
-    const errMsg = data.error?.message || JSON.stringify(data.error) || "Meta API error";
-    console.error(`[recurring-processor] Meta API erro (${response.status}): ${errMsg}`);
-    return { success: false, error: `Meta API ${response.status}: ${errMsg}` };
-  }
-
-  // ── Evolution API ─────────────────────────────────────────────────────────
-  if (creds.api_type === "evolution") {
-    if (!creds.evolution_api_url || !creds.evolution_api_key || !creds.evolution_instance_name) {
-      return { success: false, error: "Credenciais Evolution incompletas (URL, API key ou instância ausente)" };
-    }
-    if (!message) {
-      return { success: false, error: "Evolution API requer mensagem de texto (configure uma mensagem no dia da campanha)" };
-    }
-
-    const evolutionUrl = `${creds.evolution_api_url.replace(/\/$/, "")}/message/sendText/${creds.evolution_instance_name}`;
-    console.log(`[recurring-processor] Evolution API: ${evolutionUrl}, phone: ${formattedPhone}`);
-
-    const response = await fetch(evolutionUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: creds.evolution_api_key },
-      body: JSON.stringify({ number: formattedPhone, text: message }),
-    });
-
-    const respData = await response.json().catch(() => ({}));
-    console.log(`[recurring-processor] Evolution response ${response.status}:`, JSON.stringify(respData).substring(0, 400));
-
-    if (!response.ok) {
-      return { success: false, error: respData.message || respData.error || `Evolution API error ${response.status}` };
-    }
-    if (!respData?.key?.id && !respData?.messageId) {
-      const errDetail = respData?.message || respData?.error || respData?.status || JSON.stringify(respData).substring(0, 150);
-      console.error(`[recurring-processor] Evolution HTTP 200 sem key.id — erro silencioso:`, errDetail);
-      return { success: false, error: `Evolution API: mensagem não enfileirada — ${errDetail}` };
-    }
-
-    const evolutionMessageId = respData.key?.id || respData.messageId;
-    console.log(`[recurring-processor] Evolution success, key.id:`, evolutionMessageId);
-    return { success: true, messageId: evolutionMessageId };
-  }
-
-  return { success: false, error: "api_type desconhecido nas credenciais WhatsApp" };
+  return sendWhatsAppMessage(contact, { message: config.message, templateId }, creds, supabase);
 }
 
 // ===== Ligação via make-voice-call =====

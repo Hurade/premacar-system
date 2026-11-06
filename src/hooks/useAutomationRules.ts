@@ -15,6 +15,8 @@ export interface AutomationCondition {
 export interface AutomationAction {
   type: 'send_message' | 'apply_tag' | 'remove_tag' | 'move_stage' | 'create_task';
   params: Record<string, string>;
+  /** Horas de espera antes de executar esta ação (automation-delayed-processor). Ausente/0 = imediata. */
+  delay_hours?: number;
 }
 
 export interface AutomationRule {
