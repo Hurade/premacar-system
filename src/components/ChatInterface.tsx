@@ -309,6 +309,18 @@ const ChatInterface: React.FC = () => {
     }
   }, [selectedChatId, activeChat?.unreadCount, markAsRead]);
 
+  // Atribui a conversa a quem abriu, se ela ainda não tiver dono. Antes a
+  // atribuição só acontecia ao enviar a primeira mensagem de uma conversa
+  // ainda em modo "nina" (ver sendMessage/sendAudioMessage em api.ts) — uma
+  // conversa reaberta (ex: a partir de Contatos) que já estava em modo
+  // "human" sem dono nunca passava por ali. Nunca sobrescreve um dono já
+  // definido, pra não tomar a conversa de outro atendente.
+  useEffect(() => {
+    if (selectedChatId && activeChat && !activeChat.assignedUserId && teamMemberId) {
+      assignConversation(activeChat.id, teamMemberId);
+    }
+  }, [selectedChatId, activeChat?.id, activeChat?.assignedUserId, teamMemberId, assignConversation]);
+
   // Sync notes value with active chat
   useEffect(() => {
     if (activeChat) {
