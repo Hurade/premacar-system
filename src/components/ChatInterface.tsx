@@ -1039,7 +1039,14 @@ const ChatInterface: React.FC = () => {
     return (
       <>
         {assignedMember && (
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+          <span
+            className={`px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 ${assignedMember.color ? '' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'}`}
+            style={assignedMember.color ? {
+              backgroundColor: `${assignedMember.color}20`,
+              color: assignedMember.color,
+              borderColor: `${assignedMember.color}4D`,
+            } : undefined}
+          >
             <User className="w-3 h-3" />
             {assignedMember.name}
           </span>

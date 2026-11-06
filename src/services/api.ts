@@ -552,7 +552,8 @@ export const api = {
       team: m.team as any,
       function: m.function as any,
       notification_phone: (m as any).notification_phone || null,
-      follow_me_enabled: (m as any).follow_me_enabled ?? true
+      follow_me_enabled: (m as any).follow_me_enabled ?? true,
+      color: (m as any).color || null
     }));
   },
 
@@ -615,6 +616,7 @@ export const api = {
     weight: number;
     notification_phone: string | null;
     follow_me_enabled: boolean;
+    color: string | null;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')

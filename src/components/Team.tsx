@@ -9,6 +9,14 @@ import { MemberScheduleModal } from './team/MemberScheduleModal';
 import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import { RoleGate } from './RoleGate';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+
+// Mesma paleta usada em TagManager/TagsSettings, pra manter consistência
+// visual entre "cor de tag" e "cor de membro da equipe".
+const MEMBER_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+];
 
 const Team: React.FC = () => {
   const { isAdmin, isManager, teamRole } = useUserRole();
@@ -178,6 +186,21 @@ const Team: React.FC = () => {
     } catch (error) {
       console.error('Erro ao atualizar membro:', error);
       toast.error('Erro ao atualizar membro');
+    }
+  };
+
+  // Atualização otimista (diferente de handleUpdateMember acima) — a cor
+  // precisa refletir na hora no avatar, não só depois de um reload da
+  // página, já que o objetivo inteiro do seletor é feedback visual imediato.
+  const handleUpdateColor = async (id: string, color: string) => {
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, color } : m));
+    try {
+      await api.updateTeamMember(id, { color });
+      logUserAction('update_team_member', 'team_member', id, { field: 'color', value: color });
+    } catch (error) {
+      console.error('Erro ao atualizar cor do membro:', error);
+      toast.error('Erro ao atualizar cor');
+      await loadAllData();
     }
   };
 
@@ -436,9 +459,45 @@ const Team: React.FC = () => {
                                 {/* User Info */}
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 border border-slate-700 uppercase">
-                                            {member.name.substring(0, 2)}
-                                        </div>
+                                        {isAdmin ? (
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <button
+                                                title="Alterar cor"
+                                                className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold uppercase transition-transform hover:scale-105 border ${member.color ? '' : 'bg-slate-800 text-slate-300 border-slate-700'}`}
+                                                style={member.color ? {
+                                                  backgroundColor: `${member.color}30`,
+                                                  borderColor: member.color,
+                                                  color: member.color,
+                                                } : undefined}
+                                              >
+                                                {member.name.substring(0, 2)}
+                                              </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-3 bg-slate-900 border-slate-700" align="start">
+                                              <p className="text-xs text-slate-400 mb-2">Cor de {member.name}</p>
+                                              <div className="flex items-center gap-1.5">
+                                                {MEMBER_COLORS.map(color => (
+                                                  <button
+                                                    key={color}
+                                                    onClick={() => handleUpdateColor(member.id, color)}
+                                                    className={`w-6 h-6 rounded-full transition-all ${
+                                                      member.color === color ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-white' : ''
+                                                    }`}
+                                                    style={{ backgroundColor: color }}
+                                                  />
+                                                ))}
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
+                                        ) : (
+                                          <div
+                                            className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 border border-slate-700 uppercase"
+                                            style={member.color ? { backgroundColor: `${member.color}30`, borderColor: member.color, color: member.color } : undefined}
+                                          >
+                                              {member.name.substring(0, 2)}
+                                          </div>
+                                        )}
                                         <span className="text-sm font-medium text-slate-200">{member.name}</span>
                                     </div>
                                 </td>
