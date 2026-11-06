@@ -235,21 +235,26 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
             </Label>
             {activeTags.length > 0 ? (
               <div className="flex flex-wrap gap-1.5 p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-                {activeTags.map(tag => (
-                  <Badge
-                    key={tag.id}
-                    className="px-2 py-0.5 text-xs font-medium cursor-pointer transition-all"
-                    style={{ 
-                      backgroundColor: selectedTags.includes(tag.key) ? `${tag.color}30` : `${tag.color}10`,
-                      borderColor: selectedTags.includes(tag.key) ? tag.color : `${tag.color}30`,
-                      color: tag.color,
-                      borderWidth: selectedTags.includes(tag.key) ? '2px' : '1px'
-                    }}
-                    onClick={() => toggleTag(tag.key)}
-                  >
-                    {tag.label}
-                  </Badge>
-                ))}
+                {activeTags.map(tag => {
+                  // contacts.tags guarda o LABEL, não a key slugificada —
+                  // ver mesma correção em EditContactModal.tsx.
+                  const isSelected = selectedTags.some(t => t.toLowerCase() === tag.label.toLowerCase());
+                  return (
+                    <Badge
+                      key={tag.id}
+                      className="px-2 py-0.5 text-xs font-medium cursor-pointer transition-all"
+                      style={{
+                        backgroundColor: isSelected ? `${tag.color}30` : `${tag.color}10`,
+                        borderColor: isSelected ? tag.color : `${tag.color}30`,
+                        color: tag.color,
+                        borderWidth: isSelected ? '2px' : '1px'
+                      }}
+                      onClick={() => toggleTag(tag.label)}
+                    >
+                      {tag.label}
+                    </Badge>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-slate-500">

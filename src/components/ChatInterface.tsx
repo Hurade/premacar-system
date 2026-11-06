@@ -414,9 +414,10 @@ const ChatInterface: React.FC = () => {
     try {
       const newTag = await createTagDefinition.mutateAsync(tag);
 
-      // Adicionar a tag ao contato automaticamente
+      // Adicionar a tag ao contato automaticamente — grava o LABEL, igual
+      // ao resto do sistema (contacts.tags guarda o nome, não a key slugificada).
       if (activeChat) {
-        await toggleContactTag(activeChat.id, newTag.key);
+        await toggleContactTag(activeChat.id, newTag.label);
       }
     } catch (error) {
       console.error('Error creating tag:', error);
@@ -971,12 +972,13 @@ const ChatInterface: React.FC = () => {
     }
 
     // Filtro por tag (incluir apenas conversas com esta tag)
-    if (filterTag && !chat.tags.includes(filterTag)) {
+    if (filterTag && !chat.tags.some(t => t.toLowerCase() === filterTag.toLowerCase())) {
       return false;
     }
     
-    // Excluir conversas que tenham alguma das tags excluídas
-    if (excludedTags.length > 0 && excludedTags.some(tag => chat.tags.includes(tag))) {
+    // Excluir conversas que tenham alguma das tags excluídas (case-insensitive
+    // — a mesma tag existe salva com grafias diferentes em contatos distintos)
+    if (excludedTags.length > 0 && excludedTags.some(tag => chat.tags.some(ct => ct.toLowerCase() === tag.toLowerCase()))) {
       return false;
     }
     
@@ -1502,7 +1504,7 @@ const ChatInterface: React.FC = () => {
                     }`}
                   >
                     <Tag className="w-3 h-3" />
-                    {filterTag ? availableTags.find(t => t.key === filterTag)?.label || filterTag : 'Tag'}
+                    {filterTag || 'Tag'}
                     {filterTag && (
                       <X 
                         className="w-3 h-3 ml-1 hover:text-slate-100" 
@@ -1528,9 +1530,11 @@ const ChatInterface: React.FC = () => {
                     {availableTags.filter(t => t.is_active).map(tag => (
                       <button
                         key={tag.key}
-                        onClick={() => setFilterTag(tag.key)}
+                        // chat.tags guarda o LABEL — filtrar por key nunca
+                        // batia, esse filtro nunca mostrava resultado nenhum.
+                        onClick={() => setFilterTag(tag.label)}
                         className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                          filterTag === tag.key ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                          filterTag?.toLowerCase() === tag.label.toLowerCase() ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                         }`}
                       >
                         <span 
@@ -1574,15 +1578,18 @@ const ChatInterface: React.FC = () => {
                   <div className="space-y-1">
                     <p className="text-xs text-slate-500 px-3 py-1 font-medium">Ocultar conversas com:</p>
                     {availableTags.filter(t => t.is_active).map(tag => {
-                      const isExcluded = excludedTags.includes(tag.key);
+                      // chat.tags (contacts.tags) guarda o LABEL — usar a
+                      // key aqui fazia esse filtro nunca excluir nada, já
+                      // que a comparação na linha ~980 nunca batia.
+                      const isExcluded = excludedTags.some(t => t.toLowerCase() === tag.label.toLowerCase());
                       return (
                         <button
                           key={tag.key}
                           onClick={() => {
                             if (isExcluded) {
-                              setExcludedTags(prev => prev.filter(t => t !== tag.key));
+                              setExcludedTags(prev => prev.filter(t => t.toLowerCase() !== tag.label.toLowerCase()));
                             } else {
-                              setExcludedTags(prev => [...prev, tag.key]);
+                              setExcludedTags(prev => [...prev, tag.label]);
                             }
                           }}
                           className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
@@ -3217,9 +3224,15 @@ const ChatInterface: React.FC = () => {
                       availableTags.filter(t => t.is_active).map(tag => (
                         <button
                           key={tag.key}
-                          onClick={() => handleToggleTagForConv(tag.key)}
+                          // Grava o LABEL em selectedTagsForConv, não a key —
+                          // mesma convenção de contacts.tags no resto do
+                          // sistema (ver toggleContactTag/useConversations).
+                          // Usar a key aqui gravava a versão slugificada
+                          // (ex: "automax_oficina") em vez do nome real
+                          // ("Automax Oficina"), perdendo cor/categoria.
+                          onClick={() => handleToggleTagForConv(tag.label)}
                           className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                            selectedTagsForConv.includes(tag.key)
+                            selectedTagsForConv.includes(tag.label)
                               ? 'ring-2 ring-offset-2 ring-offset-slate-900'
                               : 'opacity-70 hover:opacity-100'
                           }`}
@@ -3227,7 +3240,7 @@ const ChatInterface: React.FC = () => {
                             backgroundColor: `${tag.color}20`,
                             borderColor: `${tag.color}50`,
                             color: tag.color,
-                            ...(selectedTagsForConv.includes(tag.key) ? { ringColor: tag.color } : {})
+                            ...(selectedTagsForConv.includes(tag.label) ? { ringColor: tag.color } : {})
                           }}
                         >
                           {tag.label}

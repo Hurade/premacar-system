@@ -147,11 +147,15 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
             </h5>
             <div className="space-y-0.5">
               {tags.map(tag => {
-                const isSelected = selectedTags.includes(tag.key);
+                // selectedTags (contacts.tags) guarda o LABEL, não a key
+                // slugificada — comparar/gravar por key nunca batia com o
+                // que já estava aplicado, e ao marcar gravava a key errada
+                // (ex: "automax_oficina" em vez de "Automax Oficina").
+                const isSelected = selectedTags.some(t => t.toLowerCase() === tag.label.toLowerCase());
                 return (
                   <button
                     key={tag.key}
-                    onClick={() => onToggleTag(tag.key)}
+                    onClick={() => onToggleTag(tag.label)}
                     className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-accent/50 transition-colors text-left group"
                   >
                     <div className="flex items-center gap-2">
