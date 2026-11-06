@@ -1051,7 +1051,11 @@ const ChatInterface: React.FC = () => {
           </span>
         )}
         {chat.tags.map(tagKey => {
-          const tagDef = availableTags.find(t => t.key === tagKey);
+          // contacts.tags guarda o LABEL (ex: "Api oficial"), não a key
+          // slugificada ("api_oficial") — comparar por t.key nunca batia,
+          // e toda tag automática caía no azul genérico de fallback sem
+          // cor/categoria/instrução de IA aplicadas.
+          const tagDef = availableTags.find(t => t.label === tagKey);
           return (
             <span
               key={tagKey}
@@ -2779,7 +2783,9 @@ const ChatInterface: React.FC = () => {
                   <div className="flex flex-wrap gap-2">
                     {activeChat.tags && activeChat.tags.length > 0 ? (
                       activeChat.tags.map(tagKey => {
-                        const tagDef = availableTags.find(t => t.key === tagKey);
+                        // Mesmo motivo do chip na lista de conversas (ver
+                        // comentário acima) — comparar por label, não key.
+                        const tagDef = availableTags.find(t => t.label === tagKey);
                         return (
                           <span 
                             key={tagKey}
