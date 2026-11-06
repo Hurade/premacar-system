@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saveLog } from "../_shared/logger.ts";
 import { resolveSendCredentials, SendCredentials } from "../_shared/connection-resolver.ts";
+import { isWithinBusinessHours } from "../_shared/business-hours.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -155,6 +156,22 @@ serve(async (req) => {
     if (!allSettings || allSettings.length === 0) {
       console.log(`[${SOURCE}] No active follow-up configurations found.`);
       return new Response(JSON.stringify({ success: true, processed: 0, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Respeita o horário comercial configurado (nina_settings) — sem essa
+    // checagem, follow-up disparava a qualquer hora/dia, bastando ter
+    // passado delay_hours desde a última mensagem do cliente.
+    const { data: ninaSettings } = await supabase
+      .from("nina_settings")
+      .select("business_hours_start, business_hours_end, business_days, timezone")
+      .limit(1)
+      .maybeSingle();
+
+    if (!isWithinBusinessHours(ninaSettings)) {
+      console.log(`[${SOURCE}] Fora do horário comercial configurado — pulando este ciclo.`);
+      return new Response(JSON.stringify({ success: true, processed: 0, results, reason: "outside_business_hours" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
