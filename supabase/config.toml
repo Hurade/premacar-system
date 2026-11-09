@@ -58,3 +58,10 @@ verify_jwt = false
 # O único chamador legítimo (recurring-campaign-processor) já envia
 # Authorization: Bearer <service_role_key>, um JWT válido, e o frontend usa
 # supabase.functions.invoke() que injeta o JWT do usuário automaticamente.
+
+# prema-comunicacao: API de envio de WhatsApp pra sistemas internos da
+# própria Prema (crons, admin do CRM) mandarem mensagens automáticas pros
+# clientes dela — autenticada por um token estático próprio
+# (PREMA_COMUNICACAO_API_TOKEN), não um JWT do Supabase.
+[functions.prema-comunicacao]
+verify_jwt = false
