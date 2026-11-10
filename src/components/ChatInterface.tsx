@@ -66,7 +66,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation } = useConversations();
+  const { conversations, loading, sendMessage, sendMediaMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager, teamMemberId } = useUserRole();
   const canSupervise = isAdmin || isManager;
@@ -491,14 +491,17 @@ const ChatInterface: React.FC = () => {
 
   const uploadAndSendAttachment = async (file: File) => {
     if (!activeChat) return;
+    if (file.size === 0) {
+      // Clipboard de print colado rápido demais depois do Print Screen às
+      // vezes entrega um arquivo vazio (o SO ainda não terminou de escrever
+      // a imagem na área de transferência) — sem essa checagem, isso virava
+      // uma mensagem de imagem "quebrada" enviada de verdade pro cliente.
+      toast.error('Arquivo vazio — tente colar o print de novo');
+      return;
+    }
     setIsUploadingFile(true);
     try {
-      const { data, error } = await supabase.storage
-        .from('chat-attachments')
-        .upload(`${activeChat.id}/${Date.now()}-${file.name}`, file, { upsert: false });
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from('chat-attachments').getPublicUrl(data.path);
-      await sendMessage(activeChat.id, `📎 ${file.name}\n${urlData.publicUrl}`);
+      await sendMediaMessage(activeChat.id, file);
       toast.success('Arquivo enviado');
     } catch (err) {
       console.error('[ChatInterface] File upload error:', err);

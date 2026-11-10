@@ -186,10 +186,15 @@ serve(async (req) => {
           continue;
         }
 
-        // Combine content and handle audio transcription
+        // Combine content and handle audio transcription. Usa a ordem de
+        // dbMessages (sent_at ascendente) e não a ordem de chegada na fila
+        // (message_grouping_queue.created_at) — duas mensagens quase
+        // simultâneas podem ter suas linhas inseridas na fila fora de ordem
+        // por uma corrida entre invocações concorrentes do webhook,
+        // invertendo o texto combinado (ex: "Bom dia, ..." acabando depois
+        // de uma frase que deveria vir só depois dele).
         const combinedContent = await combineAndTranscribeMessages(
           supabase,
-          messages,
           dbMessages,
           ownerSettings,
           lovableApiKey
@@ -216,6 +221,29 @@ serve(async (req) => {
             .eq('id', lastDbMessage.id);
           
           console.log(`[MessageGrouper] Updated last message with combined content`);
+
+          // Apaga as outras mensagens do grupo: seu conteúdo já está
+          // embutido na mensagem final, e sem isso elas ficavam como
+          // bolhas duplicadas e fora de ordem no histórico do chat (o
+          // texto da primeira mensagem aparecia sozinho E de novo dentro
+          // da combinada). reply_to_id de qualquer mensagem que citava uma
+          // delas vira NULL automaticamente (ON DELETE SET NULL).
+          const idsToDelete = dbMessages
+            .filter(m => m.id !== lastDbMessage.id)
+            .map(m => m.id);
+
+          if (idsToDelete.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('messages')
+              .delete()
+              .in('id', idsToDelete);
+
+            if (deleteError) {
+              console.error('[MessageGrouper] Error deleting merged sub-messages:', deleteError);
+            } else {
+              console.log(`[MessageGrouper] Deleted ${idsToDelete.length} now-merged sub-messages:`, idsToDelete);
+            }
+          }
         } else if (['audio', 'image', 'document'].includes(dbMessages[0].type) && combinedContent !== dbMessages[0].content) {
           // Update single media message with the resolved content (transcrição/descrição/texto extraído)
           await supabase
@@ -301,7 +329,6 @@ serve(async (req) => {
 // Combine content from multiple messages, resolvendo mídia (áudio/imagem/documento)
 async function combineAndTranscribeMessages(
   supabase: any,
-  queueMessages: any[],
   dbMessages: any[],
   settings: any,
   lovableApiKey: string
@@ -313,12 +340,8 @@ async function combineAndTranscribeMessages(
   const accessToken = settings?.meta_access_token || settings?.whatsapp_access_token;
   const mediaSettings = { ...settings, meta_access_token: accessToken };
 
-  for (let i = 0; i < queueMessages.length; i++) {
-    const queueMsg = queueMessages[i];
-    const dbMsg = dbMessages.find(m => m.id === queueMsg.message_id);
-
-    if (!dbMsg) continue;
-
+  // dbMessages já vem ordenado por sent_at ascendente (ordem real de envio).
+  for (const dbMsg of dbMessages) {
     let content = dbMsg.content || '';
 
     // Resolve mídia com base na própria mensagem salva (media_url + type),

@@ -585,6 +585,47 @@ export function useConversations() {
     }
   }, []);
 
+  // Send an image/document attachment via WhatsApp (preview otimista local
+  // via createObjectURL, substituída pelo real quando o realtime/refetch
+  // trouxer a mensagem já com a media_url pública do storage).
+  const sendMediaMessage = useCallback(async (conversationId: string, file: File) => {
+    const tempId = `temp-media-${Date.now()}`;
+    const tempUrl = URL.createObjectURL(file);
+    const isImage = file.type.startsWith('image/');
+    const tempMessage: UIMessage = {
+      id: tempId,
+      content: isImage ? '' : file.name,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      sentAt: new Date().toISOString(),
+      direction: MessageDirection.OUTGOING,
+      type: isImage ? MessageType.IMAGE : MessageType.DOCUMENT,
+      status: 'sent',
+      fromType: 'human',
+      mediaUrl: tempUrl,
+      whatsappMessageId: null,
+      replyToId: null,
+      apiSource: null
+    };
+
+    setConversations(prev => prev.map(conv => (
+      conv.id === conversationId
+        ? { ...conv, messages: [...conv.messages, tempMessage], lastMessage: isImage ? '📷 Imagem' : `📄 ${file.name}`, lastMessageTime: 'Agora' }
+        : conv
+    )));
+
+    try {
+      await api.sendMediaMessage(conversationId, file);
+    } catch (err) {
+      console.error('[useConversations] Error sending media message:', err);
+      toast.error('Erro ao enviar arquivo');
+      setConversations(prev => prev.map(conv => (
+        conv.id === conversationId
+          ? { ...conv, messages: conv.messages.filter(m => m.id !== tempId) }
+          : conv
+      )));
+    }
+  }, []);
+
   // Send a recorded audio message (voice note) via WhatsApp
   const sendAudioMessage = useCallback(async (conversationId: string, audioBlob: Blob, durationSeconds?: number) => {
     const tempId = `temp-audio-${Date.now()}`;
@@ -1034,6 +1075,7 @@ export function useConversations() {
     error,
     realtimeConnected,
     sendMessage,
+    sendMediaMessage,
     sendAudioMessage,
     sendInternalNote,
     updateStatus,

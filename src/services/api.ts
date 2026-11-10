@@ -1801,6 +1801,118 @@ export const api = {
   },
 
   /**
+   * Envia um anexo (imagem ou documento) pelo chat. Sobe o arquivo pro bucket
+   * público "chat-attachments" e cria a mensagem já como type 'image'/
+   * 'document' + media_url (mesmo padrão do sendAudioMessage) — antes disso,
+   * uploadAndSendAttachment mandava um sendMessage de texto comum com
+   * "📎 nome\nURL", que chegava pro cliente como texto puro (não como mídia
+   * de verdade) e aparecia na central como link em vez de preview de imagem.
+   * whatsapp-sender não tem case pra 'video' — por ora mandamos vídeo como
+   * 'document' (chega como arquivo anexado, não como player inline, mas pelo
+   * menos chega de verdade em vez de cair no default de texto).
+   */
+  sendMediaMessage: async (conversationId: string, file: File): Promise<string> => {
+    console.log(`[API] Sending media attachment to conversation ${conversationId}`);
+
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('contact_id, connection_id')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      console.error('[API] Error getting conversation:', convError);
+      throw new Error('Conversation not found');
+    }
+
+    const messageType: 'image' | 'document' = file.type.startsWith('image/') ? 'image' : 'document';
+    const filePath = `${conversationId}/${Date.now()}-${file.name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('chat-attachments')
+      .upload(filePath, file, { contentType: file.type || undefined, upsert: false });
+
+    if (uploadError) {
+      console.error('[API] Error uploading attachment:', uploadError);
+      throw uploadError;
+    }
+
+    const { data: urlData } = supabase.storage.from('chat-attachments').getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
+    // Documento usa content como fileName (é o que whatsapp-sender manda pro
+    // WhatsApp); imagem usa content como legenda, que aqui não existe ainda.
+    const content = messageType === 'document' ? file.name : '';
+
+    const { data: msgData, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        content,
+        type: messageType,
+        from_type: 'human',
+        status: 'processing',
+        media_url: publicUrl,
+        media_type: messageType,
+        sent_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (msgError || !msgData) {
+      console.error('[API] Error creating media message record:', msgError);
+      throw new Error('Failed to create message record');
+    }
+
+    const { error: sendError } = await supabase
+      .from('send_queue')
+      .insert({
+        conversation_id: conversationId,
+        contact_id: conversation.contact_id,
+        connection_id: conversation.connection_id ?? null,
+        content,
+        from_type: 'human',
+        message_type: messageType,
+        media_url: publicUrl,
+        priority: 2,
+        message_id: msgData.id,
+      });
+
+    if (sendError) {
+      console.error('[API] Error queuing media message:', sendError);
+      throw sendError;
+    }
+
+    const { data: convBeforeMedia } = await supabase
+      .from('conversations')
+      .select('status')
+      .eq('id', conversationId)
+      .maybeSingle();
+    const wasAlreadyHumanMedia = convBeforeMedia?.status === 'human';
+
+    if (!wasAlreadyHumanMedia) {
+      await supabase.from('conversations').update({ status: 'human' }).eq('id', conversationId);
+
+      try {
+        const teamMemberId = await getCurrentTeamMemberId();
+        if (teamMemberId) {
+          await supabase.from('conversations').update({ assigned_user_id: teamMemberId }).eq('id', conversationId);
+        }
+      } catch (err) {
+        console.error('[API] Error auto-assigning conversation (non-blocking):', err);
+      }
+    }
+
+    try {
+      const { error: triggerError } = await supabase.functions.invoke('whatsapp-sender');
+      if (triggerError) console.error('[API] Error triggering whatsapp-sender:', triggerError);
+    } catch (err) {
+      console.error('[API] Failed to trigger whatsapp-sender:', err);
+    }
+
+    return msgData.id;
+  },
+
+  /**
    * Envia uma mensagem de áudio (gravada no navegador) pelo chat.
    * Sobe o arquivo pro bucket público "chat-audio" e reaproveita o mesmo
    * fluxo do sendMessage (mensagem pré-criada + send_queue + trigger do
