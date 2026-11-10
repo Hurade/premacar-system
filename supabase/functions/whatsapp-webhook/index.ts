@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
 import { notifyAdmins } from "../_shared/internal-notify.ts";
+import { saveLog } from "../_shared/logger.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -856,6 +857,28 @@ serve(async (req) => {
         console.log('[Webhook] 📍 Localização recebida');
       } else {
         messageContent = '[Mensagem recebida em formato não suportado pelo sistema]';
+
+        // Sem isso não há como saber depois QUAL formato era (ex: uma edição
+        // que não bateu com o shape esperado em protocolMessage.editedMessage
+        // lá em cima) — loga as chaves do payload (não o conteúdo inteiro,
+        // pra não vazar texto de mensagem em log) pra conseguir reconhecer o
+        // formato real na próxima ocorrência em vez de adivinhar.
+        try {
+          await saveLog(supabase, {
+            source: 'whatsapp-webhook',
+            level: 'warn',
+            message: 'Formato de mensagem não reconhecido',
+            metadata: {
+              message_keys: msg ? Object.keys(msg) : [],
+              has_protocol_message: !!msg?.protocolMessage,
+              protocol_message_keys: msg?.protocolMessage ? Object.keys(msg.protocolMessage) : undefined,
+              protocol_message_type: msg?.protocolMessage?.type,
+              evolution_instance: instanceName,
+            },
+          });
+        } catch (logErr) {
+          console.error('[Webhook] Error saving unsupported-format log:', logErr);
+        }
       }
 
       // Mensagem mandada direto do celular = um humano assumiu a conversa por
