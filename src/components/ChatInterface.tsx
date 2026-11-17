@@ -907,7 +907,8 @@ const ChatInterface: React.FC = () => {
         selectedApiSource,
         selectedApiSource === 'meta' ? selectedTemplateId : undefined,
         selectedConnectionId,
-        selectedQueueId
+        selectedQueueId,
+        teamMemberId
       );
       setSelectedChatId(newConvId);
       setShowNewConversationModal(false);

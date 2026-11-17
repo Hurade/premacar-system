@@ -1021,7 +1021,8 @@ export function useConversations() {
     apiSource: 'meta' | 'evolution' = 'evolution',
     templateId?: string,
     connectionId?: string,
-    queueId?: string
+    queueId?: string,
+    assignedUserId?: string | null
   ): Promise<string> => {
     try {
       // Check if there's already an active conversation for this contact WITH THE SAME API SOURCE
@@ -1053,6 +1054,11 @@ export function useConversations() {
           api_source: apiSource,
           connection_id: connectionId ?? null,
           queue_id: queueId ?? null,
+          // Quem clicou em "Nova Conversa" já deve ficar como responsável —
+          // sem isso, o trigger create_deal_for_new_conversation sorteava
+          // o dono por round-robin (regra pensada pra leads que chegam
+          // sozinhos, não pra conversa que um atendente específico abriu).
+          assigned_user_id: assignedUserId ?? null,
           metadata: templateId ? { initial_template_id: templateId } : {},
         })
         .select()
