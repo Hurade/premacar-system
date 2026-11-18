@@ -90,7 +90,9 @@ async function sendTextViaEvolution(
     const response = await fetch(`${baseUrl}/message/sendText/${evolutionInstanceName}`, {
       method: "POST",
       headers: { apikey: evolutionApiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ number: formattedPhone, text: message }),
+      // linkPreview:false — ver whatsapp-sender/index.ts (mensagem com link
+      // travava na geração de preview da Baileys e nunca chegava no aparelho).
+      body: JSON.stringify({ number: formattedPhone, text: message, linkPreview: false }),
     });
 
     const data = await response.json();

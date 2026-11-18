@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { RecurringCampaign } from '@/hooks/useRecurringCampaigns';
+import { supabase } from '@/integrations/supabase/client';
 
 const CHANNEL_CONFIG: Record<string, { icon: string; label: string }> = {
   call: { icon: '📞', label: 'Ligação' },
@@ -15,6 +16,35 @@ interface Props {
 
 export function DayDistribution({ campaign }: Props) {
   const flowConfig = campaign.flow_config as Record<string, any> | null;
+
+  // Dias de WhatsApp fora do wizard guardam só o meta_template_id (uuid) —
+  // sem isso, a tela não mostrava nada pro conteúdo desses dias (nem nome
+  // nem texto do template), parecendo que a campanha tinha "sumido".
+  const [templateMap, setTemplateMap] = useState<Record<string, { name: string; body_text: string | null }>>({});
+
+  useEffect(() => {
+    if (!flowConfig) return;
+    const ids = Array.from(
+      new Set(
+        Object.values(flowConfig)
+          .map((d: any) => d?.config?.meta_template_id)
+          .filter((id): id is string => !!id)
+      )
+    );
+    if (ids.length === 0) return;
+    supabase
+      .from('meta_templates')
+      .select('id, name, display_name, body_text')
+      .in('id', ids)
+      .then(({ data }) => {
+        const map: Record<string, { name: string; body_text: string | null }> = {};
+        (data || []).forEach((t: any) => {
+          map[t.id] = { name: t.display_name || t.name, body_text: t.body_text };
+        });
+        setTemplateMap(map);
+      });
+  }, [flowConfig]);
+
   if (!flowConfig || typeof flowConfig !== 'object') return null;
 
   const days = Object.entries(flowConfig).sort(([a], [b]) => {
@@ -65,6 +95,20 @@ export function DayDistribution({ campaign }: Props) {
                   Template: <span className="text-foreground">{dayConfig.config.template}</span>
                 </p>
               )}
+
+              {dayConfig?.config?.meta_template_id && (() => {
+                const tpl = templateMap[dayConfig.config.meta_template_id];
+                return (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Template: <span className="text-foreground">{tpl?.name || '(carregando…)'}</span>
+                    </p>
+                    {tpl?.body_text && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{tpl.body_text}</p>
+                    )}
+                  </>
+                );
+              })()}
 
               {(() => {
                 // Campanhas fora do wizard guardam subject_options (lista,

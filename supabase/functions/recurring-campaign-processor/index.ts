@@ -269,12 +269,26 @@ serve(async (req) => {
         .order("label");
       const variations = (variationsData ?? []) as (CampaignVariationLike & { meta_template_id: string | null })[];
 
-      // Get in_progress contacts for this campaign
+      // Get in_progress contacts for this campaign.
+      // order+limit: campanhas com milhares de contatos "in_progress" ao
+      // mesmo tempo (ex: import grande de leads) travavam aqui — sem limite,
+      // cada execução varria TODOS eles (cada um custa várias queries:
+      // reply check, contact fetch, blacklist...) e estourava o tempo de
+      // execução bem antes de alcançar quem está mais pra trás na ordem
+      // física da tabela. Resultado: quem caía fora da janela alcançável
+      // nunca era processado, mesmo com o dia habilitado e tudo certo —
+      // não aparecia nem como erro, só silenciosamente nunca rodava.
+      // updated_at asc prioriza quem está esperando há mais tempo sem ser
+      // tocado; como todo contato processado tem updated_at atualizado pra
+      // agora, isso forma uma fila justa (round-robin) em vez de sempre
+      // bater nos mesmos primeiros registros da tabela a cada execução.
       const { data: contacts, error: contactsError } = await supabase
         .from("campaign_contacts")
         .select("id, contact_id, current_day, status, day_statuses, metadata, created_at")
         .eq("campaign_id", campaign.id)
-        .eq("status", "in_progress");
+        .eq("status", "in_progress")
+        .order("updated_at", { ascending: true, nullsFirst: true })
+        .limit(800);
 
       if (contactsError) {
         console.error(`[recurring-processor] Error fetching contacts:`, contactsError);

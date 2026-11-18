@@ -372,8 +372,11 @@ async function sendViaEvolution(
 
   switch (queueItem.message_type) {
     case 'text':
+      // linkPreview:false evita que a Baileys trave tentando gerar preview
+      // de URL (ex: links encurtados do Asaas) — mensagem ficava com
+      // status 'sent' (API respondeu com ID) mas nunca chegava no aparelho.
       endpoint = `/message/sendText/${settings.evolution_instance_name}`;
-      payload = { number: recipient, text: queueItem.content };
+      payload = { number: recipient, text: queueItem.content, linkPreview: false };
       break;
     case 'image':
       endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
@@ -393,7 +396,7 @@ async function sendViaEvolution(
       break;
     default:
       endpoint = `/message/sendText/${settings.evolution_instance_name}`;
-      payload = { number: recipient, text: queueItem.content };
+      payload = { number: recipient, text: queueItem.content, linkPreview: false };
   }
 
   // Reply citando a mensagem original (best-effort — se o formato não for

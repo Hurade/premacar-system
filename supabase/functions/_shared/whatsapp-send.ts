@@ -126,7 +126,9 @@ export async function sendWhatsAppMessage(
     const response = await fetch(evolutionUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: creds.evolution_api_key },
-      body: JSON.stringify({ number: formattedPhone, text: message }),
+      // linkPreview:false — ver whatsapp-sender/index.ts (mesmo problema de
+      // mensagem com link travando na geração de preview da Baileys).
+      body: JSON.stringify({ number: formattedPhone, text: message, linkPreview: false }),
     });
 
     const respData = await response.json().catch(() => ({}));
