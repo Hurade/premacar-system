@@ -256,16 +256,25 @@ export const MetaTemplatesManager: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-foreground">{template.display_name}</h3>
-                      <Badge className={statusConfig[template.status].color}>
-                        {statusConfig[template.status].icon}
-                        <span className="ml-1">{statusConfig[template.status].label}</span>
-                      </Badge>
+                      {(() => {
+                        // Qualquer status fora de pending/approved/rejected (ex: um
+                        // valor gravado errado direto no banco) derrubava a tela
+                        // inteira de templates — statusConfig[...] vinha undefined
+                        // e acessar .color quebrava o render de toda a lista.
+                        const cfg = statusConfig[template.status] || { label: template.status, icon: <Info className="w-3 h-3" />, color: 'bg-secondary text-muted-foreground' };
+                        return (
+                          <Badge className={cfg.color}>
+                            {cfg.icon}
+                            <span className="ml-1">{cfg.label}</span>
+                          </Badge>
+                        );
+                      })()}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       <code className="bg-secondary/50 px-1 rounded">{template.name}</code>
                       {' • '}
-                      <span className={categoryLabels[template.category].color.replace('bg-', 'text-').replace('/20', '')}>
-                        {categoryLabels[template.category].label}
+                      <span className={(categoryLabels[template.category] || categoryLabels.MARKETING).color.replace('bg-', 'text-').replace('/20', '')}>
+                        {categoryLabels[template.category]?.label || template.category}
                       </span>
                       {' • '}
                       {template.parameters_count} parâmetros
