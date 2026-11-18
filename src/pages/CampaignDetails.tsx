@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pause, Play, Download, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Pause, Play, Download, BarChart3, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,7 @@ import { DayDistribution } from '@/components/campaigns/DayDistribution';
 import { CampaignContactsList } from '@/components/campaigns/CampaignContactsList';
 import RecurringCampaignVariations from '@/components/campaigns/RecurringCampaignVariations';
 import RecurringCampaignSendRules from '@/components/campaigns/RecurringCampaignSendRules';
+import { EditCampaignFlowModal } from '@/components/campaigns/EditCampaignFlowModal';
 import { toast } from 'sonner';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
@@ -26,6 +27,7 @@ const CampaignDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const [campaign, setCampaign] = useState<RecurringCampaign | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editFlowOpen, setEditFlowOpen] = useState(false);
 
   const fetchCampaign = useCallback(async () => {
     if (!id) return;
@@ -151,6 +153,10 @@ const CampaignDetailsPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditFlowOpen(true)}>
+            <Pencil className="w-4 h-4" />
+            Editar Fluxo
+          </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
             <Download className="w-4 h-4" />
             Exportar CSV
@@ -191,6 +197,14 @@ const CampaignDetailsPage: React.FC = () => {
           <RecurringCampaignVariations campaignId={campaign.id} campaignName={campaign.name} />
         </div>
       )}
+
+      <EditCampaignFlowModal
+        campaignId={campaign.id}
+        flowConfig={(campaign as any).flow_config || {}}
+        open={editFlowOpen}
+        onOpenChange={setEditFlowOpen}
+        onSaved={fetchCampaign}
+      />
     </div>
   );
 };

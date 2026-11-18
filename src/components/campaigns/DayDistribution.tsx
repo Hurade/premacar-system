@@ -66,6 +66,18 @@ export function DayDistribution({ campaign }: Props) {
                 </p>
               )}
 
+              {dayConfig?.config?.subject && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assunto: <span className="text-foreground">{dayConfig.config.subject}</span>
+                </p>
+              )}
+
+              {dayConfig?.config?.message && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {dayConfig.config.message}
+                </p>
+              )}
+
               {dayConfig?.successConditions?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {dayConfig.successConditions.map((c: any, i: number) => (
