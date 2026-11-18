@@ -112,8 +112,19 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
       const t = emailTemplates.find((t: any) => t.id === cfg.config.email_template_id);
       return t ? `Template: ${t.name}` : 'Template selecionado';
     }
-    if (cfg.config?.message) {
-      return cfg.config.message.substring(0, 60) + (cfg.config.message.length > 60 ? '...' : '');
+    if (cfg.type === 'email') {
+      // Campanhas fora do wizard guardam subject_options (lista)/html_body
+      // em vez de subject/message — ver recurring-campaign-processor.
+      const subject = Array.isArray(cfg.config?.subject_options)
+        ? cfg.config.subject_options[0]
+        : cfg.config?.subject;
+      if (subject) return `Assunto: ${subject}`;
+      if (cfg.config?.html_body) return 'Email configurado (sem assunto)';
+    }
+    const message = cfg.config?.message || cfg.config?.html_body;
+    if (message) {
+      const plain = String(message).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return plain.substring(0, 60) + (plain.length > 60 ? '...' : '');
     }
     return 'Clique em Editar para configurar';
   };
@@ -370,8 +381,10 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
                             config: {
                               ...editConfig.config,
                               email_template_id: v,
-                              subject: template?.subject || '',
-                              message: template?.text_body || template?.html_body || '',
+                              subject_options: [template?.subject || ''],
+                              subject: undefined,
+                              html_body: template?.html_body || template?.text_body || '',
+                              message: undefined,
                             },
                           });
                         }
@@ -395,26 +408,83 @@ export function Step2FlowConfig({ data, onChange }: Step2Props) {
                     </Select>
                   </div>
 
+                  {/* Campanhas criadas fora do wizard (ex: direto via SQL) usam
+                      subject_options (lista p/ teste A/B) + html_body +
+                      from_name — o recurring-campaign-processor já lê esses
+                      campos com prioridade (subject_options > subject,
+                      html_body > message). Sem isso aqui, editar um desses
+                      dias mostrava tudo vazio mesmo já tendo assunto/corpo
+                      configurados. */}
                   <div className="space-y-2">
-                    <Label>Assunto *</Label>
+                    <Label>Assunto {(() => {
+                      const opts: string[] = Array.isArray(editConfig.config?.subject_options) && editConfig.config.subject_options.length > 0
+                        ? editConfig.config.subject_options
+                        : [editConfig.config?.subject || ''];
+                      return opts.length > 1 ? '— variações (teste A/B)' : '*';
+                    })()}</Label>
+                    {(() => {
+                      const opts: string[] = Array.isArray(editConfig.config?.subject_options) && editConfig.config.subject_options.length > 0
+                        ? editConfig.config.subject_options
+                        : [editConfig.config?.subject || ''];
+                      const setOpts = (next: string[]) => setEditConfig({
+                        ...editConfig,
+                        config: { ...editConfig.config, subject_options: next, subject: undefined },
+                      });
+                      return (
+                        <div className="space-y-2">
+                          {opts.map((opt, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <Input
+                                value={opt}
+                                onChange={(e) => {
+                                  const next = [...opts];
+                                  next[i] = e.target.value;
+                                  setOpts(next);
+                                }}
+                                placeholder="Ex: Acompanhamento da sua solicitação"
+                              />
+                              {opts.length > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive shrink-0"
+                                  onClick={() => setOpts(opts.filter((_, idx) => idx !== i))}
+                                >
+                                  ✕
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          <Button variant="outline" size="sm" onClick={() => setOpts([...opts, ''])}>
+                            + Variação de assunto
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                    <p className="text-xs text-muted-foreground">
+                      Mais de uma variação = testado 50/50 entre os contatos. Variáveis: {'{{nome}}'}, {'{{empresa}}'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Remetente (nome, opcional)</Label>
                     <Input
-                      value={editConfig.config?.subject || ''}
+                      value={editConfig.config?.from_name || ''}
                       onChange={(e) => setEditConfig({
                         ...editConfig,
-                        config: { ...editConfig.config, subject: e.target.value },
+                        config: { ...editConfig.config, from_name: e.target.value },
                       })}
-                      placeholder="Ex: Acompanhamento da sua solicitação"
+                      placeholder="Ex: Marco - Prema"
                     />
-                    <p className="text-xs text-muted-foreground">Variáveis: {'{{nome}}'}, {'{{empresa}}'}</p>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Mensagem do Email *</Label>
                     <Textarea
-                      value={editConfig.config?.message || ''}
+                      value={editConfig.config?.html_body ?? editConfig.config?.message ?? ''}
                       onChange={(e) => setEditConfig({
                         ...editConfig,
-                        config: { ...editConfig.config, message: e.target.value },
+                        config: { ...editConfig.config, html_body: e.target.value, message: undefined },
                       })}
                       placeholder="Digite a mensagem do email aqui... Aceita HTML."
                       rows={6}

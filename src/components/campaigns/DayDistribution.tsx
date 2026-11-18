@@ -66,17 +66,30 @@ export function DayDistribution({ campaign }: Props) {
                 </p>
               )}
 
-              {dayConfig?.config?.subject && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Assunto: <span className="text-foreground">{dayConfig.config.subject}</span>
-                </p>
-              )}
-
-              {dayConfig?.config?.message && (
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {dayConfig.config.message}
-                </p>
-              )}
+              {(() => {
+                // Campanhas fora do wizard guardam subject_options (lista,
+                // teste A/B)/html_body em vez de subject/message — ver
+                // recurring-campaign-processor.
+                const subject = Array.isArray(dayConfig?.config?.subject_options)
+                  ? dayConfig.config.subject_options[0]
+                  : dayConfig?.config?.subject;
+                const body = dayConfig?.config?.message || dayConfig?.config?.html_body;
+                const plainBody = body ? String(body).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+                return (
+                  <>
+                    {subject && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Assunto: <span className="text-foreground">{subject}</span>
+                      </p>
+                    )}
+                    {plainBody && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {plainBody}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
 
               {dayConfig?.successConditions?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
