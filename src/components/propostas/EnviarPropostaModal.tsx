@@ -157,8 +157,12 @@ export function EnviarPropostaModal({ proposta, publicLink, open, onClose }: Pro
             return
           }
         }
+        navigator.clipboard.writeText(waMsg)
+        toast.success('Mensagem copiada — cole na conversa que vai abrir')
         navigate(`/chat?conversation=${chatConvId}`)
       } else if (chatContactId) {
+        navigator.clipboard.writeText(waMsg)
+        toast.success('Mensagem copiada — cole na conversa que vai abrir')
         navigate(`/chat?newContact=${chatContactId}`)
       } else {
         // Fallback: open WhatsApp web if contact not in system

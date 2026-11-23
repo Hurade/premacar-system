@@ -56,7 +56,7 @@ const diagDefaults: DiagnosticoRespostas = {
   whatsapp_tipo: 'manual',
   quer_recuperar: true,
   tem_equipe_followup: false,
-  objetivo_principal: 'fidelizar',
+  objetivo_principal: ['fidelizar'],
   tem_multiloja_ou_erp: false,
 }
 
@@ -408,10 +408,18 @@ function Step2Diagnostico({ diagnostico, onChange, atuacaoPrincipal, onAtuacaoPr
           ] as const).map(([val, label]) => (
             <button
               key={val}
-              onClick={() => set('objetivo_principal', val)}
+              onClick={() => {
+                const atual = diagnostico.objetivo_principal
+                const selecionado = atual.includes(val)
+                // Mantém sempre ao menos 1 selecionado — não faz sentido ficar sem objetivo.
+                const novo = selecionado
+                  ? (atual.length > 1 ? atual.filter(v => v !== val) : atual)
+                  : [...atual, val]
+                set('objetivo_principal', novo)
+              }}
               className={cn(
                 'py-2.5 rounded-xl text-xs font-medium border transition-all',
-                diagnostico.objetivo_principal === val
+                diagnostico.objetivo_principal.includes(val)
                   ? 'bg-primary/15 border-primary text-primary'
                   : 'border-border/40 text-muted-foreground hover:border-primary/30',
               )}

@@ -264,7 +264,10 @@ export default function PropostaDetalhe() {
                     ['WhatsApp', { nenhum: 'Nenhum', manual: 'Manual', automatizado: 'Automatizado' }[diag.whatsapp_tipo]],
                     ['Equipe para follow-up?', diag.tem_equipe_followup ? 'Sim' : 'Não'],
                     ['Lembra o cliente?', diag.como_lembra_revisao === 'nada' ? 'Não faz' : diag.como_lembra_revisao],
-                    ['Objetivo principal', { satisfacao: 'Medir Satisfação', fidelizar: 'Fidelizar', recuperar: 'Recuperar' }[diag.objetivo_principal]],
+                    ['Objetivo principal', (Array.isArray(diag.objetivo_principal) ? diag.objetivo_principal : [diag.objetivo_principal])
+                      .map(v => ({ satisfacao: 'Medir Satisfação', fidelizar: 'Fidelizar', recuperar: 'Recuperar' } as Record<string, string>)[v])
+                      .filter(Boolean)
+                      .join(', ')],
                   ].map(([label, value]) => (
                     <div key={label}>
                       <p className="text-xs text-muted-foreground">{label}</p>

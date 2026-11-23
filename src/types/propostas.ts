@@ -53,7 +53,8 @@ export interface DiagnosticoRespostas {
   whatsapp_tipo: 'manual' | 'automatizado' | 'nenhum'
   quer_recuperar: boolean
   tem_equipe_followup: boolean
-  objetivo_principal: 'satisfacao' | 'fidelizar' | 'recuperar'
+  /** Múltiplo: tem lead que busca as 3 coisas ao mesmo tempo. */
+  objetivo_principal: Array<'satisfacao' | 'fidelizar' | 'recuperar'>
   /** Tem mais de uma loja ou quer conectar o ERP — é hoje o que diferencia o
    * Fidelizar do Mensurar (integração com ERP, fluxos do motor, multi-loja). */
   tem_multiloja_ou_erp: boolean
@@ -245,9 +246,9 @@ export const DOR_LABELS: Record<DorPrincipal, string> = {
 export function recomendarPlano(d: DiagnosticoRespostas): PlanoTipo {
   const score = { mensurar: 0, fidelizar: 0, recuperar: 0 }
 
-  if (d.objetivo_principal === 'satisfacao') score.mensurar += 3
-  if (d.objetivo_principal === 'fidelizar') score.fidelizar += 3
-  if (d.objetivo_principal === 'recuperar') score.recuperar += 3
+  if (d.objetivo_principal.includes('satisfacao')) score.mensurar += 3
+  if (d.objetivo_principal.includes('fidelizar')) score.fidelizar += 3
+  if (d.objetivo_principal.includes('recuperar')) score.recuperar += 3
   if (d.base_parada) score.recuperar += 2
   if (d.quer_recuperar) score.recuperar += 2
   if (!d.faz_pos_venda) score.fidelizar += 1
