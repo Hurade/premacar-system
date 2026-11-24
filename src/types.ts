@@ -339,7 +339,7 @@ export interface UIMessage {
   sentAt: string; // ISO date string for date grouping
   direction: MessageDirection;
   type: MessageType;
-  status: 'sent' | 'delivered' | 'read';
+  status: 'sent' | 'delivered' | 'read' | 'failed';
   fromType: MessageFromType;
   mediaUrl: string | null;
   whatsappMessageId: string | null;
@@ -451,10 +451,11 @@ function mapDBMessageType(type: DBMessageType): MessageType {
   }
 }
 
-function mapDBMessageStatus(status: DBMessageStatus): 'sent' | 'delivered' | 'read' {
+function mapDBMessageStatus(status: DBMessageStatus): 'sent' | 'delivered' | 'read' | 'failed' {
   switch (status) {
     case 'read': return 'read';
     case 'delivered': return 'delivered';
+    case 'failed': return 'failed';
     default: return 'sent';
   }
 }

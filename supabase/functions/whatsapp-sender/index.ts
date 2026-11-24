@@ -122,18 +122,30 @@ serve(async (req) => {
           
           const newRetryCount = (item.retry_count || 0) + 1;
           const shouldRetry = newRetryCount < 3;
-          
+
           await supabase
             .from('send_queue')
-            .update({ 
+            .update({
               status: shouldRetry ? 'pending' : 'failed',
               retry_count: newRetryCount,
               error_message: errorMessage,
-              scheduled_at: shouldRetry 
+              scheduled_at: shouldRetry
                 ? new Date(Date.now() + newRetryCount * 15000).toISOString() // 15s, 30s backoff
                 : null
             })
             .eq('id', item.id);
+
+          // Tentativas esgotadas: a mensagem em si (tabela messages) ficava
+          // parada em 'processing' pra sempre — só o send_queue sabia que
+          // tinha falhado. Sem isso o atendente via ✓ normal no chat, igual
+          // uma mensagem enviada com sucesso, sem nenhum aviso de que não
+          // chegou no WhatsApp.
+          if (!shouldRetry && item.message_id) {
+            await supabase
+              .from('messages')
+              .update({ status: 'failed' })
+              .eq('id', item.message_id);
+          }
         }
       }
     }

@@ -493,7 +493,11 @@ serve(async (req) => {
         ? data.key.remoteJidAlt
         : remoteJid;
       const phoneNumber = resolvedJid.replace('@s.whatsapp.net', '').replace('@lid', '');
-      const contactName = data.pushName || null;
+      // Mensagem mandada direto do celular (isPhoneMessage): pushName aqui é
+      // o nome da PRÓPRIA conta conectada (quem mandou), não de quem recebeu
+      // — usar isso pra nomear/atualizar o contato criava contato com o nome
+      // da empresa (ex: "Automax") em vez do nome de quem recebeu a mensagem.
+      const contactName = isPhoneMessage ? null : (data.pushName || null);
       const messageId = data.key?.id;
       const messageTimestamp = data.messageTimestamp || Math.floor(Date.now() / 1000);
 

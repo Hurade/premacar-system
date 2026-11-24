@@ -6,7 +6,7 @@ import {
   Smile, Play, Loader2, MessageSquare, Info, X, Mail,
   Tag, Bot, User, Pause, Brain, Plus, Filter, Inbox, CheckCircle, Trash2, UserPlus, ArrowLeft,
   KanbanSquare, Pencil, Lock, PenLine, Zap, Share2, AtSign, Star, Eye, Layers, Download, Repeat, Users,
-  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply, Smartphone, Mic
+  History, ChevronDown, ChevronUp, Ban, ShieldCheck, Copy, Reply, Smartphone, Mic, AlertCircle
 } from 'lucide-react';
 import { EmojiPicker } from './chat/EmojiPicker';
 import { AiCopilotPanel } from './chat/AiCopilotPanel';
@@ -2212,6 +2212,7 @@ const ChatInterface: React.FC = () => {
                               )}
                               <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
                               {isOutgoing && (
+                                msg.status === 'failed' ? <span title="Falha no envio — não chegou ao WhatsApp"><AlertCircle className="w-3.5 h-3.5 text-red-500" /></span> :
                                 msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> :
                                 msg.status === 'delivered' ? <CheckCheck className="w-3.5 h-3.5 text-slate-500" /> :
                                 <Check className="w-3.5 h-3.5 text-slate-500" />
@@ -2952,8 +2953,11 @@ const ChatInterface: React.FC = () => {
               </div>
               <div className="flex justify-between border-b border-slate-800 pb-2">
                 <span className="text-slate-500">Status</span>
-                <span className="text-slate-200">
-                  {messageInfoFor.status === 'read' ? 'Lida' : messageInfoFor.status === 'delivered' ? 'Entregue' : 'Enviada'}
+                <span className={messageInfoFor.status === 'failed' ? 'text-red-400' : 'text-slate-200'}>
+                  {messageInfoFor.status === 'read' ? 'Lida'
+                    : messageInfoFor.status === 'delivered' ? 'Entregue'
+                    : messageInfoFor.status === 'failed' ? 'Falhou — não chegou ao WhatsApp'
+                    : 'Enviada'}
                 </span>
               </div>
               <div className="flex justify-between border-b border-slate-800 pb-2">
