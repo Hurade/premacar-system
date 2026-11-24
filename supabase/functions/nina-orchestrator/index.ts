@@ -1334,7 +1334,11 @@ async function processQueueItem(
     .reverse()
     .filter((msg: any) => ['nina', 'human', 'user'].includes(msg.from_type))
     .map((msg: any) => ({
-      role: msg.from_type === 'nina' ? 'assistant' : 'user',
+      // 'human' (atendente real) tem que virar 'assistant' igual 'nina' —
+      // mensagem humana vem com prefixo "Nome:\n" (ex: "Brenner:\n..."), e
+      // jogando ela como 'user' a IA lia como se o PRÓPRIO CLIENTE tivesse
+      // se identificado com esse nome, e passava a chamá-lo assim.
+      role: msg.from_type === 'user' ? 'user' : 'assistant',
       content: msg.content || '[media]'
     }));
 
