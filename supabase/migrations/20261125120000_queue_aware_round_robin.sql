@@ -7,6 +7,15 @@
 -- Fix: função ganha p_queue_id opcional — quando informado, o sorteio só
 -- roda entre membros de queue_members daquela fila. Sem o parâmetro,
 -- mantém o comportamento antigo (compat com qualquer outro chamador).
+--
+-- CREATE OR REPLACE não troca a assinatura de uma função — como o
+-- parâmetro é novo, isso criava uma SEGUNDA função (overload) em vez de
+-- substituir a original, e toda chamada sem argumento (ex:
+-- create_deal_for_new_contact, que não tem fila pra passar) passou a
+-- quebrar com "function is not unique" — qualquer criação de contato
+-- novo no sistema parou de funcionar até esse DROP rodar.
+DROP FUNCTION IF EXISTS public.assign_next_owner_round_robin();
+
 CREATE OR REPLACE FUNCTION public.assign_next_owner_round_robin(p_queue_id uuid DEFAULT NULL)
 RETURNS uuid
 LANGUAGE plpgsql
