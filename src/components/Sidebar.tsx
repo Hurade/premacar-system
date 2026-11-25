@@ -58,8 +58,7 @@ const menuItems = [{
 }, {
   id: 'wiki',
   label: 'Wiki',
-  icon: BookOpen,
-  href: 'http://localhost:3000/central/'
+  icon: BookOpen
 }, {
   id: 'settings',
   label: 'Configurações',

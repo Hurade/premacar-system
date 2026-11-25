@@ -25,6 +25,8 @@ import PropostaDetalhe from './pages/propostas/PropostaDetalhe';
 import PropostaPreview from './pages/propostas/PropostaPreview';
 import PropostaPublica from './pages/propostas/PropostaPublica';
 import Biblioteca from './pages/propostas/Biblioteca';
+import Wiki from './pages/wiki/Wiki';
+import ArtigoDetalhe from './pages/wiki/ArtigoDetalhe';
 import ApresentacoesDashboard from './pages/apresentacoes/ApresentacoesDashboard';
 import NovaApresentacaoWizard from './pages/apresentacoes/NovaApresentacaoWizard';
 import ApresentacaoDetalhe from './pages/apresentacoes/ApresentacaoDetalhe';
@@ -73,6 +75,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/apresentacoes': 'PremaCar - Apresentações',
   '/apresentacoes/nova': 'PremaCar - Nova Apresentação',
   '/contatos-duplicados': 'PremaCar - Contatos Duplicados',
+  '/wiki': 'PremaCar - Wiki',
 };
 
 const PageTitle: React.FC = () => {
@@ -203,6 +206,8 @@ const App: React.FC = () => {
                   <Route path="/apresentacoes/nova" element={<NovaApresentacaoWizard />} />
                   <Route path="/apresentacoes/:id" element={<ApresentacaoDetalhe />} />
                   <Route path="/apresentacoes/:id/preview" element={<ApresentacaoPreview />} />
+                  <Route path="/wiki" element={<Wiki />} />
+                  <Route path="/wiki/artigo/:id" element={<ArtigoDetalhe />} />
                 </Route>
 
                 {/* Páginas públicas (abertas por clientes fora do app) — design
