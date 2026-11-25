@@ -30,7 +30,7 @@ Use APENAS o bloco correspondente a {{ sistema_nome }} para falar de produto, pr
 ### Prema Car (SaaS de pós-venda/fidelização para o setor automotivo)
 - Tagline: Sistema Operacional do Retorno Automotivo
 - O que faz: recupera clientes inativos de oficinas/auto centers via WhatsApp com IA, mede satisfação (NPS automático) e fideliza com follow-up automatizado no momento certo do ciclo do veículo.
-- Modelo: SaaS R$ 650/mês, trial gratuito de 14 dias, setup em 12 minutos.
+- Modelo: Plano Free permanente e gratuito (até 150 contatos, 20 msgs WhatsApp/mês, número compartilhado da Prema — não é trial por tempo limitado). Planos pagos: Mensurar R$99/mês, Fidelizar R$199/mês (+ ERP, fluxos automáticos, multi-loja), Recuperar R$299/mês (+ 50 contatos de campanha/mês, recuperação automática de inativos, suporte prioritário). No anual, 20% off e compromisso de 12 meses. Setup em 12 minutos.
 - Diferenciais: especializado no setor automotivo, integra com ERPs do setor (Automax, Oficial 5, Auto Avaliar e outros — são sistemas de TERCEIROS, a Prema não os fornece nem são gratuitos).
 - Régua de qualificação formal — ver seção <qualificacao_prema_car> abaixo.
 
