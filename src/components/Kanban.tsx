@@ -323,6 +323,9 @@ const Kanban: React.FC = () => {
     try {
       await api.markDealWon(selectedDeal.id);
       toast.success("Deal marcado como ganho! Parabéns pelo fechamento!");
+      if (!selectedDeal.value) {
+        toast('Lembre de preencher o valor do negócio — sem isso não dá pra medir ticket médio/LTV.', { icon: '💰' });
+      }
       setSelectedDeal(null);
     } catch (error) {
       console.error("Erro ao marcar deal como ganho", error);
@@ -429,6 +432,11 @@ const Kanban: React.FC = () => {
     // Persist to database
     try {
       await api.moveDealStage(dealId, targetStageId);
+      const targetStage = stages.find(s => s.id === targetStageId);
+      const movedDeal = deals.find(d => d.id === dealId);
+      if (targetStage?.title.toLowerCase() === 'cliente' && !movedDeal?.value) {
+        toast('Lembre de preencher o valor do negócio — sem isso não dá pra medir ticket médio/LTV.', { icon: '💰' });
+      }
     } catch (error) {
       console.error('Error moving deal:', error);
       // Revert on error
@@ -703,7 +711,11 @@ const Kanban: React.FC = () => {
                                               'bg-slate-800 text-slate-500 hover:bg-slate-700 hover:text-slate-300'}
                                         `}
                                         onClick={async () => {
-                                            const isGanhoColumn = col.title === 'Ganho';
+                                            // Etapa "Ganho" foi renomeada pra "Cliente" — checar o título antigo
+                                            // fazia esse branch nunca disparar, caindo sempre no "else" (que hoje
+                                            // também grava won_at corretamente via moveDealStage, mas sem o log
+                                            // de auditoria 'deal_won' que só o markDealWon chama).
+                                            const isGanhoColumn = col.title.toLowerCase() === 'cliente';
                                             const isPerdidoColumn = col.title === 'Perdido';
                                             
                                             if (isGanhoColumn) {

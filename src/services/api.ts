@@ -1383,7 +1383,12 @@ export const api = {
 
   /**
    * Move deal to a new stage
-   * Clears won_at/lost_at/lost_reason when moving away from Ganho/Perdido
+   * Bug corrigido: antes só LIMPAVA won_at/lost_at ao sair de Ganho(Cliente)/
+   * Perdido, nunca GRAVAVA ao entrar — então arrastar um card no Kanban pra
+   * "Cliente" nunca registrava data de fechamento (só o botão "Marcar como
+   * Ganho" fazia isso, raramente usado). Resultado: todo deal em "Cliente"
+   * no banco tinha won_at nulo, impossibilitando medir ciclo de venda/
+   * conversão por período.
    */
   moveDealStage: async (id: string, newStageId: string): Promise<void> => {
     const { ganhoId, perdidoId } = await getSystemStageIds();
@@ -1397,7 +1402,16 @@ export const api = {
     // Build update object - clear won_at/lost_at if moving away from those stages
     const updates: Record<string, any> = { stage_id: newStageId };
 
-    if (newStageId !== ganhoId && newStageId !== perdidoId) {
+    if (newStageId === ganhoId) {
+      updates.stage = 'won';
+      updates.won_at = new Date().toISOString();
+      updates.lost_at = null;
+      updates.lost_reason = null;
+    } else if (newStageId === perdidoId) {
+      updates.stage = 'lost';
+      updates.lost_at = new Date().toISOString();
+      updates.won_at = null;
+    } else {
       updates.won_at = null;
       updates.lost_at = null;
       updates.lost_reason = null;
