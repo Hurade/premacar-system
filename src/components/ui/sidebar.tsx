@@ -197,19 +197,15 @@ export const SidebarLink = ({
   props?: Omit<LinkProps, 'to'>;
 }) => {
   const { open, animate, setOpen } = useSidebar();
-  return (
-    <Link
-      to={link.href}
-      onClick={() => { onClick?.(); if (window.innerWidth < 768) setOpen(false); }}
-      className={cn(
-        "flex items-center justify-start gap-3 group/sidebar py-3 px-3 rounded-xl transition-all duration-200 relative overflow-hidden",
-        isActive
-          ? "bg-slate-800/80 text-cyan-700 dark:text-cyan-400 shadow-lg shadow-black/20 ring-1 ring-slate-700/50"
-          : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200",
-        className
-      )}
-      {...props}
-    >
+  const linkClassName = cn(
+    "flex items-center justify-start gap-3 group/sidebar py-3 px-3 rounded-xl transition-all duration-200 relative overflow-hidden",
+    isActive
+      ? "bg-slate-800/80 text-cyan-700 dark:text-cyan-400 shadow-lg shadow-black/20 ring-1 ring-slate-700/50"
+      : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200",
+    className
+  );
+  const content = (
+    <>
       {isActive && (
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-l-md shadow-[0_0_10px_rgba(6,182,212,0.5)]" />
       )}
@@ -235,6 +231,33 @@ export const SidebarLink = ({
       >
         {link.label}
       </motion.span>
+    </>
+  );
+
+  // Link externo (ex: ferramenta fora do app, tipo a Wiki/Central Prema) —
+  // react-router Link não navega pra fora do SPA, precisa de <a> normal.
+  if (/^https?:\/\//.test(link.href)) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => { onClick?.(); if (window.innerWidth < 768) setOpen(false); }}
+        className={linkClassName}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      to={link.href}
+      onClick={() => { onClick?.(); if (window.innerWidth < 768) setOpen(false); }}
+      className={linkClassName}
+      {...props}
+    >
+      {content}
     </Link>
   );
 };

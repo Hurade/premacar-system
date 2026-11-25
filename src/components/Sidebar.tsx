@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, BarChart3, MessageSquarePlus, FileText, Zap, Presentation, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, BarChart3, MessageSquarePlus, FileText, Zap, Presentation, Sun, Moon, BookOpen } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,6 +55,11 @@ const menuItems = [{
   id: 'team',
   label: 'Equipe',
   icon: ShieldCheck
+}, {
+  id: 'wiki',
+  label: 'Wiki',
+  icon: BookOpen,
+  href: 'http://localhost:3000/central/'
 }, {
   id: 'settings',
   label: 'Configurações',
@@ -140,7 +145,7 @@ const SidebarContent = () => {
 
   const links = filteredMenuItems.map((item) => ({
     label: item.label,
-    href: `/${item.id}`,
+    href: item.href ?? `/${item.id}`,
     icon: <item.icon className="h-5 w-5" />
   }));
   const handleLogout = async () => {
