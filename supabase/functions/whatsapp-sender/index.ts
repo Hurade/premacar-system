@@ -330,7 +330,20 @@ async function sendViaMeta(
         }
       };
       break;
-    
+
+    case 'video':
+      payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipient,
+        type: 'video',
+        video: {
+          link: queueItem.media_url,
+          caption: queueItem.content || undefined
+        }
+      };
+      break;
+
     default:
       payload = {
         messaging_product: 'whatsapp',
@@ -405,6 +418,10 @@ async function sendViaEvolution(
     case 'document':
       endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
       payload = { number: recipient, mediatype: 'document', media: queueItem.media_url, fileName: queueItem.content || 'document' };
+      break;
+    case 'video':
+      endpoint = `/message/sendMedia/${settings.evolution_instance_name}`;
+      payload = { number: recipient, mediatype: 'video', media: queueItem.media_url, caption: queueItem.content || undefined };
       break;
     default:
       endpoint = `/message/sendText/${settings.evolution_instance_name}`;

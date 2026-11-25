@@ -767,8 +767,44 @@ async function transferToHuman(
     }
     const handoffTag = `TRANSFERIDO-${queueName.toUpperCase().replace(/\s+/g, '-')}`;
     const currentTags: string[] = contact?.tags || [];
-    if (!currentTags.includes(handoffTag)) {
-      await supabase.from('contacts').update({ tags: [...currentTags, handoffTag] }).eq('id', conversation.contact_id);
+    const tagsToApply = [...currentTags];
+    if (!tagsToApply.includes(handoffTag)) tagsToApply.push(handoffTag);
+
+    // Lead qualificado pra Comercial (só essa fila preenche `origem`) da Prema
+    // Car especificamente — fila é compartilhada com Automax/Maxsig, então
+    // confirma o sistema pela conexão antes de mandar o vídeo institucional.
+    // Dedup por tag: cada contato recebe uma vez só, mesmo que seja
+    // transferido de novo depois.
+    const VIDEO_METODO_TAG = 'VIDEO-METODO-ENVIADO';
+    const VIDEO_METODO_URL = 'https://qzvswhfjuxfebpvlbysd.supabase.co/storage/v1/object/public/chat-attachments/institucional/metodo-prema.mp4';
+    if (
+      queueName.toLowerCase() === 'comercial' &&
+      args.origem &&
+      conversation.contact_id &&
+      !currentTags.includes(VIDEO_METODO_TAG)
+    ) {
+      try {
+        const sysContext = await resolveSystemContext(supabase, conversation.connection_id ?? null);
+        if (sysContext.sistema_nome === 'Prema Car') {
+          await supabase.from('send_queue').insert({
+            conversation_id: conversation.id,
+            contact_id: conversation.contact_id,
+            message_type: 'video',
+            from_type: 'nina',
+            content: 'O Método Prema Para Faturamento Automotivo Previsível 🎥',
+            media_url: VIDEO_METODO_URL,
+            priority: 2,
+          });
+          tagsToApply.push(VIDEO_METODO_TAG);
+          console.log('[Nina] Vídeo institucional enfileirado para lead qualificado', { conversation_id: conversation.id });
+        }
+      } catch (videoErr) {
+        console.error('[Nina] Falha ao enfileirar vídeo institucional:', videoErr);
+      }
+    }
+
+    if (tagsToApply.length !== currentTags.length) {
+      await supabase.from('contacts').update({ tags: tagsToApply }).eq('id', conversation.contact_id);
     }
 
     // Pessoa específica resolvida: notifica só ela (se tiver telefone de
