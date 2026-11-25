@@ -90,7 +90,16 @@ export default function PropostaDetalhe() {
 
   const lead = proposta.lead
   const planoInfo = proposta.plano?.tipo ? PLANOS_PADRAO[proposta.plano.tipo] : null
-  const valorLiquido = proposta.valor_mensal * (1 - proposta.desconto_percentual / 100)
+  // Mesma conta de PropostaDocument.tsx (o que o lead vê de fato em /p/:slug)
+  // — antes ignorava unidades/extras e não tinha a opção anual, então essa
+  // visão interna (usada pelo vendedor) mostrava um valor diferente do que
+  // a proposta pública realmente oferece.
+  const unidades = proposta.unidades ?? 1
+  const totalExtras = (proposta.extras ?? []).reduce((a, e) => a + e.valor, 0)
+  const valorBase = proposta.valor_mensal * unidades
+  const comDesconto = valorBase * (1 - proposta.desconto_percentual / 100)
+  const valorLiquido = comDesconto + totalExtras
+  const valorAnual = comDesconto * 0.8 + totalExtras
   const publicLink = `${window.location.origin}/p/${proposta.slug}`
 
   function copyLink() {
@@ -217,6 +226,9 @@ export default function PropostaDetalhe() {
                     {proposta.desconto_percentual > 0 && (
                       <p className="text-xs text-green-400">-{proposta.desconto_percentual}% de desconto</p>
                     )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Anual no cartão: <span className="text-green-400 font-medium">{formatarMoeda(valorAnual)}/mês</span> (-20%, 12x)
+                    </p>
                   </div>
                 </div>
                 <InfoRow label="Condição Especial" value={proposta.condicao_especial} />
