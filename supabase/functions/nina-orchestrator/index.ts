@@ -513,11 +513,19 @@ Deno.serve(async (req) => {
 // ═══════════════════════════════════════════
 function validateAIResponse(response: string): { message: string; issues: string[] } {
   const issues: string[] = [];
-  let cleaned = response;
+  const hadStopMarker = /\[PARAR\]/i.test(response);
+  let cleaned = response.replace(/\[PARAR\]/gi, '').trim();
+
+  if (hadStopMarker) {
+    issues.push('Internal stop marker suppressed');
+  }
 
   if (!cleaned || cleaned.trim().length === 0) {
-    issues.push('Empty response');
-    return { message: 'Olá! Como posso ajudar você hoje? 😊', issues };
+    if (!hadStopMarker) issues.push('Empty response');
+    return {
+      message: hadStopMarker ? 'Entendi, obrigado por avisar.' : 'Olá! Como posso ajudar você hoje? 😊',
+      issues,
+    };
   }
 
   // Remove unwanted qualifiers the AI sometimes adds

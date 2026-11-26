@@ -800,7 +800,9 @@ export function useConversations() {
   // Assign conversation (and sync with deal)
   const assignConversation = useCallback(async (conversationId: string, userId: string | null) => {
     const conv = conversations.find(c => c.id === conversationId);
-    if (!conv) return;
+    if (!conv) {
+      throw new Error(`Conversation ${conversationId} is not loaded`);
+    }
 
     // Optimistic UI update
     setConversations(prev => {
@@ -827,6 +829,7 @@ export function useConversations() {
           return c;
         });
       });
+      throw err;
     }
   }, [conversations]);
 

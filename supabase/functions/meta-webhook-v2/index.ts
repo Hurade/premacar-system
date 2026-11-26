@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
 import { brPhoneVariants } from "../_shared/br-phone.ts";
+import { isExplicitOptOutText } from "../_shared/opt-out.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -757,26 +758,65 @@ async function processMetaWebhookAsync(
         }
 
         // ═══════════════════════════════════════════
-        // 4c. OPT-OUT ("Não tenho interesse") — BOTÃO DE TEMPLATE OU TEXTO LIVRE
+        // 4c. OPT-OUT — BOTÃO DE TEMPLATE OU TEXTO LIVRE
         // ═══════════════════════════════════════════
-        // Clique no quick-reply chega como mensagem tipo 'button'. Mas o
-        // mesmo texto também chega digitado livremente (ex: cliente lê
-        // "Não tenho interesse" no botão e simplesmente digita a mesma
-        // frase em vez de clicar) — sem pegar os dois casos aqui, esse
-        // segundo ficava sem tag/blacklist, dependendo só da IA chamar a
-        // tool stop_campaign_contact (que não é 100% confiável: já visto
-        // antes a IA "esquecer" de chamar uma tool). Match exato (não
-        // substring) pra não pegar frases mais longas tipo "no momento não
-        // tenho interesse, mas me conta mais" por engano.
         const isOptOutButton = messageType === 'button' && message.button?.text === 'Não tenho interesse';
-        const isOptOutFreeText = messageContent?.trim().toLowerCase().replace(/[.!]+$/, '') === 'não tenho interesse';
+        const isOptOutFreeText = isExplicitOptOutText(messageContent || '');
         if (isOptOutButton || isOptOutFreeText) {
           console.log(`[Meta Async] 🙅 Opt-out via ${isOptOutButton ? 'botão' : 'texto livre'}:`, contact.id);
 
-          const optOutText = `Tudo certo, ${contact.call_name || contact.name || ''}. Você não vai mais receber mensagens desta campanha. Se um dia quiser voltar, é só chamar aqui.`.replace('  ', ' ');
+          // contact.user_id vem null pra maioria da base (import antigo
+          // nunca preencheu essa coluna) — sem o fallback pro owner da
+          // conexão (metaSettings.user_id, já carregado acima), o upsert
+          // de blacklist era pulado em silêncio pra quase todo mundo, e o
+          // contato continuava elegível pros próximos disparos da campanha
+          // mesmo depois de pedir pra parar.
+          const blacklistOwnerId = contact.user_id || metaSettings.user_id || null;
+          if (blacklistOwnerId) {
+            const { error: blacklistError } = await supabase
+              .from('campaign_blacklist')
+              .upsert(
+                { user_id: blacklistOwnerId, phone: contact.phone_number, reason: `Opt-out via ${isOptOutButton ? 'botão' : 'texto'} "Não tenho interesse"` },
+                { onConflict: 'user_id,phone' }
+              );
+            if (blacklistError) {
+              console.error('[Meta Async] ❌ Erro ao incluir contato na blacklist:', blacklistError);
+            }
+          } else {
+            console.warn('[Meta Async] ⚠️ Opt-out sem user_id (contato e nina_settings nulos) — blacklist não gravada:', contact.id);
+          }
 
+          // A recusa precisa bloquear o contato globalmente e cancelar
+          // qualquer campanha ativa, mesmo se a conversa não estiver
+          // vinculada à campanha que originou o contato.
+          const currentContactTags: string[] = Array.isArray(contact.tags) ? contact.tags : [];
+          const updatedTags = currentContactTags.includes('Nao Interessado')
+            ? currentContactTags
+            : [...currentContactTags, 'Nao Interessado'];
+          const { error: blockContactError } = await supabase
+            .from('contacts')
+            .update({ is_blocked: true, tags: updatedTags })
+            .eq('id', contact.id);
+          if (blockContactError) {
+            console.error('[Meta Async] ❌ Erro ao bloquear contato após opt-out:', blockContactError);
+            continue;
+          }
+
+          const { error: cancelCampaignsError } = await supabase
+            .from('campaign_contacts')
+            .update({ status: 'cancelled' })
+            .eq('contact_id', contact.id)
+            .eq('status', 'in_progress');
+          if (cancelCampaignsError) {
+            console.error('[Meta Async] ❌ Erro ao cancelar campanhas após opt-out:', cancelCampaignsError);
+          }
+
+          const contactNameForReply = contact.call_name || contact.name;
+          const optOutText = contactNameForReply
+            ? `Tudo certo, ${contactNameForReply}. Você não receberá novas mensagens. Se quiser voltar a receber, entre em contato com a equipe.`
+            : 'Tudo certo. Você não receberá novas mensagens. Se quiser voltar a receber, entre em contato com a equipe.';
           try {
-            await fetch(`https://graph.facebook.com/v21.0/${metaSettings.meta_phone_number_id}/messages`, {
+            const response = await fetch(`https://graph.facebook.com/v21.0/${metaSettings.meta_phone_number_id}/messages`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${metaSettings.meta_access_token}`,
@@ -790,49 +830,12 @@ async function processMetaWebhookAsync(
                 text: { body: optOutText },
               }),
             });
+            if (!response.ok) {
+              console.error('[Meta Async] ❌ Meta rejeitou confirmação de opt-out:', response.status, await response.text());
+            }
           } catch (optOutSendError) {
             console.error('[Meta Async] ❌ Erro ao enviar confirmação de opt-out:', optOutSendError);
           }
-
-          // contact.user_id vem null pra maioria da base (import antigo
-          // nunca preencheu essa coluna) — sem o fallback pro owner da
-          // conexão (metaSettings.user_id, já carregado acima), o upsert
-          // de blacklist era pulado em silêncio pra quase todo mundo, e o
-          // contato continuava elegível pros próximos disparos da campanha
-          // mesmo depois de pedir pra parar.
-          const blacklistOwnerId = contact.user_id || metaSettings.user_id || null;
-          if (blacklistOwnerId) {
-            await supabase
-              .from('campaign_blacklist')
-              .upsert(
-                { user_id: blacklistOwnerId, phone: contact.phone_number, reason: `Opt-out via ${isOptOutButton ? 'botão' : 'texto'} "Não tenho interesse"` },
-                { onConflict: 'user_id,phone' }
-              );
-          } else {
-            console.warn('[Meta Async] ⚠️ Opt-out sem user_id (contato e nina_settings nulos) — blacklist não gravada:', contact.id);
-          }
-
-          // Tag visível no contato (antes só a blacklist acontecia — nada
-          // indicava visualmente, na tela de Chat, que o contato pediu
-          // pra parar) + cancela qualquer campanha ativa do contato, mesmo
-          // efeito da tool stop_campaign_contact (nina-orchestrator) usada
-          // no texto livre não-exato processado pela IA. Cancela por
-          // contact_id (não só a campanha da conversa atual) porque a
-          // conversa pode não estar vinculada a nenhuma campanha
-          // (conversation.campaign_id nulo) mesmo quando o contato tem
-          // campaign_contacts ativo em outra.
-          const currentContactTags: string[] = contact.tags || [];
-          if (!currentContactTags.includes('Nao Interessado')) {
-            await supabase
-              .from('contacts')
-              .update({ tags: [...currentContactTags, 'Nao Interessado'] })
-              .eq('id', contact.id);
-          }
-          await supabase
-            .from('campaign_contacts')
-            .update({ status: 'cancelled' })
-            .eq('contact_id', contact.id)
-            .eq('status', 'in_progress');
 
           continue;
         }

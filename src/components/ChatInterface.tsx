@@ -309,18 +309,6 @@ const ChatInterface: React.FC = () => {
     }
   }, [selectedChatId, activeChat?.unreadCount, markAsRead]);
 
-  // Atribui a conversa a quem abriu, se ela ainda não tiver dono. Antes a
-  // atribuição só acontecia ao enviar a primeira mensagem de uma conversa
-  // ainda em modo "nina" (ver sendMessage/sendAudioMessage em api.ts) — uma
-  // conversa reaberta (ex: a partir de Contatos) que já estava em modo
-  // "human" sem dono nunca passava por ali. Nunca sobrescreve um dono já
-  // definido, pra não tomar a conversa de outro atendente.
-  useEffect(() => {
-    if (selectedChatId && activeChat && !activeChat.assignedUserId && teamMemberId) {
-      assignConversation(activeChat.id, teamMemberId);
-    }
-  }, [selectedChatId, activeChat?.id, activeChat?.assignedUserId, teamMemberId, assignConversation]);
-
   // Sync notes value with active chat
   useEffect(() => {
     if (activeChat) {
@@ -643,12 +631,22 @@ const ChatInterface: React.FC = () => {
 
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
-    await updateStatus(activeChat.id, status);
-    // "Assumir conversa": ao virar humano, atrela ao atendente que clicou
-    // (aparece na aba "Atendendo" dele). Sem isso a conversa ficava só
-    // roteada pra fila, sem responsável — ninguém "dono" dela.
+    try {
+      await updateStatus(activeChat.id, status);
+    } catch (error) {
+      console.error('Error updating conversation status:', error);
+      toast.error('Erro ao atualizar status da conversa');
+      return;
+    }
+
+    // "Assumir conversa" atribui explicitamente ao atendente que clicou.
     if (status === 'human' && teamMemberId) {
-      await assignConversation(activeChat.id, teamMemberId);
+      try {
+        await assignConversation(activeChat.id, teamMemberId);
+      } catch (error) {
+        console.error('Error assigning conversation while taking it:', error);
+        toast.error('Status atualizado, mas não foi possível assumir a conversa');
+      }
     }
   };
 
@@ -2745,11 +2743,7 @@ const ChatInterface: React.FC = () => {
                   </h4>
                   <select
                     value={activeChat.assignedUserId || ''}
-                    onChange={(e) => {
-                      const userId = e.target.value || null;
-                      assignConversation(activeChat.id, userId);
-                      toast.success('Conversa atribuída. Deal atualizado automaticamente.');
-                    }}
+                    onChange={(e) => handleTransferUser(e.target.value || null)}
                     className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none transition-all"
                   >
                     <option value="">Não atribuído</option>
