@@ -1,5 +1,6 @@
 import { Upload } from 'tus-js-client';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeStorageFileName } from '@/lib/sanitizeStorageFileName';
 import { 
   Contact, 
   StatMetric, 
@@ -1905,7 +1906,7 @@ export const api = {
       : file.type.startsWith('video/')
         ? 'video'
         : 'document';
-    const filePath = `${conversationId}/${Date.now()}-${file.name}`;
+    const filePath = `${conversationId}/${Date.now()}-${sanitizeStorageFileName(file.name)}`;
 
     try {
       await uploadChatAttachment(filePath, file);
