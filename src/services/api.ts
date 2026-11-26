@@ -1839,7 +1839,17 @@ export const api = {
       throw new Error('Conversation not found');
     }
 
-    const messageType: 'image' | 'document' = file.type.startsWith('image/') ? 'image' : 'document';
+    // Vídeo caía no balde de 'document' (só existia a distinção image/
+    // document aqui) — whatsapp-sender manda 'document' como anexo genérico
+    // pro WhatsApp, sem preview de vídeo nenhum, e pior: Marco relatou erro
+    // tentando mandar vídeo pela API oficial, provavelmente o limite de
+    // tamanho de documento (100MB) ou de vídeo (16MB) da Meta sendo batido
+    // do jeito errado por estar classificado como o tipo errado.
+    const messageType: 'image' | 'document' | 'video' = file.type.startsWith('image/')
+      ? 'image'
+      : file.type.startsWith('video/')
+        ? 'video'
+        : 'document';
     const filePath = `${conversationId}/${Date.now()}-${file.name}`;
 
     const { error: uploadError } = await supabase.storage
@@ -1854,7 +1864,7 @@ export const api = {
     const { data: urlData } = supabase.storage.from('chat-attachments').getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
     // Documento usa content como fileName (é o que whatsapp-sender manda pro
-    // WhatsApp); imagem usa content como legenda, que aqui não existe ainda.
+    // WhatsApp); imagem/vídeo usam content como legenda, que aqui não existe ainda.
     const content = messageType === 'document' ? file.name : '';
 
     const { data: msgData, error: msgError } = await supabase

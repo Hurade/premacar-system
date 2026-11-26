@@ -592,13 +592,14 @@ export function useConversations() {
     const tempId = `temp-media-${Date.now()}`;
     const tempUrl = URL.createObjectURL(file);
     const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
     const tempMessage: UIMessage = {
       id: tempId,
-      content: isImage ? '' : file.name,
+      content: (isImage || isVideo) ? '' : file.name,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       sentAt: new Date().toISOString(),
       direction: MessageDirection.OUTGOING,
-      type: isImage ? MessageType.IMAGE : MessageType.DOCUMENT,
+      type: isImage ? MessageType.IMAGE : isVideo ? MessageType.VIDEO : MessageType.DOCUMENT,
       status: 'sent',
       fromType: 'human',
       mediaUrl: tempUrl,
@@ -609,7 +610,7 @@ export function useConversations() {
 
     setConversations(prev => prev.map(conv => (
       conv.id === conversationId
-        ? { ...conv, messages: [...conv.messages, tempMessage], lastMessage: isImage ? '📷 Imagem' : `📄 ${file.name}`, lastMessageTime: 'Agora' }
+        ? { ...conv, messages: [...conv.messages, tempMessage], lastMessage: isImage ? '📷 Imagem' : isVideo ? '🎥 Vídeo' : `📄 ${file.name}`, lastMessageTime: 'Agora' }
         : conv
     )));
 
