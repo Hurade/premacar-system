@@ -1,3 +1,4 @@
+import { Upload } from 'tus-js-client';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Contact, 
@@ -42,6 +43,60 @@ const getCurrentTeamMemberId = async (): Promise<string | null> => {
     .eq('status', 'active')
     .maybeSingle();
   return byEmail?.id ?? null;
+};
+
+const RESUMABLE_UPLOAD_THRESHOLD_BYTES = 6 * 1024 * 1024;
+const TUS_CHUNK_SIZE_BYTES = 6 * 1024 * 1024;
+
+const uploadChatAttachment = async (filePath: string, file: File): Promise<void> => {
+  if (file.size <= RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
+    const { error } = await supabase.storage
+      .from('chat-attachments')
+      .upload(filePath, file, { contentType: file.type || undefined, upsert: false });
+    if (error) throw error;
+    return;
+  }
+
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  if (!session) throw new Error('Sua sessão expirou. Entre novamente para enviar o arquivo.');
+
+  const supabaseUrl = new URL(supabase.supabaseUrl);
+  const projectRef = supabaseUrl.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i)?.[1];
+  const endpoint = projectRef
+    ? `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`
+    : `${supabaseUrl.origin}/storage/v1/upload/resumable`;
+
+  await new Promise<void>((resolve, reject) => {
+    const upload = new Upload(file, {
+      endpoint,
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: {
+        authorization: `Bearer ${session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      chunkSize: TUS_CHUNK_SIZE_BYTES,
+      metadata: {
+        bucketName: 'chat-attachments',
+        objectName: filePath,
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: '3600',
+      },
+      onError: reject,
+      onSuccess: resolve,
+    });
+
+    upload.findPreviousUploads()
+      .then(previousUploads => {
+        if (previousUploads.length > 0) {
+          upload.resumeFromPreviousUpload(previousUploads[0]);
+        }
+        upload.start();
+      })
+      .catch(reject);
+  });
 };
 
 // Cache for system stage IDs (Ganho/Perdido) - keyed by user_id for multi-tenant
@@ -1852,11 +1907,9 @@ export const api = {
         : 'document';
     const filePath = `${conversationId}/${Date.now()}-${file.name}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('chat-attachments')
-      .upload(filePath, file, { contentType: file.type || undefined, upsert: false });
-
-    if (uploadError) {
+    try {
+      await uploadChatAttachment(filePath, file);
+    } catch (uploadError) {
       console.error('[API] Error uploading attachment:', uploadError);
       throw uploadError;
     }

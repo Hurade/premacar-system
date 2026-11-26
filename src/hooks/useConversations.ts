@@ -618,12 +618,12 @@ export function useConversations() {
       await api.sendMediaMessage(conversationId, file);
     } catch (err) {
       console.error('[useConversations] Error sending media message:', err);
-      toast.error('Erro ao enviar arquivo');
       setConversations(prev => prev.map(conv => (
         conv.id === conversationId
           ? { ...conv, messages: conv.messages.filter(m => m.id !== tempId) }
           : conv
       )));
+      throw err;
     }
   }, []);
 

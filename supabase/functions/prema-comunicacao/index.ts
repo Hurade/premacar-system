@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveSendCredentials } from "../_shared/connection-resolver.ts";
 import { sendWhatsAppMessage } from "../_shared/whatsapp-send.ts";
 import { saveLog } from "../_shared/logger.ts";
+import { brPhoneVariants } from "../_shared/br-phone.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,23 +28,6 @@ const DEDUPE_WINDOWS_HOURS: Record<string, number> = {
 
 function dedupeKey(tipo: string, topico?: string | null): string {
   return topico ? `${tipo}:${topico}` : tipo;
-}
-
-// Celular BR tem 13 dígitos com DDI (55 + DDD 2 dígitos + 9 + 8 dígitos),
-// mas às vezes aparece sem esse "9" (formato legado, 12 dígitos) — mesmo
-// utilitário usado em whatsapp-webhook/index.ts, copiado aqui (função pura,
-// sem motivo pra acoplar as duas functions por causa disso).
-function brPhoneVariants(phone: string): string[] {
-  const digits = phone.replace(/\D/g, "");
-  if (!digits.startsWith("55")) return [digits];
-  const rest = digits.slice(2);
-  if (rest.length === 9 && rest[2] === "9") {
-    return [digits, "55" + rest.slice(0, 2) + rest.slice(3)];
-  }
-  if (rest.length === 8) {
-    return [digits, "55" + rest.slice(0, 2) + "9" + rest.slice(2)];
-  }
-  return [digits];
 }
 
 interface SendRequestBody {

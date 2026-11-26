@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
+import { brPhoneVariants } from "../_shared/br-phone.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -477,25 +478,16 @@ async function processMetaWebhookAsync(
         // ═══════════════════════════════════════════
         console.log('[Meta Async] 📞 Buscando contato...');
 
-        // Normalizar número: gerar variantes com/sem dígito 9 extra (Brasil)
-        const cleanPhone = phoneNumber.replace(/\D/g, '');
-        const phoneVariants = [cleanPhone];
-        // 13 dígitos (55 + DDD + 9 + 8 dígitos) → tentar sem o 9
-        if (cleanPhone.length === 13 && cleanPhone.startsWith('55')) {
-          phoneVariants.push(cleanPhone.slice(0, 4) + cleanPhone.slice(5));
-        }
-        // 12 dígitos (55 + DDD + 8 dígitos) → tentar com o 9
-        if (cleanPhone.length === 12 && cleanPhone.startsWith('55')) {
-          phoneVariants.push(cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4));
-        }
+        const phoneVariants = brPhoneVariants(phoneNumber);
         console.log('[Meta Async] 🔍 Variantes de telefone:', phoneVariants);
 
-        const { data: existingContacts } = await supabase
+        let { data: contact } = await supabase
           .from('contacts')
           .select('*')
-          .in('phone_number', phoneVariants);
-
-        let contact = existingContacts && existingContacts.length > 0 ? existingContacts[0] : null;
+          .in('phone_number', phoneVariants)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
         if (!contact) {
           console.log('[Meta Async] ➕ Criando novo contato');
@@ -860,19 +852,10 @@ async function processMetaWebhookAsync(
           console.log('[Meta Async] 📩 Detectada resposta a conversa de disparo!');
           
           // Find campaign_lead by contact phone number that hasn't been marked as replied yet
-          const contactPhone = contact.phone_number;
-          const leadPhoneVariants = [contactPhone];
-          if (contactPhone.length === 13 && contactPhone.startsWith('55')) {
-            leadPhoneVariants.push(contactPhone.slice(0, 4) + contactPhone.slice(5));
-          }
-          if (contactPhone.length === 12 && contactPhone.startsWith('55')) {
-            leadPhoneVariants.push(contactPhone.slice(0, 4) + '9' + contactPhone.slice(4));
-          }
-
           const { data: repliedLeads } = await supabase
             .from('campaign_leads')
             .select('id, campaign_id, status')
-            .in('phone', leadPhoneVariants)
+            .in('phone', brPhoneVariants(contact.phone_number))
             .in('status', ['sent', 'delivered', 'read'])
             .order('created_at', { ascending: false })
             .limit(1);

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { triggerNinaOrchestrator } from "../_shared/trigger-orchestrator.ts";
 import { notifyAdmins } from "../_shared/internal-notify.ts";
 import { saveLog } from "../_shared/logger.ts";
+import { brPhoneVariants } from "../_shared/br-phone.ts";
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<any>): void;
@@ -12,26 +13,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Celular BR tem 13 dígitos com DDI (55 + DDD 2 dígitos + 9 + 8 dígitos),
-// mas o WhatsApp às vezes manda o JID sem esse "9" (formato legado, 12
-// dígitos) — inconsistente até pro MESMO contato entre uma mensagem e
-// outra. Busca exata (=) então não bate com o contato já cadastrado e
-// cria um duplicado do zero. Gera as duas variantes pra buscar com IN().
-function brPhoneVariants(phone: string): string[] {
-  const digits = phone.replace(/\D/g, '');
-  if (!digits.startsWith('55')) return [digits];
-  const rest = digits.slice(2);
-  if (rest.length === 9 && rest[2] === '9') {
-    // DDD (2) + 9 dígitos com o 9 extra -> variante sem o 9
-    return [digits, '55' + rest.slice(0, 2) + rest.slice(3)];
-  }
-  if (rest.length === 8) {
-    // DDD (2) + 8 dígitos -> variante com o 9 inserido
-    return [digits, '55' + rest.slice(0, 2) + '9' + rest.slice(2)];
-  }
-  return [digits];
-}
 
 // ═══════════════════════════════════════════
 // HMAC-SHA256 signature validation
@@ -522,7 +503,7 @@ serve(async (req) => {
       const { data: campaignLead } = await supabase
         .from('campaign_leads')
         .select('id, campaign_id, status')
-        .eq('phone', phoneNumber)
+        .in('phone', brPhoneVariants(phoneNumber))
         .in('status', ['sent', 'delivered', 'read'])
         .order('sent_at', { ascending: false })
         .limit(1)

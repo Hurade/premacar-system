@@ -505,7 +505,8 @@ const ChatInterface: React.FC = () => {
       toast.success('Arquivo enviado');
     } catch (err) {
       console.error('[ChatInterface] File upload error:', err);
-      toast.error('Erro ao enviar arquivo');
+      const errorMessage = err instanceof Error ? err.message : 'Erro inesperado';
+      toast.error(`Erro ao enviar arquivo: ${errorMessage}`);
     } finally {
       setIsUploadingFile(false);
     }
