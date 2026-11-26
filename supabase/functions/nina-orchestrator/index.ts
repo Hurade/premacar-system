@@ -910,11 +910,22 @@ async function stopCampaignContact(
         );
     }
 
+    // is_blocked=true é o que de fato impede CONTATO FUTURO por qualquer
+    // mecanismo (whatsapp-webhook ignora mensagem recebida de contato
+    // bloqueado, "como se o número não existisse mais pro sistema") — sem
+    // isso, só a campanha que originou o pedido parava; outros disparos
+    // (ex: followup-processor, que só checa is_blocked, não tag nem
+    // campaign_blacklist) continuavam contatando o mesmo número depois de
+    // já ter sido avisado que é número errado ou que a pessoa não quer mais
+    // contato. Achado real: contato marcado "Numero Invalido" recebeu
+    // mensagem de reativação do Follow-up dias depois.
     const tag = args.reason === 'wrong_number' ? 'Numero Invalido' : 'Nao Interessado';
     const currentTags: string[] = contact?.tags || [];
+    const updatePayload: Record<string, unknown> = { is_blocked: true };
     if (!currentTags.includes(tag)) {
-      await supabase.from('contacts').update({ tags: [...currentTags, tag] }).eq('id', conversation.contact_id);
+      updatePayload.tags = [...currentTags, tag];
     }
+    await supabase.from('contacts').update(updatePayload).eq('id', conversation.contact_id);
 
     await supabase
       .from('campaign_contacts')
