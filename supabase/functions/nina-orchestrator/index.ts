@@ -1369,14 +1369,27 @@ async function processQueueItem(
   const conversationHistory = (recentMessages || [])
     .reverse()
     .filter((msg: any) => ['nina', 'human', 'user'].includes(msg.from_type))
-    .map((msg: any) => ({
+    .map((msg: any) => {
       // 'human' (atendente real) tem que virar 'assistant' igual 'nina' —
       // mensagem humana vem com prefixo "Nome:\n" (ex: "Brenner:\n..."), e
       // jogando ela como 'user' a IA lia como se o PRÓPRIO CLIENTE tivesse
       // se identificado com esse nome, e passava a chamá-lo assim.
-      role: msg.from_type === 'user' ? 'user' : 'assistant',
-      content: msg.content || '[media]'
-    }));
+      let content = msg.content || '[media]';
+      // Além do papel, o PRÓPRIO texto "Brenner:\n..." entrava cru no
+      // histórico — a IA aprendia o padrão vendo várias respostas humanas
+      // formatadas assim e passava a assinar as PRÓPRIAS respostas como se
+      // fosse o atendente (achado real: conversa com assigned_user_id
+      // Brenner, IA respondendo e se identificando como "Brenner:\n..."
+      // pro cliente). Tira o prefixo antes de virar contexto pra IA nunca
+      // ver esse formato como algo a imitar.
+      if (msg.from_type === 'human') {
+        content = content.replace(/^[^:\n]{1,40}:\n/, '');
+      }
+      return {
+        role: msg.from_type === 'user' ? 'user' : 'assistant',
+        content,
+      };
+    });
 
   const clientMemory = conversation.contact?.client_memory || {};
 
@@ -2107,7 +2120,8 @@ INSTRUÇÃO CRÍTICA DE FORMATO:
 - Se precisar fazer uma pergunta, faça APENAS 1
 - Não use duplo Enter (parágrafo duplo) para separar ideias diferentes
 - Use Enter simples se precisar de quebra de linha
-- NUNCA adicione "(opcional)", "(se quiser)" ou qualificadores entre parênteses nas mensagens`;
+- NUNCA adicione "(opcional)", "(se quiser)" ou qualificadores entre parênteses nas mensagens
+- NUNCA assine a mensagem com nome de pessoa (seu ou de qualquer atendente humano) nem comece a resposta com "Nome:" — isso faz o cliente achar que um humano específico respondeu, quando foi você`;
 
   return basePrompt + contextInfo + knowledgeBaseInfo + antiDoubleMessageInstruction;
 }
