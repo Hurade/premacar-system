@@ -1,39 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import ChatInterface from './components/ChatInterface';
-import Contacts from './components/Contacts';
-import Settings from './components/Settings';
-import Team from './components/Team';
-import Scheduling from './components/Scheduling';
-import Kanban from './components/Kanban';
-import Campanhas from './pages/Campanhas';
-import CreateCampaign from './pages/CreateCampaign';
-import CampaignDetails from './pages/CampaignDetails';
-import Followup from './pages/Followup';
-import Automacoes from './pages/Automacoes';
-import Auth from './pages/Auth';
-import OAuthConsent from './pages/OAuthConsent';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleGate from './components/RoleGate';
-import PropostasDashboard from './pages/propostas/PropostasDashboard';
-import Leads from './pages/propostas/Leads';
-import NovaPropostaWizard from './pages/propostas/NovaPropostaWizard';
-import PropostaDetalhe from './pages/propostas/PropostaDetalhe';
-import PropostaPreview from './pages/propostas/PropostaPreview';
-import PropostaPublica from './pages/propostas/PropostaPublica';
-import Biblioteca from './pages/propostas/Biblioteca';
-import Wiki from './pages/wiki/Wiki';
-import ArtigoDetalhe from './pages/wiki/ArtigoDetalhe';
-import ApresentacoesDashboard from './pages/apresentacoes/ApresentacoesDashboard';
-import NovaApresentacaoWizard from './pages/apresentacoes/NovaApresentacaoWizard';
-import ApresentacaoDetalhe from './pages/apresentacoes/ApresentacaoDetalhe';
-import ApresentacaoPreview from './pages/apresentacoes/ApresentacaoPreview';
-import ApresentacaoPublica from './pages/apresentacoes/ApresentacaoPublica';
-import DuplicateContacts from './pages/DuplicateContacts';
-import CsatPublic from './pages/CsatPublic';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { NotificationSettingsProvider } from './hooks/useNotificationSettings';
@@ -41,9 +11,42 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { UserRoleProvider } from './hooks/useUserRole';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { Toaster } from 'sonner';
-import { OnboardingWizard } from './components/OnboardingWizard';
 import { useOnlinePresence } from './hooks/useOnlinePresence';
 import NotificationBell from './components/NotificationBell';
+
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const ChatInterface = lazy(() => import('./components/ChatInterface'));
+const Contacts = lazy(() => import('./components/Contacts'));
+const Settings = lazy(() => import('./components/Settings'));
+const Team = lazy(() => import('./components/Team'));
+const Scheduling = lazy(() => import('./components/Scheduling'));
+const Kanban = lazy(() => import('./components/Kanban'));
+const Campanhas = lazy(() => import('./pages/Campanhas'));
+const CreateCampaign = lazy(() => import('./pages/CreateCampaign'));
+const CampaignDetails = lazy(() => import('./pages/CampaignDetails'));
+const Followup = lazy(() => import('./pages/Followup'));
+const Automacoes = lazy(() => import('./pages/Automacoes'));
+const Auth = lazy(() => import('./pages/Auth'));
+const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
+const PropostasDashboard = lazy(() => import('./pages/propostas/PropostasDashboard'));
+const Leads = lazy(() => import('./pages/propostas/Leads'));
+const NovaPropostaWizard = lazy(() => import('./pages/propostas/NovaPropostaWizard'));
+const PropostaDetalhe = lazy(() => import('./pages/propostas/PropostaDetalhe'));
+const PropostaPreview = lazy(() => import('./pages/propostas/PropostaPreview'));
+const PropostaPublica = lazy(() => import('./pages/propostas/PropostaPublica'));
+const Biblioteca = lazy(() => import('./pages/propostas/Biblioteca'));
+const Wiki = lazy(() => import('./pages/wiki/Wiki'));
+const ArtigoDetalhe = lazy(() => import('./pages/wiki/ArtigoDetalhe'));
+const ApresentacoesDashboard = lazy(() => import('./pages/apresentacoes/ApresentacoesDashboard'));
+const NovaApresentacaoWizard = lazy(() => import('./pages/apresentacoes/NovaApresentacaoWizard'));
+const ApresentacaoDetalhe = lazy(() => import('./pages/apresentacoes/ApresentacaoDetalhe'));
+const ApresentacaoPreview = lazy(() => import('./pages/apresentacoes/ApresentacaoPreview'));
+const ApresentacaoPublica = lazy(() => import('./pages/apresentacoes/ApresentacaoPublica'));
+const DuplicateContacts = lazy(() => import('./pages/DuplicateContacts'));
+const CsatPublic = lazy(() => import('./pages/CsatPublic'));
+const OnboardingWizard = lazy(() =>
+  import('./components/OnboardingWizard').then(module => ({ default: module.OnboardingWizard }))
+);
 
 // Sem UI própria — só mantém a sessão do usuário logado marcada como "online"
 // via Presence API do Supabase Realtime enquanto o app estiver aberto.
@@ -113,10 +116,11 @@ const AppLayout: React.FC = () => {
         </div>
       </main>
 
-      <OnboardingWizard 
-        isOpen={showOnboarding} 
-        onClose={() => setShowOnboarding(false)} 
-      />
+      {showOnboarding && (
+        <Suspense fallback={null}>
+          <OnboardingWizard isOpen onClose={() => setShowOnboarding(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };
@@ -136,6 +140,11 @@ const App: React.FC = () => {
           <NotificationSettingsProvider>
             <BrowserRouter>
               <PageTitle />
+              <Suspense fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-foreground">
+                  Carregando...
+                </div>
+              }>
               <Routes>
                 {/* Public Routes */}
                 <Route path="/auth" element={<Auth />} />
@@ -220,6 +229,7 @@ const App: React.FC = () => {
                 {/* Catch all - redirect to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
+              </Suspense>
             </BrowserRouter>
             <ThemedToaster />
           </NotificationSettingsProvider>

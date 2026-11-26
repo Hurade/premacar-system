@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -18,14 +18,15 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
   const [sdrName, setSdrName] = useState('');
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const isAuthenticated = Boolean(user?.id);
   // Fonte única de verdade pra isAdmin — já checa user_roles E team_members
   // (ver useUserRole.tsx). A versão anterior daqui só checava user_roles,
   // então um admin só por team_members.role (sem linha em user_roles) via
   // "Somente Leitura" em Configurações mesmo sendo admin de verdade.
   const { isAdmin } = useUserRole();
 
-  const fetchSettings = async () => {
-    if (!user) {
+  const fetchSettings = useCallback(async () => {
+    if (!isAuthenticated) {
       setLoading(false);
       return;
     }
@@ -58,11 +59,11 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    fetchSettings();
-  }, [user]);
+    void fetchSettings();
+  }, [fetchSettings]);
 
   const value: CompanySettings = {
     companyName,

@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -102,16 +102,28 @@ export const MENU_ROLE_REQUIREMENTS: Record<string, TeamRole[]> = {
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);
 
+interface RoleUser {
+  id: string;
+  email: string | null;
+}
+
 export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
+  const roleUser = useMemo<RoleUser | null>(
+    () => user ? { id: user.id, email: user.email } : null,
+    [user?.id, user?.email]
+  );
   const [appRole, setAppRole] = useState<AppRole | null>(null);
   const [teamRole, setTeamRole] = useState<TeamRole | null>(null);
   const [teamMemberId, setTeamMemberId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const roleFetchSequence = useRef(0);
 
-  const fetchRoles = async () => {
-    if (!user) {
+  const fetchRoles = useCallback(async (currentUser: RoleUser | null) => {
+    const requestId = ++roleFetchSequence.current;
+
+    if (!currentUser) {
       setAppRole(null);
       setTeamRole(null);
       setTeamMemberId(null);
@@ -120,38 +132,48 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    setLoading(true);
     try {
-      // Fetch app role from user_roles table
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const [roleResult, teamByUserIdResult] = await Promise.all([
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', currentUser.id)
+          .maybeSingle(),
+        supabase
+          .from('team_members')
+          .select('id, role, status, name')
+          .eq('user_id', currentUser.id)
+          .eq('status', 'active')
+          .maybeSingle(),
+      ]);
 
-      if (roleData) {
-        setAppRole(roleData.role as AppRole);
-      } else {
-        setAppRole('user');
+      if (roleResult.error) {
+        console.error('Error fetching app role:', roleResult.error);
+      }
+      if (teamByUserIdResult.error) {
+        console.error('Error fetching team member by user ID:', teamByUserIdResult.error);
       }
 
-      // Fetch team member info — try user_id first (reliable), fall back to email
-      const { data: teamByUserId } = await supabase
-        .from('team_members')
-        .select('id, role, status, name')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
+      let teamMemberData = teamByUserIdResult.data;
+      if (!teamMemberData && currentUser.email) {
+        const teamByEmailResult = await supabase
+          .from('team_members')
+          .select('id, role, status, name')
+          .eq('email', currentUser.email)
+          .eq('status', 'active')
+          .maybeSingle();
 
-      const { data: teamByEmail } = teamByUserId
-        ? { data: null }
-        : await supabase
-            .from('team_members')
-            .select('id, role, status, name')
-            .eq('email', user.email!)
-            .eq('status', 'active')
-            .maybeSingle();
+        if (teamByEmailResult.error) {
+          console.error('Error fetching team member by email:', teamByEmailResult.error);
+        }
+        teamMemberData = teamByEmailResult.data;
+      }
 
-      const teamMemberData = teamByUserId ?? teamByEmail;
+      if (requestId !== roleFetchSequence.current) return;
+
+      const roleData = roleResult.data;
+      setAppRole(roleData?.role ? roleData.role as AppRole : 'user');
 
       if (teamMemberData) {
         setTeamRole(teamMemberData.role as TeamRole);
@@ -166,19 +188,24 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     } catch (error) {
+      if (requestId !== roleFetchSequence.current) return;
       console.error('Error fetching user roles:', error);
       setAppRole('user');
       setTeamRole('agent');
+      setTeamMemberId(null);
+      setCurrentUserName(null);
     } finally {
-      setLoading(false);
+      if (requestId === roleFetchSequence.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!authLoading) {
-      fetchRoles();
+      void fetchRoles(roleUser);
     }
-  }, [user, authLoading]);
+  }, [fetchRoles, roleUser, authLoading]);
 
   const isAdmin = appRole === 'admin' || teamRole === 'admin';
   const isManager = teamRole === 'manager' || isAdmin;
@@ -192,10 +219,10 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
     return permissions.includes(permission);
   };
 
-  const refetchRoles = async () => {
-    setLoading(true);
-    await fetchRoles();
-  };
+  const refetchRoles = useCallback(
+    async () => fetchRoles(roleUser),
+    [fetchRoles, roleUser]
+  );
 
   return (
     <UserRoleContext.Provider

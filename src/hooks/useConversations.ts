@@ -24,9 +24,8 @@ const updateDocumentTitle = (unreadCount: number) => {
   }
 };
 
-// Fallback quando o realtime cai: cada fetchConversations() traz até 100
-// conversas × 100 mensagens. A cada 4s isso sozinho consumia o egress do
-// plano em poucas horas com uma aba aberta.
+// Fallback quando o realtime cai; fetchConversations busca mensagens em lote
+// e mantém o limite de 100 mensagens por conversa.
 const POLLING_FALLBACK_MS = 30_000;
 
 export function useConversations() {
