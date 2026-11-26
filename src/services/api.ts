@@ -61,7 +61,7 @@ const uploadChatAttachment = async (filePath: string, file: File): Promise<void>
   if (sessionError) throw sessionError;
   if (!session) throw new Error('Sua sessão expirou. Entre novamente para enviar o arquivo.');
 
-  const supabaseUrl = new URL(supabase.supabaseUrl);
+  const supabaseUrl = new URL(import.meta.env.VITE_SUPABASE_URL);
   const projectRef = supabaseUrl.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i)?.[1];
   const endpoint = projectRef
     ? `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`
@@ -85,7 +85,7 @@ const uploadChatAttachment = async (filePath: string, file: File): Promise<void>
         cacheControl: '3600',
       },
       onError: reject,
-      onSuccess: resolve,
+      onSuccess: () => resolve(),
     });
 
     upload.findPreviousUploads()
