@@ -4218,6 +4218,14 @@ export type Database = {
         Args: never
         Returns: string[]
       }
+      fetch_conversation_message_weeks: {
+        Args: { p_conversation_ids: string[] }
+        Returns: {
+          conversation_id: string
+          week_start: string
+          message_count: number
+        }[]
+      }
       fetch_recent_chat_messages: {
         Args: { p_conversation_ids: string[] }
         Returns: Database["public"]["Tables"]["messages"]["Row"][]

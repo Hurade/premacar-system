@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DBMessage, UIMessage, transformDBToUIMessage, ApiSource } from '@/types';
+import { ApiSource } from '@/types';
+import {
+  ConversationMessageWeek,
+  fetchConversationMessageWeeks,
+} from '@/lib/conversationMessageWeeks';
 
 export interface HistorySession {
   conversationId: string;
@@ -12,7 +16,7 @@ export interface HistorySession {
   attendantName: string | null;
   startedAt: string;
   lastMessageAt: string;
-  messages: UIMessage[];
+  weeks: ConversationMessageWeek[];
 }
 
 interface UseContactHistoryOptions {
@@ -59,30 +63,17 @@ async function fetchContactHistory(
 
   if (sessions.length === 0) return [];
 
-  const messagesByConversation = new Map<string, DBMessage[]>();
-  const [, attendantNameById] = await Promise.all([
-    Promise.all(sessions.map(async (conv) => {
-      const pageSize = 1000;
-      const messages: DBMessage[] = [];
-
-      for (let offset = 0; ; offset += pageSize) {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', conv.id)
-          .order('sent_at', { ascending: true })
-          .range(offset, offset + pageSize - 1);
-
-        if (error) throw error;
-
-        messages.push(...((data || []) as DBMessage[]));
-        if ((data || []).length < pageSize) break;
-      }
-
-      messagesByConversation.set(conv.id, messages);
-    })),
+  const [weeks, attendantNameById] = await Promise.all([
+    fetchConversationMessageWeeks(sessions.map((conv) => conv.id)),
     fetchAttendantNames(sessions.map((conv) => conv.assigned_user_id)),
   ]);
+
+  const weeksByConversation = new Map<string, ConversationMessageWeek[]>();
+  for (const week of weeks) {
+    const conversationWeeks = weeksByConversation.get(week.conversationId) || [];
+    conversationWeeks.push(week);
+    weeksByConversation.set(week.conversationId, conversationWeeks);
+  }
 
   return sessions.map((conv) => ({
     conversationId: conv.id,
@@ -94,7 +85,7 @@ async function fetchContactHistory(
     attendantName: conv.assigned_user_id ? attendantNameById.get(conv.assigned_user_id) || null : null,
     startedAt: conv.started_at,
     lastMessageAt: conv.last_message_at,
-    messages: (messagesByConversation.get(conv.id) || []).map(transformDBToUIMessage),
+    weeks: weeksByConversation.get(conv.id) || [],
   }));
 }
 
@@ -112,12 +103,16 @@ export function useContactHistory(
   });
 
   const sessions = query.data || [];
-  const totalMessages = sessions.reduce((sum, s) => sum + s.messages.length, 0);
+  const totalMessages = sessions.reduce(
+    (sum, session) => sum + session.weeks.reduce((weekTotal, week) => weekTotal + week.messageCount, 0),
+    0
+  );
 
   return {
     sessions,
     totalMessages,
     isLoading: query.isLoading,
     error: query.error,
+    refetch: query.refetch,
   };
 }

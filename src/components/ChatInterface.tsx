@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck,
@@ -52,6 +52,14 @@ import { VoiceCallsPanel } from './chat/VoiceCallsPanel';
 import { useApprovedMetaTemplates } from '@/hooks/useMetaTemplates';
 import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { WeeklyMessageBlock } from './chat/WeeklyMessageBlock';
+import {
+  ConversationMessageWeek,
+  fetchAllConversationMessages,
+  fetchConversationMessageWeeks,
+  getConversationWeekStart,
+  isConversationWeekWithinLastSevenDays,
+} from '@/lib/conversationMessageWeeks';
 
 type FilterType = 'all' | 'unread' | 'favorite';
 type StatusFilter = 'all' | 'nina' | 'human' | 'paused';
@@ -66,7 +74,8 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendMediaMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation, loadFullConversationHistory } = useConversations();
+  const queryClient = useQueryClient();
+  const { conversations, loading, sendMessage, sendMediaMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager, teamMemberId } = useUserRole();
   const canSupervise = isAdmin || isManager;
@@ -158,12 +167,48 @@ const ChatInterface: React.FC = () => {
   const recordingStreamRef = useRef<MediaStream | null>(null);
 
   const activeChat = conversations.find(c => c.id === selectedChatId);
+  const {
+    data: activeConversationWeeks = [],
+    isLoading: isLoadingConversationWeeks,
+    isError: hasConversationWeeksError,
+    refetch: refetchConversationWeeks,
+  } = useQuery({
+    queryKey: ['conversation-message-weeks', activeChat?.id],
+    queryFn: () => fetchConversationMessageWeeks([activeChat!.id]),
+    enabled: !!activeChat?.id,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+  const activeMessageWeeks = useMemo(() => {
+    if (activeConversationWeeks.length > 0 || !activeChat?.messages.length) {
+      return activeConversationWeeks;
+    }
+
+    const messageCounts = new Map<string, number>();
+    activeChat.messages.forEach((message) => {
+      const weekStart = getConversationWeekStart(message.sentAt);
+      messageCounts.set(weekStart, (messageCounts.get(weekStart) || 0) + 1);
+    });
+
+    return [...messageCounts.entries()]
+      .map(([weekStart, messageCount]) => ({
+        conversationId: activeChat.id,
+        weekStart,
+        messageCount,
+      }))
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+  }, [activeChat, activeConversationWeeks]);
   const isSpyMode = canSupervise && spyConversationId !== null && spyConversationId === selectedChatId;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Histórico de conversas anteriores do mesmo contato (outras conexões/filas/atendentes)
   const [showPriorHistory, setShowPriorHistory] = useState(false);
-  const { sessions: priorHistorySessions, totalMessages: priorHistoryMessageCount } = useContactHistory(
+  const {
+    sessions: priorHistorySessions,
+    totalMessages: priorHistoryMessageCount,
+    error: priorHistoryError,
+    refetch: refetchPriorHistory,
+  } = useContactHistory(
     activeChat?.contactId,
     { excludeConversationId: activeChat?.id, enabled: !!activeChat }
   );
@@ -174,15 +219,18 @@ const ChatInterface: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChatId]);
 
-  useEffect(() => {
-    if (selectedChatId) {
-      loadFullConversationHistory(selectedChatId);
+  const handleExportConversation = async (chat: UIConversation) => {
+    let messages: UIMessage[];
+    try {
+      messages = await fetchAllConversationMessages(chat.id);
+    } catch (error) {
+      console.error('[ChatInterface] Error loading conversation for export:', error);
+      toast.error('Erro ao carregar o histórico para exportação');
+      return;
     }
-  }, [selectedChatId, loadFullConversationHistory]);
 
-  const handleExportConversation = (chat: UIConversation) => {
     const header = 'Data,Remetente,Tipo,Conteudo\n';
-    const rows = chat.messages.map(m => {
+    const rows = messages.map(m => {
       const remetente = m.isInternal ? 'Nota Interna' : m.direction === MessageDirection.OUTGOING ? (m.senderName || 'Atendente') : chat.contactName;
       const conteudo = (m.content || '').replace(/"/g, '""').replace(/\n/g, ' ');
       return `"${m.sentAt}","${remetente}","${m.type}","${conteudo}"`;
@@ -466,6 +514,15 @@ const ChatInterface: React.FC = () => {
     if (!confirm('Apagar esta mensagem?')) return;
     try {
       const { deletedOnWhatsapp } = await deleteMessage(activeChat.id, msg.id);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['conversation-week-messages', activeChat.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['conversation-message-weeks', activeChat.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['contact-history', activeChat.contactId] }),
+      ]);
       toast.success(deletedOnWhatsapp ? 'Mensagem apagada também no WhatsApp' : 'Mensagem removida do sistema');
     } catch (err) {
       console.error('[ChatInterface] Error deleting message:', err);
@@ -2094,6 +2151,18 @@ const ChatInterface: React.FC = () => {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-0">
+              {priorHistoryError && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-xs text-rose-300">
+                  <span>Não foi possível carregar o histórico de conversas anteriores.</span>
+                  <button
+                    type="button"
+                    onClick={() => refetchPriorHistory()}
+                    className="shrink-0 underline hover:text-rose-100"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
               {priorHistorySessions.length > 0 && (
                 <div>
                   <button
@@ -2121,15 +2190,50 @@ const ChatInterface: React.FC = () => {
                   )}
                 </div>
               )}
-              {activeChat.messages.length === 0 ? (
+              {hasConversationWeeksError && activeMessageWeeks.length > 0 && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-900/50 bg-amber-950/30 px-4 py-3 text-xs text-amber-300">
+                  <span>Não foi possível atualizar o índice semanal; exibindo o histórico disponível.</span>
+                  <button
+                    type="button"
+                    onClick={() => refetchConversationWeeks()}
+                    className="shrink-0 underline hover:text-amber-100"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+              {activeMessageWeeks.length === 0 && isLoadingConversationWeeks ? (
+                <div className="flex items-center justify-center h-full text-sm text-slate-500">
+                  Carregando blocos semanais...
+                </div>
+              ) : activeMessageWeeks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                  <MessageSquare className="w-16 h-16 mb-4 opacity-30" />
-                  <p className="text-sm">Nenhuma mensagem ainda</p>
-                  <p className="text-xs mt-1 opacity-70">Envie uma mensagem para iniciar a conversa</p>
+                  {hasConversationWeeksError ? (
+                    <>
+                      <AlertCircle className="w-12 h-12 mb-3 opacity-40" />
+                      <p className="text-sm">Não foi possível carregar as semanas da conversa</p>
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-16 h-16 mb-4 opacity-30" />
+                      <p className="text-sm">Nenhuma mensagem ainda</p>
+                      <p className="text-xs mt-1 opacity-70">Envie uma mensagem para iniciar a conversa</p>
+                    </>
+                  )}
                 </div>
               ) : (
-                <>
-                  {activeChat.messages.map((msg, index) => {
+                <div className="space-y-5">
+                  {activeMessageWeeks.map((week) => (
+                    <WeeklyMessageBlock
+                      key={week.weekStart}
+                      conversationId={activeChat.id}
+                      week={week}
+                      defaultOpen={isConversationWeekWithinLastSevenDays(week.weekStart)}
+                      supplementalMessages={activeChat.messages.filter(
+                        (message) => getConversationWeekStart(message.sentAt) === week.weekStart
+                      )}
+                    >
+                      {(weekMessages) => weekMessages.map((msg, index) => {
                     const isOutgoing = msg.direction === MessageDirection.OUTGOING;
                     
                     // Date separator logic
@@ -2139,7 +2243,7 @@ const ChatInterface: React.FC = () => {
                       showDateSeparator = true;
                       dateSeparatorLabel = formatDateSeparator(msg.sentAt);
                     } else {
-                      const prevMsg = activeChat.messages[index - 1];
+                      const prevMsg = weekMessages[index - 1];
                       const prevDate = new Date(prevMsg.sentAt);
                       const currDate = new Date(msg.sentAt);
                       if (
@@ -2187,7 +2291,8 @@ const ChatInterface: React.FC = () => {
                               }`}
                             >
                               {msg.replyToId && (() => {
-                                const repliedMsg = activeChat.messages.find(m => m.id === msg.replyToId);
+                                const repliedMsg = weekMessages.find(m => m.id === msg.replyToId)
+                                  || activeChat.messages.find(m => m.id === msg.replyToId);
                                 if (!repliedMsg) return null;
                                 const repliedIsOutgoing = repliedMsg.direction === MessageDirection.OUTGOING;
                                 return (
@@ -2282,8 +2387,10 @@ const ChatInterface: React.FC = () => {
                         )}
                       </div>
                     );
-                  })}
-                </>
+                      })}
+                    </WeeklyMessageBlock>
+                  ))}
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>

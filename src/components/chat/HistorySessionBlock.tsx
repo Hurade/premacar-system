@@ -2,6 +2,8 @@ import React from 'react';
 import { Layers, Share2, User, Bot, Download } from 'lucide-react';
 import { HistorySession } from '@/hooks/useContactHistory';
 import { UIMessage, MessageDirection, MessageType } from '@/types';
+import { isConversationWeekWithinLastSevenDays } from '@/lib/conversationMessageWeeks';
+import { WeeklyMessageBlock } from './WeeklyMessageBlock';
 
 function formatSessionDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('pt-BR', {
@@ -100,35 +102,45 @@ export function HistorySessionBlock({ session, muted = false }: HistorySessionBl
         </span>
       </div>
 
-      {session.messages.length === 0 ? (
+      {session.weeks.length === 0 ? (
         <p className="text-xs text-slate-500 italic px-1">Sem mensagens nesta conversa.</p>
       ) : (
-        <div className="space-y-3 px-1">
-          {session.messages.map((msg) => {
-            const isOutgoing = msg.direction === MessageDirection.OUTGOING;
-            return (
-              <div key={msg.id} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
-                <div className={`flex flex-col max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
-                  <div
-                    className={`px-4 py-2 rounded-2xl text-sm leading-relaxed ${muted ? 'opacity-70' : 'opacity-90'} ${
-                      isOutgoing
-                        ? msg.fromType === 'nina'
-                          ? 'bg-violet-700/60 text-white rounded-tr-sm'
-                          : 'bg-cyan-700/60 text-white rounded-tr-sm'
-                        : 'bg-slate-800 text-slate-300 rounded-tl-sm border border-slate-700/50'
-                    }`}
-                  >
-                    {renderHistoryMessageContent(msg)}
+        <div className="space-y-4">
+          {session.weeks.map((week) => (
+            <WeeklyMessageBlock
+              key={week.weekStart}
+              conversationId={session.conversationId}
+              week={week}
+              defaultOpen={isConversationWeekWithinLastSevenDays(week.weekStart)}
+              muted={muted}
+            >
+              {(messages) => messages.map((msg) => {
+                const isOutgoing = msg.direction === MessageDirection.OUTGOING;
+                return (
+                  <div key={msg.id} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`flex flex-col max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
+                      <div
+                        className={`px-4 py-2 rounded-2xl text-sm leading-relaxed ${muted ? 'opacity-70' : 'opacity-90'} ${
+                          isOutgoing
+                            ? msg.fromType === 'nina'
+                              ? 'bg-violet-700/60 text-white rounded-tr-sm'
+                              : 'bg-cyan-700/60 text-white rounded-tr-sm'
+                            : 'bg-slate-800 text-slate-300 rounded-tl-sm border border-slate-700/50'
+                        }`}
+                      >
+                        {renderHistoryMessageContent(msg)}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1 px-1">
+                        {isOutgoing && msg.fromType === 'nina' && <Bot className="w-3 h-3 text-violet-400" />}
+                        {isOutgoing && msg.fromType === 'human' && <User className="w-3 h-3 text-cyan-400" />}
+                        <span className="text-[10px] text-slate-500">{msg.timestamp}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 mt-1 px-1">
-                    {isOutgoing && msg.fromType === 'nina' && <Bot className="w-3 h-3 text-violet-400" />}
-                    {isOutgoing && msg.fromType === 'human' && <User className="w-3 h-3 text-cyan-400" />}
-                    <span className="text-[10px] text-slate-500">{msg.timestamp}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </WeeklyMessageBlock>
+          ))}
         </div>
       )}
     </div>
