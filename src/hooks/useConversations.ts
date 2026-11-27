@@ -128,8 +128,7 @@ export function useConversations() {
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('sent_at', { ascending: false })
-        .limit(100);
+        .order('sent_at', { ascending: true });
 
       if (msgError) {
         console.error('[Realtime] Error fetching messages:', msgError);
@@ -197,6 +196,30 @@ export function useConversations() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const loadFullConversationHistory = useCallback(async (conversationId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('sent_at', { ascending: true });
+
+    if (error) {
+      console.error('[useConversations] Error loading full conversation history:', error);
+      return;
+    }
+
+    const messages = ((data || []) as DBMessage[]).map(transformDBToUIMessage);
+    messages.forEach(message => {
+      processedMessageIds.current.add(message.id);
+    });
+
+    setConversations(prev => prev.map(conversation =>
+      conversation.id === conversationId
+        ? { ...conversation, messages }
+        : conversation
+    ));
   }, []);
 
   // Update document title when unread count changes
@@ -1099,6 +1122,7 @@ export function useConversations() {
     deleteMessage,
     createConversation,
     refetch: fetchConversations,
-    fetchAndAddConversation
+    fetchAndAddConversation,
+    loadFullConversationHistory
   };
 }

@@ -29,7 +29,10 @@ async function fetchAttendantNames(userIds: (string | null)[]): Promise<Map<stri
     .select('id, name')
     .in('id', uniqueIds);
 
-  if (error) throw error;
+  if (error) {
+    console.error('[useContactHistory] Error fetching attendant names:', error);
+    return new Map();
+  }
 
   return new Map((data || []).map((member) => [member.id, member.name]));
 }

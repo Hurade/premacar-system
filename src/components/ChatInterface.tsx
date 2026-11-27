@@ -66,7 +66,7 @@ const ChatInterface: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { conversations, loading, sendMessage, sendMediaMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation } = useConversations();
+  const { conversations, loading, sendMessage, sendMediaMessage, sendAudioMessage, sendInternalNote, updateStatus, markAsRead, assignConversation, assignQueue, toggleContactTag, transferConnection, toggleFavorite, finalizeConversation, deleteConversation, deleteMessage, createConversation, refetch, fetchAndAddConversation, loadFullConversationHistory } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const { currentUserName, isAdmin, isManager, teamMemberId } = useUserRole();
   const canSupervise = isAdmin || isManager;
@@ -173,6 +173,12 @@ const ChatInterface: React.FC = () => {
     setReplyingTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChatId]);
+
+  useEffect(() => {
+    if (selectedChatId) {
+      loadFullConversationHistory(selectedChatId);
+    }
+  }, [selectedChatId, loadFullConversationHistory]);
 
   const handleExportConversation = (chat: UIConversation) => {
     const header = 'Data,Remetente,Tipo,Conteudo\n';
