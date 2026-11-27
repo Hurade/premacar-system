@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { UIMessage } from '@/types';
@@ -14,6 +14,7 @@ interface WeeklyMessageBlockProps {
   defaultOpen?: boolean;
   muted?: boolean;
   supplementalMessages?: UIMessage[];
+  onReady?: () => void;
   children: (messages: UIMessage[]) => ReactNode;
 }
 
@@ -23,6 +24,7 @@ export function WeeklyMessageBlock({
   defaultOpen = false,
   muted = false,
   supplementalMessages = [],
+  onReady,
   children,
 }: WeeklyMessageBlockProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -41,6 +43,12 @@ export function WeeklyMessageBlock({
       (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
     );
   }, [query.data, supplementalMessages]);
+
+  useEffect(() => {
+    if (isOpen && !query.isLoading && (query.isSuccess || query.isError)) {
+      onReady?.();
+    }
+  }, [isOpen, onReady, query.isError, query.isLoading, query.isSuccess]);
 
   return (
     <section className="space-y-3">

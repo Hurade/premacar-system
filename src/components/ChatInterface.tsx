@@ -196,10 +196,14 @@ const ChatInterface: React.FC = () => {
         weekStart,
         messageCount,
       }))
-      .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
   }, [activeChat, activeConversationWeeks]);
   const isSpyMode = canSupervise && spyConversationId !== null && spyConversationId === selectedChatId;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const autoScrolledConversationId = useRef<string | null>(null);
+  const previousLatestMessageRef = useRef<{ conversationId: string; messageId: string | null } | null>(null);
 
   // Histórico de conversas anteriores do mesmo contato (outras conexões/filas/atendentes)
   const [showPriorHistory, setShowPriorHistory] = useState(false);
@@ -433,19 +437,71 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  const latestActiveMessageId = activeChat?.messages[activeChat.messages.length - 1]?.id ?? null;
 
   useEffect(() => {
-    if (activeChat) {
-      scrollToBottom();
+    autoScrolledConversationId.current = null;
+    isAtBottomRef.current = true;
+  }, [selectedChatId]);
+
+  useEffect(() => {
+    if (!activeChat?.id) {
+      previousLatestMessageRef.current = null;
+      return;
     }
-  }, [activeChat?.id, selectedChatId]); 
+
+    const previous = previousLatestMessageRef.current;
+    previousLatestMessageRef.current = {
+      conversationId: activeChat.id,
+      messageId: latestActiveMessageId,
+    };
+
+    if (
+      previous?.conversationId === activeChat.id &&
+      previous.messageId !== latestActiveMessageId &&
+      isAtBottomRef.current
+    ) {
+      requestAnimationFrame(() => scrollToBottom());
+    }
+  }, [activeChat?.id, latestActiveMessageId, scrollToBottom]);
+
+  const handleLatestWeekReady = useCallback(() => {
+    if (
+      !activeChat?.id ||
+      autoScrolledConversationId.current === activeChat.id ||
+      !isAtBottomRef.current
+    ) {
+      return;
+    }
+    autoScrolledConversationId.current = activeChat.id;
+    requestAnimationFrame(() => scrollToBottom('auto'));
+  }, [activeChat?.id, scrollToBottom]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [activeChat?.messages]);
+    if (
+      !activeChat?.id ||
+      isLoadingConversationWeeks ||
+      autoScrolledConversationId.current === activeChat.id ||
+      !isAtBottomRef.current
+    ) {
+      return;
+    }
+
+    const latestWeek = activeMessageWeeks[activeMessageWeeks.length - 1];
+    if (!latestWeek || !isConversationWeekWithinLastSevenDays(latestWeek.weekStart)) {
+      autoScrolledConversationId.current = activeChat.id;
+      requestAnimationFrame(() => scrollToBottom('auto'));
+    }
+  }, [
+    activeChat?.id,
+    activeMessageWeeks,
+    isLoadingConversationWeeks,
+    scrollToBottom,
+  ]);
 
   const handleToggleTag = async (tagKey: string) => {
     if (!activeChat) return;
@@ -2150,7 +2206,16 @@ const ChatInterface: React.FC = () => {
             )}
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-0">
+            <div
+              ref={messagesContainerRef}
+              onScroll={() => {
+                const container = messagesContainerRef.current;
+                isAtBottomRef.current = container
+                  ? container.scrollHeight - container.scrollTop - container.clientHeight <= 80
+                  : true;
+              }}
+              className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-0"
+            >
               {priorHistoryError && (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-xs text-rose-300">
                   <span>Não foi possível carregar o histórico de conversas anteriores.</span>
@@ -2229,6 +2294,11 @@ const ChatInterface: React.FC = () => {
                       conversationId={activeChat.id}
                       week={week}
                       defaultOpen={isConversationWeekWithinLastSevenDays(week.weekStart)}
+                      onReady={
+                        week.weekStart === activeMessageWeeks[activeMessageWeeks.length - 1]?.weekStart
+                          ? handleLatestWeekReady
+                          : undefined
+                      }
                       supplementalMessages={activeChat.messages.filter(
                         (message) => getConversationWeekStart(message.sentAt) === week.weekStart
                       )}

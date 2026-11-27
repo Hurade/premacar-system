@@ -18,11 +18,16 @@ export async function fetchConversationMessageWeeks(
 
   if (error) throw error;
 
-  return (data || []).map((week) => ({
-    conversationId: week.conversation_id,
-    weekStart: week.week_start,
-    messageCount: Number(week.message_count),
-  }));
+  return (data || [])
+    .map((week) => ({
+      conversationId: week.conversation_id,
+      weekStart: week.week_start,
+      messageCount: Number(week.message_count),
+    }))
+    .sort((a, b) =>
+      a.conversationId.localeCompare(b.conversationId) ||
+      a.weekStart.localeCompare(b.weekStart)
+    );
 }
 
 export async function fetchConversationWeekMessages(
