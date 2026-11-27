@@ -59,25 +59,30 @@ async function fetchContactHistory(
 
   if (sessions.length === 0) return [];
 
-  const conversationIds = sessions.map((conv) => conv.id);
+  const messagesByConversation = new Map<string, DBMessage[]>();
+  const [, attendantNameById] = await Promise.all([
+    Promise.all(sessions.map(async (conv) => {
+      const pageSize = 1000;
+      const messages: DBMessage[] = [];
 
-  const [{ data: messages, error: msgError }, attendantNameById] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('*')
-      .in('conversation_id', conversationIds)
-      .order('sent_at', { ascending: true }),
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conv.id)
+          .order('sent_at', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (error) throw error;
+
+        messages.push(...((data || []) as DBMessage[]));
+        if ((data || []).length < pageSize) break;
+      }
+
+      messagesByConversation.set(conv.id, messages);
+    })),
     fetchAttendantNames(sessions.map((conv) => conv.assigned_user_id)),
   ]);
-
-  if (msgError) throw msgError;
-
-  const messagesByConversation = new Map<string, DBMessage[]>();
-  for (const msg of (messages || []) as DBMessage[]) {
-    const list = messagesByConversation.get(msg.conversation_id) || [];
-    list.push(msg);
-    messagesByConversation.set(msg.conversation_id, list);
-  }
 
   return sessions.map((conv) => ({
     conversationId: conv.id,

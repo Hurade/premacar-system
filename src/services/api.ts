@@ -1672,19 +1672,25 @@ export const api = {
    */
   fetchConversations: async (): Promise<UIConversation[]> => {
     console.log('[API] Fetching conversations from Supabase...');
-    
-    // Buscar conversas SEM dispatch_sent_at (conversas normais) - sempre mostrar
-    const { data: normalConversations, error: normalError } = await supabase
-      .from('conversations')
-      .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
-      .eq('is_active', true)
-      .is('dispatch_sent_at', null)
-      .order('last_message_at', { ascending: false })
-      .limit(50);
+    const conversationPageSize = 500;
+    const normalConversations: DBConversation[] = [];
 
-    if (normalError) {
-      console.error('[API] Error fetching normal conversations:', normalError);
-      throw normalError;
+    for (let offset = 0; ; offset += conversationPageSize) {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
+        .eq('is_active', true)
+        .is('dispatch_sent_at', null)
+        .order('last_message_at', { ascending: false })
+        .range(offset, offset + conversationPageSize - 1);
+
+      if (error) {
+        console.error('[API] Error fetching normal conversations:', error);
+        throw error;
+      }
+
+      normalConversations.push(...((data || []) as unknown as DBConversation[]));
+      if ((data || []).length < conversationPageSize) break;
     }
 
     // Buscar apenas conversas de disparo ativas que tiveram interação.
@@ -1697,23 +1703,26 @@ export const api = {
     }
 
     // Buscar conversas de disparo que tiveram interação
-    let dispatchConversations: any[] = [];
+    const dispatchConversations: DBConversation[] = [];
     if ((interactedIds || []).length > 0) {
-      const { data: dispatchData, error: dispatchError } = await supabase
-        .from('conversations')
-        .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
-        .eq('is_active', true)
-        .not('dispatch_sent_at', 'is', null)
-        .in('id', interactedIds || [])
-        .order('last_message_at', { ascending: false })
-        .limit(50);
+      for (let offset = 0; ; offset += conversationPageSize) {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select(`*, contact:contacts(*), connection:whatsapp_connections(id, name, api_type)`)
+          .eq('is_active', true)
+          .not('dispatch_sent_at', 'is', null)
+          .in('id', interactedIds)
+          .order('last_message_at', { ascending: false })
+          .range(offset, offset + conversationPageSize - 1);
 
-      if (dispatchError) {
-        console.error('[API] Error fetching dispatch conversations:', dispatchError);
-        throw dispatchError;
+        if (error) {
+          console.error('[API] Error fetching dispatch conversations:', error);
+          throw error;
+        }
+
+        dispatchConversations.push(...((data || []) as unknown as DBConversation[]));
+        if ((data || []).length < conversationPageSize) break;
       }
-      
-      dispatchConversations = dispatchData || [];
     }
 
     // Combinar e ordenar por last_message_at
@@ -1728,7 +1737,7 @@ export const api = {
       if (seen.has(c.id)) return false;
       seen.add(c.id);
       return true;
-    }).slice(0, 100);
+    });
 
     if (conversations.length === 0) {
       console.log('[API] No conversations found');
@@ -1739,20 +1748,34 @@ export const api = {
 
     const filteredConversations = conversations;
 
-    const { data: messages, error: messagesError } = await supabase
-      .rpc('fetch_recent_chat_messages', {
-        p_conversation_ids: filteredConversations.map(conv => conv.id),
-      });
+    // Keep each RPC response below PostgREST's row cap. A single response
+    // containing 100 messages for every conversation was silently truncated,
+    // leaving later conversations with no visible history.
+    const messageBatchSize = 5;
+    const conversationBatches: string[][] = [];
+    for (let index = 0; index < filteredConversations.length; index += messageBatchSize) {
+      conversationBatches.push(
+        filteredConversations.slice(index, index + messageBatchSize).map(conv => conv.id)
+      );
+    }
 
-    if (messagesError) {
-      console.error('[API] Error fetching recent conversation messages:', messagesError);
-      throw messagesError;
+    const messageResults = await Promise.all(conversationBatches.map(p_conversation_ids =>
+      supabase.rpc('fetch_recent_chat_messages', { p_conversation_ids })
+    ));
+
+    const messages: DBMessage[] = [];
+    for (const result of messageResults) {
+      if (result.error) {
+        console.error('[API] Error fetching recent conversation messages:', result.error);
+        throw result.error;
+      }
+      messages.push(...((result.data || []) as unknown as DBMessage[]));
     }
 
     const messagesByConversation = new Map<string, DBMessage[]>();
-    for (const message of messages || []) {
+    for (const message of messages) {
       const conversationMessages = messagesByConversation.get(message.conversation_id) || [];
-      conversationMessages.push(message as unknown as DBMessage);
+      conversationMessages.push(message);
       messagesByConversation.set(message.conversation_id, conversationMessages);
     }
 

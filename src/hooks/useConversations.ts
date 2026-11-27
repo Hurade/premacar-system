@@ -36,6 +36,9 @@ export function useConversations() {
   
   // Track processed message IDs to prevent duplicates across re-renders
   const processedMessageIds = useRef(new Set<string>());
+  const fullHistoryLoadedConversationIds = useRef(new Set<string>());
+  const loadingHistoryConversationIds = useRef(new Set<string>());
+  const fetchRequestId = useRef(0);
   
   // Track conversation IDs being fetched to prevent duplicate fetches
   const fetchingConversationIds = useRef(new Set<string>());
@@ -122,13 +125,14 @@ export function useConversations() {
         if (!include) return false;
       }
 
-      // Mesmo limite de fetchConversations (últimas 100) — antes buscava o
-      // histórico inteiro da conversa a cada evento de realtime.
+      // Carrega um lote limitado aqui; a tela busca o histórico completo ao
+      // selecionar a conversa.
       const { data: messagesDesc, error: msgError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('sent_at', { ascending: true });
+        .order('sent_at', { ascending: false })
+        .limit(1000);
 
       if (msgError) {
         console.error('[Realtime] Error fetching messages:', msgError);
@@ -166,60 +170,81 @@ export function useConversations() {
 
   // Initial fetch
   const fetchConversations = useCallback(async () => {
+    const requestId = ++fetchRequestId.current;
+
     try {
       setLoading(true);
       setError(null);
       const data = await api.fetchConversations();
-      
-      // Reset processed IDs on fresh fetch and populate with existing messages
-      processedMessageIds.current.clear();
-      data.forEach(conv => {
-        conv.messages.forEach(msg => {
-          processedMessageIds.current.add(msg.id);
-        });
-      });
-      
-      // Merge em vez de substituir: preserva conversas já em estado (ex:
-      // criada via createConversation/fetchAndAddConversation) que ainda não
-      // apareceriam no snapshot deste fetch por terem sido criadas depois
-      // dele ter começado — sem isso, essa busca completa (mais lenta) podia
-      // "apagar" de volta uma conversa recém-criada que já estava na tela.
+      if (requestId !== fetchRequestId.current) return;
+
       setConversations(prev => {
-        const freshIds = new Set(data.map(c => c.id));
+        const previousById = new Map(prev.map(conv => [conv.id, conv]));
+        const freshData = data.map(conv => {
+          const previous = previousById.get(conv.id);
+          if (previous && fullHistoryLoadedConversationIds.current.has(conv.id)) {
+            return { ...conv, messages: previous.messages };
+          }
+          return conv;
+        });
+
+        processedMessageIds.current.clear();
+        freshData.forEach(conv => {
+          conv.messages.forEach(msg => processedMessageIds.current.add(msg.id));
+        });
+
+        // Keep conversations created after this fetch began.
+        const freshIds = new Set(freshData.map(c => c.id));
         const extras = prev.filter(c => !freshIds.has(c.id));
-        return [...data, ...extras];
+        return [...freshData, ...extras];
       });
     } catch (err) {
+      if (requestId !== fetchRequestId.current) return;
       console.error('[useConversations] Error fetching:', err);
       setError('Erro ao carregar conversas');
       toast.error('Erro ao carregar conversas');
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestId.current) setLoading(false);
     }
   }, []);
 
   const loadFullConversationHistory = useCallback(async (conversationId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('sent_at', { ascending: true });
+    if (loadingHistoryConversationIds.current.has(conversationId)) return;
+    loadingHistoryConversationIds.current.add(conversationId);
 
-    if (error) {
-      console.error('[useConversations] Error loading full conversation history:', error);
-      return;
+    try {
+      const pageSize = 1000;
+      const messages: DBMessage[] = [];
+
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('sent_at', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (error) throw error;
+
+        messages.push(...((data || []) as DBMessage[]));
+        if ((data || []).length < pageSize) break;
+      }
+
+      const uiMessages = messages.map(transformDBToUIMessage);
+      fullHistoryLoadedConversationIds.current.add(conversationId);
+      uiMessages.forEach(message => processedMessageIds.current.add(message.id));
+
+      setConversations(prev => prev.map(conversation =>
+        conversation.id === conversationId
+          ? { ...conversation, messages: uiMessages }
+          : conversation
+      ));
+    } catch (err) {
+      console.error('[useConversations] Error loading full conversation history:', err);
+      toast.error('Erro ao carregar o histórico completo da conversa');
+    } finally {
+      loadingHistoryConversationIds.current.delete(conversationId);
     }
-
-    const messages = ((data || []) as DBMessage[]).map(transformDBToUIMessage);
-    messages.forEach(message => {
-      processedMessageIds.current.add(message.id);
-    });
-
-    setConversations(prev => prev.map(conversation =>
-      conversation.id === conversationId
-        ? { ...conversation, messages }
-        : conversation
-    ));
   }, []);
 
   // Update document title when unread count changes
